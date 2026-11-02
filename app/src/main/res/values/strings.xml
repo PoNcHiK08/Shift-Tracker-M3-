@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default language: Ukrainian. English lives in values-en. -->
+<resources>
+    <string name="app_name" translatable="false">Shift Tracker</string>
+
+    <!-- Navigation -->
+    <string name="nav_calendar">Календар</string>
+    <string name="nav_summary">Підсумок</string>
+    <string name="nav_settings">Налаштування</string>
+    <string name="back">Назад</string>
+    <string name="close">Закрити</string>
+    <string name="previous_month">Попередній місяць</string>
+    <string name="next_month">Наступний місяць</string>
+    <string name="today">Сьогодні</string>
+
+    <!-- Common -->
+    <string name="save">Зберегти</string>
+    <string name="cancel">Скасувати</string>
+    <string name="delete">Видалити</string>
+    <string name="ok">OK</string>
+    <string name="undo">Повернути</string>
+    <string name="hours">Години</string>
+    <string name="hours_value">%1$s год</string>
+    <string name="shifts">Зміни</string>
+    <string name="earned">Зароблено</string>
+    <string name="earnings">Заробіток</string>
+    <string name="minutes_short">%1$d хв</string>
+    <string name="minutes_suffix">хв</string>
+    <string name="break_short">перерва %1$d хв</string>
+    <string name="overnight_shift">Нічна зміна</string>
+
+    <!-- Calendar -->
+    <string name="add_shift">Додати зміну</string>
+    <string name="no_shifts_title">Цього місяця змін немає</string>
+    <string name="no_shifts_message">Натисни на день у календарі або «Додати зміну», щоб записати першу.</string>
+    <string name="no_shifts_this_day">Цього дня змін немає.</string>
+    <string name="no_jobs_title">Спершу додай роботу</string>
+    <string name="no_jobs_message">Вкажи назву роботи й погодинну ставку, і можна буде записувати зміни.</string>
+
+    <!-- Summary -->
+    <string name="summary_title">Підсумок</string>
+    <string name="total_earnings">Заробіток за місяць</string>
+    <string name="average_rate">Середня ставка</string>
+    <string name="by_job">За роботами</string>
+    <string name="share_of_earnings">%1$d%% заробітку за місяць</string>
+    <string name="summary_empty_title">Поки нічого рахувати</string>
+    <string name="summary_empty_message">Коли додаси зміни за цей місяць, тут з\'являться години й заробіток.</string>
+
+    <!-- Jobs -->
+    <string name="jobs_title">Роботи</string>
+    <string name="add_job">Додати роботу</string>
+    <string name="new_job">Нова робота</string>
+    <string name="edit_job">Редагувати роботу</string>
+    <string name="job_name">Назва</string>
+    <string name="hourly_rate">Ставка за годину</string>
+    <string name="job_color">Колір</string>
+    <string name="error_name_required">Вкажи назву</string>
+    <string name="error_rate_invalid">Вкажи ставку, наприклад 30,50</string>
+    <string name="delete_job_named">Видалити «%1$s»</string>
+    <string name="delete_job_title">Видалити «%1$s»?</string>
+    <string name="delete_job_no_shifts">У цієї роботи немає змін.</string>
+    <string-array name="palette_color_names">
+        <item>Синій</item>
+        <item>Зелений</item>
+        <item>Червоний</item>
+        <item>Помаранчевий</item>
+        <item>Фіолетовий</item>
+        <item>Бірюзовий</item>
+        <item>Рожевий</item>
+        <item>Жовтий</item>
+        <item>Коричневий</item>
+        <item>Індиго</item>
+        <item>Темно-бірюзовий</item>
+        <item>Салатовий</item>
+    </string-array>
+
+    <!-- Shift editor -->
+    <string name="new_shift">Нова зміна</string>
+    <string name="edit_shift">Редагувати зміну</string>
+    <string name="job">Робота</string>
+    <string name="date">Дата</string>
+    <string name="start_time">Початок</string>
+    <string name="end_time">Кінець</string>
+    <string name="ends_next_day">Закінчується наступного дня</string>
+    <string name="unpaid_break">Неоплачувана перерва</string>
+    <string name="no_break">Без перерви</string>
+    <string name="break_minutes">Перерва</string>
+    <string name="note_optional">Нотатка (необов\'язково)</string>
+    <string name="paid_hours">Оплачувані години</string>
+    <string name="rate_used">Ставка: %1$s</string>
+    <string name="rate_changed_hint">Поточна ставка цієї роботи вже інша: %1$s</string>
+    <string name="use_current_rate">Застосувати поточну ставку</string>
+    <string name="error_job_required">Обери роботу</string>
+    <string name="error_break_too_long">Перерва довша за саму зміну</string>
+    <string name="delete_shift">Видалити зміну</string>
+    <string name="delete_shift_title">Видалити зміну?</string>
+    <string name="delete_shift_message">Її години й заробіток зникнуть з підсумків.</string>
+    <string name="shift_saved">Зміну збережено</string>
+    <string name="shift_deleted">Зміну видалено</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Налаштування</string>
+    <string name="section_work">Робота</string>
+    <string name="section_appearance">Вигляд</string>
+    <string name="section_data">Дані</string>
+    <string name="section_about">Про застосунок</string>
+    <string name="jobs_and_rates">Роботи й ставки</string>
+    <string name="theme">Тема</string>
+    <string name="theme_system">Системна</string>
+    <string name="theme_light">Світла</string>
+    <string name="theme_dark">Темна</string>
+    <string name="dynamic_color">Динамічні кольори</string>
+    <string name="dynamic_color_summary">Кольори з шпалер телефона (Material You)</string>
+    <string name="dynamic_color_unsupported">Доступно на Android 12 і новіших</string>
+    <string name="language">Мова</string>
+    <string name="language_ukrainian">Українська</string>
+    <string name="language_english">English</string>
+    <string name="language_system">Системна</string>
+    <string name="export_data">Експорт даних</string>
+    <string name="export_data_summary">Зберегти всі роботи й зміни у файл JSON</string>
+    <string name="export_done">Дані експортовано</string>
+    <string name="import_data">Імпорт даних</string>
+    <string name="import_data_summary">Відновити з файлу JSON (замінить поточні дані)</string>
+    <string name="import_backup_title">Замінити всі дані?</string>
+    <string name="import_backup_message">Усі поточні роботи й зміни буде видалено й замінено даними з файлу.</string>
+    <string name="replace_data">Замінити</string>
+    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d</string>
+    <string name="error_file_operation">Не вдалося обробити файл</string>
+    <string name="version">Версія %1$s</string>
+
+    <!-- .ics import -->
+    <string name="import_schedule">Імпорт графіку (.ics)</string>
+    <string name="import_schedule_summary">Додати зміни з файлу календаря</string>
+    <string name="import_assign_job">До якої роботи належать зміни</string>
+    <string name="import_events">Події</string>
+    <string name="select_new">Нові</string>
+    <string name="select_none">Жодної</string>
+    <string name="duplicate">Вже є</string>
+    <string name="import_error_title">Не вдалося прочитати файл</string>
+    <string name="import_error_message">Переконайся, що це файл календаря у форматі .ics.</string>
+    <string name="import_empty_title">Подій не знайдено</string>
+    <string name="import_empty_message">У файлі немає подій з часом початку й кінця. Події на весь день пропускаються.</string>
+    <string name="import_needs_job">Щоб імпортувати графік, спершу створи роботу, до якої належать ці зміни.</string>
+
+    <plurals name="shift_count">
+        <item quantity="one">%1$d зміна</item>
+        <item quantity="few">%1$d зміни</item>
+        <item quantity="many">%1$d змін</item>
+        <item quantity="other">%1$d зміни</item>
+    </plurals>
+    <plurals name="job_count">
+        <item quantity="one">%1$d робота</item>
+        <item quantity="few">%1$d роботи</item>
+        <item quantity="many">%1$d робіт</item>
+        <item quantity="other">%1$d роботи</item>
+    </plurals>
+    <plurals name="delete_job_with_shifts">
+        <item quantity="one">Разом з нею буде видалено %1$d зміну.</item>
+        <item quantity="few">Разом з нею буде видалено %1$d зміни.</item>
+        <item quantity="many">Разом з нею буде видалено %1$d змін.</item>
+        <item quantity="other">Разом з нею буде видалено %1$d зміни.</item>
+    </plurals>
+    <plurals name="import_found_events">
+        <item quantity="one">Знайдено %1$d подію</item>
+        <item quantity="few">Знайдено %1$d події</item>
+        <item quantity="many">Знайдено %1$d подій</item>
+        <item quantity="other">Знайдено %1$d події</item>
+    </plurals>
+    <plurals name="import_duplicates">
+        <item quantity="one">%1$d вже є в застосунку — не позначена</item>
+        <item quantity="few">%1$d вже є в застосунку — не позначені</item>
+        <item quantity="many">%1$d вже є в застосунку — не позначені</item>
+        <item quantity="other">%1$d вже є в застосунку — не позначені</item>
+    </plurals>
+    <plurals name="import_skipped">
+        <item quantity="one">%1$d пропущено (на весь день або без часу)</item>
+        <item quantity="few">%1$d пропущено (на весь день або без часу)</item>
+        <item quantity="many">%1$d пропущено (на весь день або без часу)</item>
+        <item quantity="other">%1$d пропущено (на весь день або без часу)</item>
+    </plurals>
+    <plurals name="import_n_shifts">
+        <item quantity="one">Імпортувати %1$d зміну</item>
+        <item quantity="few">Імпортувати %1$d зміни</item>
+        <item quantity="many">Імпортувати %1$d змін</item>
+        <item quantity="other">Імпортувати %1$d зміни</item>
+    </plurals>
+    <plurals name="imported_shifts">
+        <item quantity="one">Імпортовано %1$d зміну</item>
+        <item quantity="few">Імпортовано %1$d зміни</item>
+        <item quantity="many">Імпортовано %1$d змін</item>
+        <item quantity="other">Імпортовано %1$d зміни</item>
+    </plurals>
+</resources>

@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Navigation -->
+    <string name="nav_calendar">Calendar</string>
+    <string name="nav_summary">Summary</string>
+    <string name="nav_settings">Settings</string>
+    <string name="back">Back</string>
+    <string name="close">Close</string>
+    <string name="previous_month">Previous month</string>
+    <string name="next_month">Next month</string>
+    <string name="today">Today</string>
+
+    <!-- Common -->
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="ok">OK</string>
+    <string name="undo">Undo</string>
+    <string name="hours">Hours</string>
+    <string name="hours_value">%1$s h</string>
+    <string name="shifts">Shifts</string>
+    <string name="earned">Earned</string>
+    <string name="earnings">Earnings</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="minutes_suffix">min</string>
+    <string name="break_short">%1$d min break</string>
+    <string name="overnight_shift">Overnight shift</string>
+
+    <!-- Calendar -->
+    <string name="add_shift">Add shift</string>
+    <string name="no_shifts_title">No shifts this month</string>
+    <string name="no_shifts_message">Tap a day in the calendar or “Add shift” to log your first one.</string>
+    <string name="no_shifts_this_day">No shifts on this day.</string>
+    <string name="no_jobs_title">Add a job first</string>
+    <string name="no_jobs_message">Give it a name and an hourly rate, then you can start logging shifts.</string>
+
+    <!-- Summary -->
+    <string name="summary_title">Summary</string>
+    <string name="total_earnings">Earned this month</string>
+    <string name="average_rate">Average rate</string>
+    <string name="by_job">By job</string>
+    <string name="share_of_earnings">%1$d%% of this month\'s earnings</string>
+    <string name="summary_empty_title">Nothing to count yet</string>
+    <string name="summary_empty_message">Once you add shifts for this month, hours and earnings show up here.</string>
+
+    <!-- Jobs -->
+    <string name="jobs_title">Jobs</string>
+    <string name="add_job">Add job</string>
+    <string name="new_job">New job</string>
+    <string name="edit_job">Edit job</string>
+    <string name="job_name">Name</string>
+    <string name="hourly_rate">Hourly rate</string>
+    <string name="job_color">Color</string>
+    <string name="error_name_required">Enter a name</string>
+    <string name="error_rate_invalid">Enter a rate, e.g. 30.50</string>
+    <string name="delete_job_named">Delete “%1$s”</string>
+    <string name="delete_job_title">Delete “%1$s”?</string>
+    <string name="delete_job_no_shifts">This job has no shifts.</string>
+    <string-array name="palette_color_names">
+        <item>Blue</item>
+        <item>Green</item>
+        <item>Red</item>
+        <item>Orange</item>
+        <item>Purple</item>
+        <item>Cyan</item>
+        <item>Pink</item>
+        <item>Yellow</item>
+        <item>Brown</item>
+        <item>Indigo</item>
+        <item>Teal</item>
+        <item>Light green</item>
+    </string-array>
+
+    <!-- Shift editor -->
+    <string name="new_shift">New shift</string>
+    <string name="edit_shift">Edit shift</string>
+    <string name="job">Job</string>
+    <string name="date">Date</string>
+    <string name="start_time">Start</string>
+    <string name="end_time">End</string>
+    <string name="ends_next_day">Ends the next day</string>
+    <string name="unpaid_break">Unpaid break</string>
+    <string name="no_break">No break</string>
+    <string name="break_minutes">Break</string>
+    <string name="note_optional">Note (optional)</string>
+    <string name="paid_hours">Paid hours</string>
+    <string name="rate_used">Rate: %1$s</string>
+    <string name="rate_changed_hint">This job\'s current rate is different: %1$s</string>
+    <string name="use_current_rate">Use current rate</string>
+    <string name="error_job_required">Choose a job</string>
+    <string name="error_break_too_long">The break is longer than the shift</string>
+    <string name="delete_shift">Delete shift</string>
+    <string name="delete_shift_title">Delete this shift?</string>
+    <string name="delete_shift_message">Its hours and earnings will be removed from your totals.</string>
+    <string name="shift_saved">Shift saved</string>
+    <string name="shift_deleted">Shift deleted</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="section_work">Work</string>
+    <string name="section_appearance">Appearance</string>
+    <string name="section_data">Data</string>
+    <string name="section_about">About</string>
+    <string name="jobs_and_rates">Jobs &amp; rates</string>
+    <string name="theme">Theme</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="dynamic_color">Dynamic color</string>
+    <string name="dynamic_color_summary">Use colors from your wallpaper (Material You)</string>
+    <string name="dynamic_color_unsupported">Available on Android 12 and newer</string>
+    <string name="language">Language</string>
+    <string name="language_ukrainian">Українська</string>
+    <string name="language_english">English</string>
+    <string name="language_system">System</string>
+    <string name="export_data">Export data</string>
+    <string name="export_data_summary">Save all jobs and shifts to a JSON file</string>
+    <string name="export_done">Data exported</string>
+    <string name="import_data">Import data</string>
+    <string name="import_data_summary">Restore from a JSON file (replaces current data)</string>
+    <string name="import_backup_title">Replace all data?</string>
+    <string name="import_backup_message">All current jobs and shifts will be deleted and replaced with the data from the file.</string>
+    <string name="replace_data">Replace</string>
+    <string name="import_backup_done">Restored %1$d jobs and %2$d shifts</string>
+    <string name="error_file_operation">Couldn\'t process the file</string>
+    <string name="version">Version %1$s</string>
+
+    <!-- .ics import -->
+    <string name="import_schedule">Import schedule (.ics)</string>
+    <string name="import_schedule_summary">Add shifts from a calendar file</string>
+    <string name="import_assign_job">Which job are these shifts for</string>
+    <string name="import_events">Events</string>
+    <string name="select_new">New</string>
+    <string name="select_none">None</string>
+    <string name="duplicate">Exists</string>
+    <string name="import_error_title">Couldn\'t read the file</string>
+    <string name="import_error_message">Make sure it is a calendar file in .ics format.</string>
+    <string name="import_empty_title">No events found</string>
+    <string name="import_empty_message">The file has no events with a start and end time. All-day events are skipped.</string>
+    <string name="import_needs_job">To import a schedule, first create the job these shifts belong to.</string>
+
+    <plurals name="shift_count">
+        <item quantity="one">%1$d shift</item>
+        <item quantity="other">%1$d shifts</item>
+    </plurals>
+    <plurals name="job_count">
+        <item quantity="one">%1$d job</item>
+        <item quantity="other">%1$d jobs</item>
+    </plurals>
+    <plurals name="delete_job_with_shifts">
+        <item quantity="one">Its %1$d shift will be deleted too.</item>
+        <item quantity="other">Its %1$d shifts will be deleted too.</item>
+    </plurals>
+    <plurals name="import_found_events">
+        <item quantity="one">Found %1$d event</item>
+        <item quantity="other">Found %1$d events</item>
+    </plurals>
+    <plurals name="import_duplicates">
+        <item quantity="one">%1$d already exists — unchecked</item>
+        <item quantity="other">%1$d already exist — unchecked</item>
+    </plurals>
+    <plurals name="import_skipped">
+        <item quantity="one">%1$d skipped (all-day or no time)</item>
+        <item quantity="other">%1$d skipped (all-day or no time)</item>
+    </plurals>
+    <plurals name="import_n_shifts">
+        <item quantity="one">Import %1$d shift</item>
+        <item quantity="other">Import %1$d shifts</item>
+    </plurals>
+    <plurals name="imported_shifts">
+        <item quantity="one">Imported %1$d shift</item>
+        <item quantity="other">Imported %1$d shifts</item>
+    </plurals>
+</resources>

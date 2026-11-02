@@ -1,0 +1,74 @@
+package com.vkurylo.shifttracker.di
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStoreFile
+import androidx.room.Room
+import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
+import com.vkurylo.shifttracker.data.local.JobDao
+import com.vkurylo.shifttracker.data.local.ShiftDao
+import com.vkurylo.shifttracker.data.local.ShiftDatabase
+import com.vkurylo.shifttracker.data.repository.AppCompatLanguageRepository
+import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
+import com.vkurylo.shifttracker.data.repository.RoomJobRepository
+import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
+import com.vkurylo.shifttracker.domain.repository.BackupRepository
+import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.LanguageRepository
+import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
+import com.vkurylo.shifttracker.domain.repository.ShiftRepository
+import dagger.Binds
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object DataModule {
+
+    @Provides
+    @Singleton
+    fun provideDatabase(@ApplicationContext context: Context): ShiftDatabase =
+        Room.databaseBuilder(context, ShiftDatabase::class.java, ShiftDatabase.NAME).build()
+
+    @Provides
+    fun provideJobDao(db: ShiftDatabase): JobDao = db.jobDao()
+
+    @Provides
+    fun provideShiftDao(db: ShiftDatabase): ShiftDao = db.shiftDao()
+
+    @Provides
+    @Singleton
+    fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("settings") }
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class RepositoryModule {
+    @Binds abstract fun bindJobRepository(impl: RoomJobRepository): JobRepository
+    @Binds abstract fun bindShiftRepository(impl: RoomShiftRepository): ShiftRepository
+    @Binds abstract fun bindPreferencesRepository(impl: DataStorePreferencesRepository): PreferencesRepository
+    @Binds abstract fun bindLanguageRepository(impl: AppCompatLanguageRepository): LanguageRepository
+    @Binds abstract fun bindBackupRepository(impl: JsonBackupRepository): BackupRepository
+}
+
+@javax.inject.Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class ApplicationScope
+
+@Module
+@InstallIn(SingletonComponent::class)
+object CoroutinesModule {
+    /** Outlives screens; used for work that must finish after navigation (e.g. undo). */
+    @Provides
+    @Singleton
+    @ApplicationScope
+    fun provideApplicationScope(): kotlinx.coroutines.CoroutineScope =
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+}

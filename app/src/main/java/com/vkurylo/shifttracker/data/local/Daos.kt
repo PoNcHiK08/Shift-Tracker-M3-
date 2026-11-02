@@ -1,0 +1,67 @@
+package com.vkurylo.shifttracker.data.local
+
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Upsert
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface JobDao {
+    @Query("SELECT * FROM jobs ORDER BY name COLLATE NOCASE")
+    fun observeAll(): Flow<List<JobEntity>>
+
+    @Query("SELECT * FROM jobs ORDER BY id")
+    suspend fun getAll(): List<JobEntity>
+
+    @Query("SELECT * FROM jobs WHERE id = :id")
+    suspend fun get(id: Long): JobEntity?
+
+    @Upsert
+    suspend fun upsert(job: JobEntity): Long
+
+    @Insert
+    suspend fun insertAll(jobs: List<JobEntity>)
+
+    @Delete
+    suspend fun delete(job: JobEntity)
+
+    @Query("DELETE FROM jobs")
+    suspend fun deleteAll()
+
+    @Query("SELECT COUNT(*) FROM shifts WHERE job_id = :jobId")
+    suspend fun shiftCount(jobId: Long): Int
+}
+
+@Dao
+interface ShiftDao {
+    @Query(
+        """
+        SELECT s.*, j.id AS j_id, j.name AS j_name,
+               j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color
+        FROM shifts s INNER JOIN jobs j ON j.id = s.job_id
+        WHERE s.date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
+        ORDER BY s.date_epoch_day, s.start_minute
+        """,
+    )
+    fun observeBetween(fromEpochDay: Long, toEpochDay: Long): Flow<List<ShiftWithJobRow>>
+
+    @Query("SELECT * FROM shifts WHERE id = :id")
+    suspend fun get(id: Long): ShiftEntity?
+
+    @Query("SELECT * FROM shifts ORDER BY date_epoch_day, start_minute")
+    suspend fun getAll(): List<ShiftEntity>
+
+    @Upsert
+    suspend fun upsert(shift: ShiftEntity): Long
+
+    @Insert
+    suspend fun insertAll(shifts: List<ShiftEntity>)
+
+    @Delete
+    suspend fun delete(shift: ShiftEntity)
+
+    @Query("DELETE FROM shifts")
+    suspend fun deleteAll()
+}
