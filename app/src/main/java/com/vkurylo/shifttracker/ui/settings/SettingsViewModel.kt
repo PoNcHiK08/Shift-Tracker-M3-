@@ -83,8 +83,8 @@ class SettingsViewModel @Inject constructor(
         val uri = pendingImport.value ?: return
         pendingImport.update { null }
         runBusy {
-            val (jobs, shifts) = backupRepository.importJson(documentIo.readText(uri))
-            _messages.send(UiMessage(R.string.import_backup_done, listOf(jobs, shifts)))
+            val counts = backupRepository.importJson(documentIo.readText(uri))
+            _messages.send(UiMessage(R.string.import_backup_done, listOf(counts.jobs, counts.shifts, counts.bonuses)))
         }
     }
 

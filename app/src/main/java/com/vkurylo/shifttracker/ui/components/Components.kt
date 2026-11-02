@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.ui.util.Formatters
@@ -116,6 +118,44 @@ fun ShiftListItem(
                 )
                 Text(hoursLabel(shift.paidMinutes), style = MaterialTheme.typography.bodySmall)
             }
+        },
+    )
+}
+
+@Composable
+fun BonusListItem(
+    item: BonusWithJob,
+    modifier: Modifier = Modifier,
+    showDate: Boolean = false,
+    containerColor: Color = ListItemDefaults.colors().containerColor,
+) {
+    val locale = currentLocale()
+    val bonus = item.bonus
+    val supporting = listOfNotNull(
+        if (showDate) Formatters.shortDate(bonus.date, locale) else null,
+        bonus.note,
+    ).joinToString(" · ")
+    ListItem(
+        modifier = modifier,
+        colors = ListItemDefaults.colors(containerColor = containerColor),
+        leadingContent = {
+            Box(
+                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Redeem, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
+            }
+        },
+        headlineContent = { Text(stringResource(R.string.bonus_for_job, item.job.name), maxLines = 1) },
+        supportingContent = if (supporting.isNotEmpty()) {
+            { Text(supporting, maxLines = 2) }
+        } else null,
+        trailingContent = {
+            Text(
+                "+" + Formatters.money(bonus.amountGrosze, locale),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.tertiary,
+            )
         },
     )
 }

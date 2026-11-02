@@ -6,6 +6,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.vkurylo.shifttracker.domain.model.Bonus
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -112,3 +114,47 @@ fun Shift.toEntity() = ShiftEntity(
 )
 
 fun ShiftWithJobRow.toDomain() = ShiftWithJob(shift = shift.toDomain(), job = job.toDomain())
+
+/** A one-off extra payment. Added in DB version 3. */
+@Entity(
+    tableName = "bonuses",
+    foreignKeys = [
+        ForeignKey(
+            entity = JobEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["job_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("job_id"), Index("date_epoch_day")],
+)
+data class BonusEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    @ColumnInfo(name = "date_epoch_day") val dateEpochDay: Long,
+    @ColumnInfo(name = "amount_grosze") val amountGrosze: Long,
+    val note: String?,
+)
+
+data class BonusWithJobRow(
+    @Embedded val bonus: BonusEntity,
+    @Embedded(prefix = "j_") val job: JobEntity,
+)
+
+fun BonusEntity.toDomain() = Bonus(
+    id = id,
+    jobId = jobId,
+    date = LocalDate.ofEpochDay(dateEpochDay),
+    amountGrosze = amountGrosze,
+    note = note,
+)
+
+fun Bonus.toEntity() = BonusEntity(
+    id = id,
+    jobId = jobId,
+    dateEpochDay = date.toEpochDay(),
+    amountGrosze = amountGrosze,
+    note = note?.takeIf { it.isNotBlank() },
+)
+
+fun BonusWithJobRow.toDomain() = BonusWithJob(bonus = bonus.toDomain(), job = job.toDomain())

@@ -17,11 +17,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
+import com.vkurylo.shifttracker.ui.util.Formatters
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
+import java.time.LocalDate
 
 /**
  * End-to-end smoke test through the real app: create a job, log a shift, browse every
@@ -85,10 +87,26 @@ class AppSmokeTest {
         waitForText("244")
         composeRule.onAllNodesWithText("Kawiarnia").onFirst().assertExists()
 
-        // Summary and settings render.
+        // Add a 75 zł bonus for today through the day's bottom sheet.
+        val locale = composeRule.activity.resources.configuration.locales[0]
+        val todayLabel = Formatters.fullDate(LocalDate.now(), locale)
+        val todayCell = hasContentDescription(todayLabel, substring = true) and hasClickAction()
+        composeRule.waitUntilAtLeastOneExists(todayCell, 10_000)
+        composeRule.onNode(todayCell).performClick()
+        clickOn(str(R.string.bonus))
+        waitForText(str(R.string.new_bonus))
+        composeRule.onNode(hasSetTextAction() and hasText(str(R.string.bonus_amount))).performTextInput("75")
+        composeRule.onNode(hasSetTextAction() and hasText(str(R.string.bonus_note))).performTextInput("Premia")
+        clickOn(str(R.string.save))
+        waitForText("+75")
+        // Month card: 244 + 75 = 319 zł.
+        waitForText("319")
+
+        // Summary and settings render; the bonus counts towards earnings.
         clickOn(str(R.string.nav_summary))
         waitForText(str(R.string.earnings_month))
-        waitForText("244")
+        waitForText("319")
+        waitForText(composeRule.activity.getString(R.string.including_bonuses, "").trim())
         clickOn(str(R.string.period_year))
         waitForText(str(R.string.earnings_year))
         waitForText(str(R.string.by_month))
@@ -109,6 +127,14 @@ class AppSmokeTest {
         waitForText(str(R.string.edit_shift))
         clickOn(str(R.string.delete_shift))
         waitForText(str(R.string.delete_shift_title))
+        composeRule.onNodeWithText(str(R.string.delete)).performClick()
+
+        // Then the bonus.
+        waitForText("+75")
+        composeRule.onNode(hasText("+75", substring = true)).performScrollTo().performClick()
+        waitForText(str(R.string.edit_bonus))
+        clickOn(str(R.string.delete_bonus))
+        waitForText(str(R.string.delete_bonus_title))
         composeRule.onNodeWithText(str(R.string.delete)).performClick()
         waitForText(str(R.string.no_shifts_title))
     }

@@ -4,8 +4,10 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -13,7 +15,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -46,9 +47,13 @@ data class PeriodRange(val period: SummaryPeriod, val from: LocalDate, val to: L
 data class BreakdownEntry(
     val date: LocalDate,
     val paidMinutes: Long,
+    /** Shift pay + bonuses of that day / month. */
     val earningsGrosze: Long,
     val shiftCount: Int,
-)
+    val bonusCount: Int,
+) {
+    val isEmpty: Boolean get() = shiftCount == 0 && bonusCount == 0
+}
 
 data class SummaryUiState(
     val range: PeriodRange = PeriodRange.of(SummaryPeriod.MONTH, LocalDate.now()),
@@ -63,6 +68,7 @@ data class SummaryUiState(
 class SummaryViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     shiftRepository: ShiftRepository,
+    bonusRepository: BonusRepository,
 ) : ViewModel() {
 
     private val period = savedStateHandle.getStateFlow(KEY_PERIOD, SummaryPeriod.MONTH.name)
@@ -72,11 +78,14 @@ class SummaryViewModel @Inject constructor(
         PeriodRange.of(SummaryPeriod.valueOf(p), LocalDate.ofEpochDay(a))
     }
         .flatMapLatest { range ->
-            shiftRepository.observeShifts(range.from, range.to).map { shifts ->
+            combine(
+                shiftRepository.observeShifts(range.from, range.to),
+                bonusRepository.observeBonuses(range.from, range.to),
+            ) { shifts, bonuses ->
                 SummaryUiState(
                     range = range,
-                    summary = ShiftCalculator.summarize(shifts),
-                    breakdown = breakdown(range, shifts),
+                    summary = ShiftCalculator.summarize(shifts, bonuses),
+                    breakdown = breakdown(range, shifts, bonuses),
                     loading = false,
                 )
             }
@@ -104,23 +113,32 @@ class SummaryViewModel @Inject constructor(
         savedStateHandle[KEY_ANCHOR] = moved.toEpochDay()
     }
 
-    private fun breakdown(range: PeriodRange, shifts: List<ShiftWithJob>): List<BreakdownEntry> = when (range.period) {
+    private fun breakdown(
+        range: PeriodRange,
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob>,
+    ): List<BreakdownEntry> = when (range.period) {
         SummaryPeriod.WEEK -> (0L..6L).map { offset ->
             val day = range.from.plusDays(offset)
-            entry(day, shifts.filter { it.shift.date == day })
+            entry(day, shifts.filter { it.shift.date == day }, bonuses.filter { it.bonus.date == day })
         }
         SummaryPeriod.YEAR -> (1..12).map { month ->
             val first = range.from.withMonth(month).withDayOfMonth(1)
-            entry(first, shifts.filter { it.shift.date.monthValue == month })
+            entry(
+                first,
+                shifts.filter { it.shift.date.monthValue == month },
+                bonuses.filter { it.bonus.date.monthValue == month },
+            )
         }
         SummaryPeriod.MONTH -> emptyList()
     }
 
-    private fun entry(date: LocalDate, shifts: List<ShiftWithJob>) = BreakdownEntry(
+    private fun entry(date: LocalDate, shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob>) = BreakdownEntry(
         date = date,
         paidMinutes = shifts.sumOf { it.shift.paidMinutes },
-        earningsGrosze = shifts.sumOf { it.shift.earningsGrosze },
+        earningsGrosze = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze },
         shiftCount = shifts.size,
+        bonusCount = bonuses.size,
     )
 
     private companion object {

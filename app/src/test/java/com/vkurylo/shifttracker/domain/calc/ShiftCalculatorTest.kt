@@ -1,5 +1,7 @@
 package com.vkurylo.shifttracker.domain.calc
 
+import com.vkurylo.shifttracker.domain.model.Bonus
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -104,5 +106,45 @@ class ShiftCalculatorTest {
         assertEquals(2, summary.perJob[0].shiftCount)
         assertEquals(36000L, summary.perJob[0].earningsGrosze)
         assertEquals(21000L, summary.perJob[1].earningsGrosze)
+    }
+
+    @Test
+    fun `bonuses add to earnings but not to hours or the average rate`() {
+        val bk = Job(id = 1, name = "Burger King", hourlyRateGrosze = 3300, color = 0)
+        val gift = Job(id = 2, name = "Only bonus", hourlyRateGrosze = 3000, color = 0)
+        val date = LocalDate.of(2026, 8, 31)
+        val shifts = listOf(
+            ShiftWithJob(Shift(id = 1, jobId = 1, date = date, start = t(10), end = t(18), hourlyRateGrosze = 3300), bk),
+        )
+        val bonuses = listOf(
+            BonusWithJob(Bonus(id = 1, jobId = 1, date = date, amountGrosze = 7500, note = "Premia"), bk),
+            BonusWithJob(Bonus(id = 2, jobId = 2, date = date, amountGrosze = 1000), gift),
+        )
+
+        val summary = ShiftCalculator.summarize(shifts, bonuses)
+
+        assertEquals(26400L, summary.shiftEarningsGrosze) // 8 h * 33
+        assertEquals(8500L, summary.bonusGrosze)
+        assertEquals(34900L, summary.totalEarningsGrosze)
+        assertEquals(480L, summary.totalPaidMinutes)
+        assertEquals(3300L, summary.averageRateGrosze) // bonuses don't inflate the hourly rate
+        assertEquals(1, summary.shiftCount)
+        assertEquals(2, summary.bonusCount)
+        // A job with only a bonus in the period still shows up in the breakdown.
+        assertEquals(listOf("Burger King", "Only bonus"), summary.perJob.map { it.job.name })
+        assertEquals(33900L, summary.perJob[0].earningsGrosze)
+        assertEquals(0, summary.perJob[1].shiftCount)
+    }
+
+    @Test
+    fun `bonuses alone make a non-empty summary`() {
+        val job = Job(id = 1, name = "BK", hourlyRateGrosze = 3300, color = 0)
+        val summary = ShiftCalculator.summarize(
+            emptyList(),
+            listOf(BonusWithJob(Bonus(jobId = 1, date = LocalDate.of(2026, 8, 31), amountGrosze = 7500), job)),
+        )
+        assertEquals(false, summary.isEmpty)
+        assertEquals(7500L, summary.totalEarningsGrosze)
+        assertEquals(0L, summary.averageRateGrosze)
     }
 }

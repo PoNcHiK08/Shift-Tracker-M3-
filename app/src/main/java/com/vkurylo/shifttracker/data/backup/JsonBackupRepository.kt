@@ -1,9 +1,11 @@
 package com.vkurylo.shifttracker.data.backup
 
 import androidx.room.withTransaction
+import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.ShiftEntity
+import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -14,10 +16,12 @@ import javax.inject.Singleton
 @Serializable
 data class BackupFile(
     val format: String = FORMAT,
-    val version: Int = 2,
+    val version: Int = 3,
     @SerialName("exported_at") val exportedAt: String,
     val jobs: List<BackupJob>,
     val shifts: List<BackupShift>,
+    /** Added in backup version 3; older files simply have none. */
+    val bonuses: List<BackupBonus> = emptyList(),
 ) {
     companion object {
         const val FORMAT = "shift-tracker-backup"
@@ -56,6 +60,15 @@ data class BackupShift(
     @SerialName("second_rate") val secondRate: BackupTimedRate? = null,
 )
 
+@Serializable
+data class BackupBonus(
+    @SerialName("job_id") val jobId: Long,
+    /** ISO date, e.g. 2026-08-31. */
+    val date: String,
+    @SerialName("amount_grosze") val amountGrosze: Long,
+    val note: String? = null,
+)
+
 class InvalidBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 @Singleton
@@ -72,6 +85,7 @@ class JsonBackupRepository @Inject constructor(
     override suspend fun exportJson(): String {
         val jobs = db.jobDao().getAll()
         val shifts = db.shiftDao().getAll()
+        val bonuses = db.bonusDao().getAll()
         val file = BackupFile(
             exportedAt = java.time.OffsetDateTime.now().toString(),
             jobs = jobs.map {
@@ -96,11 +110,19 @@ class JsonBackupRepository @Inject constructor(
                     secondRate = backupRate(it.secondRateGrosze, it.secondRateFromMinute, it.secondRateToMinute),
                 )
             },
+            bonuses = bonuses.map {
+                BackupBonus(
+                    jobId = it.jobId,
+                    date = java.time.LocalDate.ofEpochDay(it.dateEpochDay).toString(),
+                    amountGrosze = it.amountGrosze,
+                    note = it.note,
+                )
+            },
         )
         return json.encodeToString(BackupFile.serializer(), file)
     }
 
-    override suspend fun importJson(json: String): Pair<Int, Int> {
+    override suspend fun importJson(json: String): BackupCounts {
         val file = try {
             this.json.decodeFromString(BackupFile.serializer(), json)
         } catch (e: Exception) {
@@ -146,13 +168,30 @@ class JsonBackupRepository @Inject constructor(
             throw InvalidBackupException("Backup contains invalid jobs", e)
         }
 
+        val bonuses = try {
+            file.bonuses.map {
+                require(it.jobId in jobIds) { "Bonus refers to unknown job ${it.jobId}" }
+                require(it.amountGrosze >= 0) { "Negative bonus" }
+                BonusEntity(
+                    jobId = it.jobId,
+                    dateEpochDay = java.time.LocalDate.parse(it.date).toEpochDay(),
+                    amountGrosze = it.amountGrosze,
+                    note = it.note,
+                )
+            }
+        } catch (e: Exception) {
+            throw InvalidBackupException("Backup contains invalid bonuses", e)
+        }
+
         db.withTransaction {
+            db.bonusDao().deleteAll()
             db.shiftDao().deleteAll()
             db.jobDao().deleteAll()
             db.jobDao().insertAll(jobs)
             db.shiftDao().insertAll(shifts)
+            db.bonusDao().insertAll(bonuses)
         }
-        return file.jobs.size to shifts.size
+        return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)
     }
 
     private fun backupRate(grosze: Long?, fromMinute: Int, toMinute: Int): BackupTimedRate? =

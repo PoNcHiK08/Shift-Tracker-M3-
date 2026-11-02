@@ -128,7 +128,7 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                     TotalsCard(target.range.period, target.summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
             }
-            if (!state.loading && state.summary.shiftCount == 0) {
+            if (!state.loading && state.summary.isEmpty) {
                 item(key = "empty") {
                     EmptyState(
                         icon = Icons.Filled.QueryStats,
@@ -215,7 +215,7 @@ private fun periodLabel(range: PeriodRange): String {
 private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val onColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val average = if (summary.totalPaidMinutes > 0) summary.totalEarningsGrosze * 60 / summary.totalPaidMinutes else 0
+    val average = summary.averageRateGrosze
     val title = when (period) {
         SummaryPeriod.WEEK -> R.string.earnings_week
         SummaryPeriod.MONTH -> R.string.earnings_month
@@ -233,6 +233,13 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
                 style = MaterialTheme.typography.displaySmall,
                 color = onColor,
             )
+            if (summary.bonusGrosze > 0) {
+                Text(
+                    stringResource(R.string.including_bonuses, Formatters.money(summary.bonusGrosze, locale)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = onColor.copy(alpha = 0.8f),
+                )
+            }
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 StatBlock(stringResource(R.string.hours), Formatters.decimalHours(summary.totalPaidMinutes, locale), color = onColor, modifier = Modifier.weight(1f))
@@ -255,8 +262,17 @@ private fun JobSummaryCard(summary: JobSummary, totalEarnings: Long, modifier: M
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text(summary.job.name, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+                    val details = buildList {
+                        if (summary.shiftCount > 0) {
+                            add(hoursLabel(summary.paidMinutes))
+                            add(shiftsCountLabel(summary.shiftCount))
+                        }
+                        if (summary.bonusGrosze > 0) {
+                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, locale)))
+                        }
+                    }
                     Text(
-                        "${hoursLabel(summary.paidMinutes)} · ${shiftsCountLabel(summary.shiftCount)}",
+                        details.joinToString(" · "),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -294,7 +310,7 @@ private fun BreakdownCard(period: SummaryPeriod, entries: List<BreakdownEntry>, 
                     SummaryPeriod.WEEK -> Formatters.shortDate(entry.date, locale)
                     else -> Formatters.monthName(YearMonth.from(entry.date), locale)
                 }
-                val empty = entry.shiftCount == 0
+                val empty = entry.isEmpty
                 val valueText = Formatters.money(entry.earningsGrosze, locale)
                 val hoursText = hoursLabel(entry.paidMinutes)
                 Column(
@@ -310,7 +326,7 @@ private fun BreakdownCard(period: SummaryPeriod, entries: List<BreakdownEntry>, 
                             color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )
-                        if (!empty) {
+                        if (entry.shiftCount > 0) {
                             Text(
                                 hoursText,
                                 style = MaterialTheme.typography.bodySmall,

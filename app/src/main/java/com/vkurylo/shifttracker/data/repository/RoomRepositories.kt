@@ -1,12 +1,16 @@
 package com.vkurylo.shifttracker.data.repository
 
+import com.vkurylo.shifttracker.data.local.BonusDao
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.data.local.toEntity
+import com.vkurylo.shifttracker.domain.model.Bonus
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import kotlinx.coroutines.flow.Flow
@@ -45,4 +49,19 @@ class RoomShiftRepository @Inject constructor(
     }
     override suspend fun insertAll(shifts: List<Shift>) = dao.insertAll(shifts.map { it.toEntity() })
     override suspend fun delete(shift: Shift) = dao.delete(shift.toEntity())
+}
+
+@Singleton
+class RoomBonusRepository @Inject constructor(
+    private val dao: BonusDao,
+) : BonusRepository {
+    override fun observeBonuses(from: LocalDate, to: LocalDate): Flow<List<BonusWithJob>> =
+        dao.observeBetween(from.toEpochDay(), to.toEpochDay()).map { rows -> rows.map { it.toDomain() } }
+
+    override suspend fun getBonus(id: Long): Bonus? = dao.get(id)?.toDomain()
+    override suspend fun upsert(bonus: Bonus): Long {
+        val rowId = dao.upsert(bonus.toEntity())
+        return if (rowId == -1L) bonus.id else rowId
+    }
+    override suspend fun delete(bonus: Bonus) = dao.delete(bonus.toEntity())
 }

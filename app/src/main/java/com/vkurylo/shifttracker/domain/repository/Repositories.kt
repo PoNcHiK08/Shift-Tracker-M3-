@@ -1,6 +1,8 @@
 package com.vkurylo.shifttracker.domain.repository
 
 import com.vkurylo.shifttracker.domain.model.AppLanguage
+import com.vkurylo.shifttracker.domain.model.Bonus
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -30,6 +32,14 @@ interface ShiftRepository {
     suspend fun delete(shift: Shift)
 }
 
+interface BonusRepository {
+    /** Bonuses (with their job) dated within [from]..[to], ordered by date. */
+    fun observeBonuses(from: LocalDate, to: LocalDate): Flow<List<BonusWithJob>>
+    suspend fun getBonus(id: Long): Bonus?
+    suspend fun upsert(bonus: Bonus): Long
+    suspend fun delete(bonus: Bonus)
+}
+
 interface PreferencesRepository {
     val preferences: Flow<UserPreferences>
     suspend fun setThemeMode(mode: ThemeMode)
@@ -44,9 +54,11 @@ interface LanguageRepository {
     suspend fun applyDefaultOnFirstLaunch()
 }
 
-/** JSON export/import of all jobs and shifts. */
+/** JSON export/import of all jobs, shifts and bonuses. */
 interface BackupRepository {
     suspend fun exportJson(): String
-    /** Replaces all data with the backup. Returns (jobs, shifts) imported. */
-    suspend fun importJson(json: String): Pair<Int, Int>
+    /** Replaces all data with the backup. */
+    suspend fun importJson(json: String): BackupCounts
 }
+
+data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int)

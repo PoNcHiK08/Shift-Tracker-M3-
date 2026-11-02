@@ -47,6 +47,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.ui.bonus.EditBonusScreen
 import com.vkurylo.shifttracker.ui.calendar.CalendarScreen
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.SnackbarController
@@ -158,6 +159,8 @@ fun ShiftTrackerNavHost() {
                     CalendarScreen(
                         onAddShift = { date -> navController.navigate(EditShiftRoute(dateEpochDay = date.toEpochDay())) },
                         onEditShift = { id -> navController.navigate(EditShiftRoute(shiftId = id)) },
+                        onAddBonus = { date -> navController.navigate(EditBonusRoute(dateEpochDay = date.toEpochDay())) },
+                        onEditBonus = { id -> navController.navigate(EditBonusRoute(bonusId = id)) },
                         onManageJobs = { navController.navigate(JobsRoute) },
                     )
                 }
@@ -181,6 +184,12 @@ fun ShiftTrackerNavHost() {
                 }
                 composable<EditShiftRoute> {
                     EditShiftScreen(
+                        onClose = { navController.navigateUp() },
+                        onManageJobs = { navController.navigate(JobsRoute) },
+                    )
+                }
+                composable<EditBonusRoute> {
+                    EditBonusScreen(
                         onClose = { navController.navigateUp() },
                         onManageJobs = { navController.navigate(JobsRoute) },
                     )

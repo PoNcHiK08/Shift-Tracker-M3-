@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.domain.calc
 
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftPay
@@ -80,24 +81,28 @@ object ShiftCalculator {
 
     private fun LocalTime.toMinuteOfDay(): Int = hour * 60 + minute
 
-    /** Totals plus a per-job breakdown, sorted by earnings (highest first). */
-    fun summarize(shifts: List<ShiftWithJob>): MonthSummary {
-        if (shifts.isEmpty()) return MonthSummary.EMPTY
-        val perJob = shifts
-            .groupBy { it.job.id }
-            .map { (_, items) ->
-                JobSummary(
-                    job = items.first().job,
-                    paidMinutes = items.sumOf { it.shift.paidMinutes },
-                    earningsGrosze = items.sumOf { it.shift.earningsGrosze },
-                    shiftCount = items.size,
-                )
-            }
-            .sortedWith(compareByDescending<JobSummary> { it.earningsGrosze }.thenBy { it.job.name })
+    /** Totals plus a per-job breakdown (shifts and bonuses), sorted by earnings (highest first). */
+    fun summarize(shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob> = emptyList()): MonthSummary {
+        if (shifts.isEmpty() && bonuses.isEmpty()) return MonthSummary.EMPTY
+        val shiftsByJob = shifts.groupBy { it.job.id }
+        val bonusesByJob = bonuses.groupBy { it.job.id }
+        val perJob = (shiftsByJob.keys + bonusesByJob.keys).map { jobId ->
+            val jobShifts = shiftsByJob[jobId].orEmpty()
+            val jobBonuses = bonusesByJob[jobId].orEmpty()
+            JobSummary(
+                job = jobShifts.firstOrNull()?.job ?: jobBonuses.first().job,
+                paidMinutes = jobShifts.sumOf { it.shift.paidMinutes },
+                shiftEarningsGrosze = jobShifts.sumOf { it.shift.earningsGrosze },
+                bonusGrosze = jobBonuses.sumOf { it.bonus.amountGrosze },
+                shiftCount = jobShifts.size,
+            )
+        }.sortedWith(compareByDescending<JobSummary> { it.earningsGrosze }.thenBy { it.job.name })
         return MonthSummary(
             totalPaidMinutes = perJob.sumOf { it.paidMinutes },
-            totalEarningsGrosze = perJob.sumOf { it.earningsGrosze },
+            shiftEarningsGrosze = perJob.sumOf { it.shiftEarningsGrosze },
+            bonusGrosze = perJob.sumOf { it.bonusGrosze },
             shiftCount = shifts.size,
+            bonusCount = bonuses.size,
             perJob = perJob,
         )
     }

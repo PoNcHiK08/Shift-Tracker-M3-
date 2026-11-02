@@ -71,6 +71,22 @@
     <string name="rate_line_second">%1$s–%2$s: %3$s · %4$s год</string>
     <string name="break_split_hint">Перерва віднімається з обох ставок пропорційно</string>
 
+    <!-- Bonuses -->
+    <string name="bonus">Бонус</string>
+    <string name="new_bonus">Новий бонус</string>
+    <string name="edit_bonus">Редагувати бонус</string>
+    <string name="delete_bonus">Видалити бонус</string>
+    <string name="delete_bonus_title">Видалити бонус?</string>
+    <string name="bonus_saved">Бонус збережено</string>
+    <string name="bonus_deleted">Бонус видалено</string>
+    <string name="bonus_amount">Сума</string>
+    <string name="error_amount_invalid">Вкажи суму, наприклад 75</string>
+    <string name="bonus_note">За що (необов\'язково)</string>
+    <string name="bonus_hint">Бонус додається до заробітку за день, але не впливає на години й середню ставку.</string>
+    <string name="bonus_for_job">Бонус · %1$s</string>
+    <string name="including_bonuses">у т.ч. бонуси %1$s</string>
+    <string name="bonuses_value">бонуси %1$s</string>
+
     <!-- Jobs -->
     <string name="jobs_title">Роботи</string>
     <string name="add_job">Додати роботу</string>
@@ -149,7 +165,7 @@
     <string name="import_backup_title">Замінити всі дані?</string>
     <string name="import_backup_message">Усі поточні роботи й зміни буде видалено й замінено даними з файлу.</string>
     <string name="replace_data">Замінити</string>
-    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d</string>
+    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
     <string name="error_file_operation">Не вдалося обробити файл</string>
     <string name="version">Версія %1$s</string>
 

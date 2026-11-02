@@ -21,3 +21,10 @@ data class EditShiftRoute(
 /** Preview + confirm screen for a picked .ics file. */
 @Serializable
 data class ImportIcsRoute(val uri: String)
+
+/** [bonusId] = 0 creates a new bonus on [dateEpochDay] (or today when [EditShiftRoute.NO_DATE]). */
+@Serializable
+data class EditBonusRoute(
+    val bonusId: Long = 0L,
+    val dateEpochDay: Long = EditShiftRoute.NO_DATE,
+)

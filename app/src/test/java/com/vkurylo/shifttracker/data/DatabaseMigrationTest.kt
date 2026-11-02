@@ -63,7 +63,7 @@ class DatabaseMigrationTest {
     }
 
     @Test
-    fun migrateFrom1KeepsAllData() = runBlocking {
+    fun migrateFrom1ToLatestKeepsAllData() = runBlocking {
         createVersion1Database()
 
         val db = Room.databaseBuilder(context, ShiftDatabase::class.java, dbName)
@@ -84,6 +84,9 @@ class DatabaseMigrationTest {
             assertEquals("old shift", shift.note)
             assertNull(shift.secondRate)
             assertEquals(3300L * 15 / 2, shift.earningsGrosze) // 7.5 h * 33 zł
+
+            // v3 adds an empty bonuses table.
+            assertEquals(0, db.bonusDao().getAll().size)
 
             // Defaults written by the migration for the new window columns.
             val raw = db.jobDao().getAll().single()

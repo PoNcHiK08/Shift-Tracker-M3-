@@ -68,3 +68,38 @@ interface ShiftDao {
     @Query("DELETE FROM shifts")
     suspend fun deleteAll()
 }
+
+@Dao
+interface BonusDao {
+    @Query(
+        """
+        SELECT b.*, j.id AS j_id, j.name AS j_name,
+               j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color,
+               j.second_rate_grosze AS j_second_rate_grosze,
+               j.second_rate_from_minute AS j_second_rate_from_minute,
+               j.second_rate_to_minute AS j_second_rate_to_minute
+        FROM bonuses b INNER JOIN jobs j ON j.id = b.job_id
+        WHERE b.date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
+        ORDER BY b.date_epoch_day, b.id
+        """,
+    )
+    fun observeBetween(fromEpochDay: Long, toEpochDay: Long): Flow<List<BonusWithJobRow>>
+
+    @Query("SELECT * FROM bonuses WHERE id = :id")
+    suspend fun get(id: Long): BonusEntity?
+
+    @Query("SELECT * FROM bonuses ORDER BY date_epoch_day, id")
+    suspend fun getAll(): List<BonusEntity>
+
+    @Upsert
+    suspend fun upsert(bonus: BonusEntity): Long
+
+    @Insert
+    suspend fun insertAll(bonuses: List<BonusEntity>)
+
+    @Delete
+    suspend fun delete(bonus: BonusEntity)
+
+    @Query("DELETE FROM bonuses")
+    suspend fun deleteAll()
+}

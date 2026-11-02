@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.EventAvailable
+import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.Button
@@ -66,7 +67,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.ui.components.BonusListItem
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.ShiftListItem
@@ -90,6 +93,8 @@ private const val INITIAL_PAGE = PAGE_COUNT / 2
 fun CalendarScreen(
     onAddShift: (LocalDate) -> Unit,
     onEditShift: (Long) -> Unit,
+    onAddBonus: (LocalDate) -> Unit,
+    onEditBonus: (Long) -> Unit,
     onManageJobs: () -> Unit,
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
@@ -165,6 +170,7 @@ fun CalendarScreen(
                     MonthGrid(
                         month = month,
                         shiftsByDate = state.shiftsByDate,
+                        bonusDates = state.bonusesByDate.keys,
                         onDayClick = viewModel::selectDate,
                     )
                 }
@@ -186,7 +192,7 @@ fun CalendarScreen(
                         action = { Button(onClick = onManageJobs) { Text(stringResource(R.string.add_job)) } },
                     )
                 }
-            } else if (!state.loading && state.monthShifts.isEmpty()) {
+            } else if (!state.loading && state.monthShifts.isEmpty() && state.monthBonuses.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
                         icon = Icons.Filled.EventAvailable,
@@ -195,12 +201,23 @@ fun CalendarScreen(
                     )
                 }
             } else {
-                items(state.monthShifts, key = { it.shift.id }) { item ->
-                    ShiftListItem(
-                        item = item,
-                        showDate = true,
-                        modifier = Modifier.animateItem().clickable { onEditShift(item.shift.id) },
-                    )
+                // Shifts and bonuses of the month in date order (bonuses after the day's shifts).
+                val entries: List<Any> = (state.monthShifts.map { it.shift.date to it } + state.monthBonuses.map { it.bonus.date to it })
+                    .sortedWith(compareBy({ it.first }, { if (it.second is ShiftWithJob) 0 else 1 }))
+                    .map { it.second }
+                items(entries, key = { if (it is ShiftWithJob) "s${it.shift.id}" else "b${(it as BonusWithJob).bonus.id}" }) { item ->
+                    when (item) {
+                        is ShiftWithJob -> ShiftListItem(
+                            item = item,
+                            showDate = true,
+                            modifier = Modifier.animateItem().clickable { onEditShift(item.shift.id) },
+                        )
+                        is BonusWithJob -> BonusListItem(
+                            item = item,
+                            showDate = true,
+                            modifier = Modifier.animateItem().clickable { onEditBonus(item.bonus.id) },
+                        )
+                    }
                 }
             }
         }
@@ -210,6 +227,7 @@ fun CalendarScreen(
         DayBottomSheet(
             date = date,
             shifts = state.shiftsByDate[date].orEmpty(),
+            bonuses = state.bonusesByDate[date].orEmpty(),
             canAdd = hasJobs,
             onDismiss = viewModel::dismissDay,
             onAddShift = {
@@ -219,6 +237,14 @@ fun CalendarScreen(
             onEditShift = { id ->
                 viewModel.dismissDay()
                 onEditShift(id)
+            },
+            onAddBonus = {
+                viewModel.dismissDay()
+                onAddBonus(date)
+            },
+            onEditBonus = { id ->
+                viewModel.dismissDay()
+                onEditBonus(id)
             },
         )
     }
@@ -244,6 +270,7 @@ private fun WeekdayHeader() {
 private fun MonthGrid(
     month: YearMonth,
     shiftsByDate: Map<LocalDate, List<ShiftWithJob>>,
+    bonusDates: Set<LocalDate>,
     onDayClick: (LocalDate) -> Unit,
 ) {
     val firstDay = month.atDay(1)
@@ -264,6 +291,7 @@ private fun MonthGrid(
                                 date = date,
                                 isToday = date == today,
                                 shifts = shiftsByDate[date].orEmpty(),
+                                hasBonus = date in bonusDates,
                                 onClick = { onDayClick(date) },
                             )
                         }
@@ -279,6 +307,7 @@ private fun DayCell(
     date: LocalDate,
     isToday: Boolean,
     shifts: List<ShiftWithJob>,
+    hasBonus: Boolean,
     onClick: () -> Unit,
 ) {
     val locale = currentLocale()
@@ -296,6 +325,7 @@ private fun DayCell(
     val description = buildString {
         append(Formatters.fullDate(date, locale))
         if (hasShifts) append(", ").append(pluralStringResource(R.plurals.shift_count, shifts.size, shifts.size))
+        if (hasBonus) append(", ").append(stringResource(R.string.bonus))
     }
 
     Column(
@@ -326,6 +356,14 @@ private fun DayCell(
             }
             if (jobColors.size > 3) {
                 Text("+", style = MaterialTheme.typography.labelSmall, color = contentColor)
+            }
+            if (hasBonus) {
+                Icon(
+                    Icons.Filled.Redeem,
+                    contentDescription = null,
+                    modifier = Modifier.size(9.dp),
+                    tint = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.tertiary,
+                )
             }
         }
     }
@@ -370,13 +408,16 @@ private fun MonthStatsCard(minutes: Long, earnings: Long, shifts: Int, modifier:
 private fun DayBottomSheet(
     date: LocalDate,
     shifts: List<ShiftWithJob>,
+    bonuses: List<BonusWithJob>,
     canAdd: Boolean,
     onDismiss: () -> Unit,
     onAddShift: () -> Unit,
     onEditShift: (Long) -> Unit,
+    onAddBonus: () -> Unit,
+    onEditBonus: (Long) -> Unit,
 ) {
     val locale = currentLocale()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = shifts.size < 4)
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = shifts.size + bonuses.size < 4)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
             Text(
@@ -384,9 +425,9 @@ private fun DayBottomSheet(
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
-            if (shifts.isNotEmpty()) {
+            if (shifts.isNotEmpty() || bonuses.isNotEmpty()) {
                 val minutes = shifts.sumOf { it.shift.paidMinutes }
-                val earnings = shifts.sumOf { it.shift.earningsGrosze }
+                val earnings = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze }
                 Text(
                     text = "${hoursLabel(minutes)} · ${Formatters.money(earnings, locale)}",
                     style = MaterialTheme.typography.bodyMedium,
@@ -395,7 +436,7 @@ private fun DayBottomSheet(
                 )
             }
             Spacer(Modifier.height(8.dp))
-            if (shifts.isEmpty()) {
+            if (shifts.isEmpty() && bonuses.isEmpty()) {
                 Text(
                     text = stringResource(R.string.no_shifts_this_day),
                     style = MaterialTheme.typography.bodyMedium,
@@ -411,15 +452,30 @@ private fun DayBottomSheet(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                     )
                 }
+                bonuses.forEach { item ->
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
+                    BonusListItem(
+                        item = item,
+                        modifier = Modifier.clickable { onEditBonus(item.bonus.id) },
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    )
+                }
             }
             if (canAdd) {
-                FilledTonalButton(
-                    onClick = onAddShift,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).height(52.dp),
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.size(8.dp))
-                    Text(stringResource(R.string.add_shift))
+                    Button(onClick = onAddShift, modifier = Modifier.weight(1f).height(52.dp)) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.add_shift))
+                    }
+                    FilledTonalButton(onClick = onAddBonus, modifier = Modifier.height(52.dp)) {
+                        Icon(Icons.Filled.Redeem, contentDescription = null, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text(stringResource(R.string.bonus))
+                    }
                 }
             }
         }

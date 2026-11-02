@@ -68,6 +68,22 @@
     <string name="rate_line_second">%1$s–%2$s: %3$s · %4$s h</string>
     <string name="break_split_hint">The break is taken from both rates proportionally</string>
 
+    <!-- Bonuses -->
+    <string name="bonus">Bonus</string>
+    <string name="new_bonus">New bonus</string>
+    <string name="edit_bonus">Edit bonus</string>
+    <string name="delete_bonus">Delete bonus</string>
+    <string name="delete_bonus_title">Delete this bonus?</string>
+    <string name="bonus_saved">Bonus saved</string>
+    <string name="bonus_deleted">Bonus deleted</string>
+    <string name="bonus_amount">Amount</string>
+    <string name="error_amount_invalid">Enter an amount, e.g. 75</string>
+    <string name="bonus_note">What for (optional)</string>
+    <string name="bonus_hint">A bonus adds to the day\'s earnings but doesn\'t change hours or the average rate.</string>
+    <string name="bonus_for_job">Bonus · %1$s</string>
+    <string name="including_bonuses">incl. bonuses %1$s</string>
+    <string name="bonuses_value">bonuses %1$s</string>
+
     <!-- Jobs -->
     <string name="jobs_title">Jobs</string>
     <string name="add_job">Add job</string>
@@ -146,7 +162,7 @@
     <string name="import_backup_title">Replace all data?</string>
     <string name="import_backup_message">All current jobs and shifts will be deleted and replaced with the data from the file.</string>
     <string name="replace_data">Replace</string>
-    <string name="import_backup_done">Restored %1$d jobs and %2$d shifts</string>
+    <string name="import_backup_done">Restored %1$d jobs, %2$d shifts and %3$d bonuses</string>
     <string name="error_file_operation">Couldn\'t process the file</string>
     <string name="version">Version %1$s</string>
 

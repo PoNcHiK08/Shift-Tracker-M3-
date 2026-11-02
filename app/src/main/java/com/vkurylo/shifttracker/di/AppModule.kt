@@ -7,14 +7,17 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
+import com.vkurylo.shifttracker.data.local.BonusDao
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.repository.AppCompatLanguageRepository
 import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
+import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
+import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.LanguageRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
@@ -43,6 +46,9 @@ object DataModule {
     fun provideShiftDao(db: ShiftDatabase): ShiftDao = db.shiftDao()
 
     @Provides
+    fun provideBonusDao(db: ShiftDatabase): BonusDao = db.bonusDao()
+
+    @Provides
     @Singleton
     fun provideDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
         PreferenceDataStoreFactory.create { context.preferencesDataStoreFile("settings") }
@@ -53,6 +59,7 @@ object DataModule {
 abstract class RepositoryModule {
     @Binds abstract fun bindJobRepository(impl: RoomJobRepository): JobRepository
     @Binds abstract fun bindShiftRepository(impl: RoomShiftRepository): ShiftRepository
+    @Binds abstract fun bindBonusRepository(impl: RoomBonusRepository): BonusRepository
     @Binds abstract fun bindPreferencesRepository(impl: DataStorePreferencesRepository): PreferencesRepository
     @Binds abstract fun bindLanguageRepository(impl: AppCompatLanguageRepository): LanguageRepository
     @Binds abstract fun bindBackupRepository(impl: JsonBackupRepository): BackupRepository

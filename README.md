@@ -14,7 +14,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
   earnings (the editor offers "use current rate" when they differ).
-- **Calendar** — swipeable month grid with colored dots per job; tap a day for a bottom sheet with its shifts and an "Add shift" button.
+- **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
+  calendar and summary, but not towards hours or the average hourly rate.
+- **Calendar** — swipeable month grid with colored dots per job; tap a day for a bottom sheet with its shifts and bonuses and "Add shift" / "Bonus" buttons.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year.
 - **Settings** — jobs & rates, theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
@@ -54,7 +56,7 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 | UI | Jetpack Compose, Material 3 Expressive (material3 1.5.0-beta02 on Compose BOM 2026.09), dynamic color, edge-to-edge |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
 | Navigation | Navigation Compose 2.10 with type-safe `@Serializable` routes, shared-axis / fade-through transitions |
-| Storage | Room 2.8 (jobs, shifts; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |
+| Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
 | Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English) |
@@ -69,5 +71,5 @@ app/src/main/java/com/vkurylo/shifttracker/
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
 app/src/test/      calculator (incl. second rate), money parser, .ics parser, import planner,
-                   DB migration from v1, and an end-to-end UI smoke test
+                   DB migration from v1, JSON backup round trip, and an end-to-end UI smoke test
 ```
