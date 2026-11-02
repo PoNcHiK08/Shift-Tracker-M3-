@@ -55,7 +55,7 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 | --- | --- |
 | UI | Jetpack Compose, Material 3 Expressive (material3 1.5.0-beta02 on Compose BOM 2026.09), dynamic color, edge-to-edge |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
-| Navigation | Navigation Compose 2.10 with type-safe `@Serializable` routes, shared-axis / fade-through transitions |
+| Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) with a One UI-style slide-over transition (420 ms, cubic-bezier(0.22, 0.25, 0, 1), 31 % parallax, 16 % dim — measured from a screen recording) that also drives predictive back, and a nested tab host with fade-through. Icon-only bottom bar built from M3 Expressive toggle buttons |
 | Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
