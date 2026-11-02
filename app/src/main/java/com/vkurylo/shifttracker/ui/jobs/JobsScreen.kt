@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.ui.jobs
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,7 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -28,6 +32,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -36,11 +42,13 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -72,11 +80,15 @@ import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.JobPalette
+import com.vkurylo.shifttracker.domain.model.TimedRate
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
+import com.vkurylo.shifttracker.ui.components.PickerField
+import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.onColor
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
+import java.time.LocalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -132,7 +144,7 @@ fun JobsScreen(
                         modifier = Modifier.animateItem().clickable { viewModel.startEdit(job) },
                         leadingContent = { JobAvatar(job) },
                         headlineContent = { Text(job.name) },
-                        supportingContent = { Text(Formatters.rate(job.hourlyRateGrosze, locale)) },
+                        supportingContent = { Text(jobRatesLabel(job)) },
                         trailingContent = {
                             IconButton(onClick = { viewModel.requestDelete(job) }) {
                                 Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_job_named, job.name))
@@ -187,10 +199,27 @@ private fun JobEditorSheet(
     var rate by rememberSaveable(job.id) { mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze)) }
     var color by rememberSaveable(job.id) { mutableIntStateOf(job.color) }
     var showErrors by rememberSaveable(job.id) { mutableStateOf(false) }
+    var secondEnabled by rememberSaveable(job.id) { mutableStateOf(job.secondRate != null) }
+    var secondRate by rememberSaveable(job.id) {
+        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze) } ?: "")
+    }
+    var secondFrom by rememberSaveable(job.id) {
+        mutableIntStateOf((job.secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toSecondOfDay() / 60)
+    }
+    var secondTo by rememberSaveable(job.id) {
+        mutableIntStateOf((job.secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toSecondOfDay() / 60)
+    }
+    var pickingFrom by rememberSaveable { mutableStateOf(false) }
+    var pickingTo by rememberSaveable { mutableStateOf(false) }
 
     val rateGrosze = MoneyParser.parseGrosze(rate)
+    val secondRateGrosze = MoneyParser.parseGrosze(secondRate)
     val nameError = name.isBlank()
     val rateError = rateGrosze == null
+    val secondRateError = secondEnabled && secondRateGrosze == null
+    val windowError = secondEnabled && secondFrom == secondTo
+    val fromTime = LocalTime.of(secondFrom / 60, secondFrom % 60)
+    val toTime = LocalTime.of(secondTo / 60, secondTo % 60)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -199,6 +228,7 @@ private fun JobEditorSheet(
                 .fillMaxWidth()
                 .navigationBarsPadding()
                 .imePadding()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp)
                 .padding(bottom = 24.dp),
         ) {
@@ -227,7 +257,7 @@ private fun JobEditorSheet(
             OutlinedTextField(
                 value = rate,
                 onValueChange = { rate = it },
-                label = { Text(stringResource(R.string.hourly_rate)) },
+                label = { Text(stringResource(if (secondEnabled) R.string.base_rate else R.string.hourly_rate)) },
                 suffix = { Text("zł/h") },
                 singleLine = true,
                 isError = showErrors && rateError,
@@ -237,6 +267,60 @@ private fun JobEditorSheet(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
             )
+
+            // Optional second rate inside a daily time window (e.g. night rate 23:00–06:00).
+            ListItem(
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.medium)
+                    .toggleable(value = secondEnabled, role = Role.Switch, onValueChange = { secondEnabled = it }),
+                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                headlineContent = { Text(stringResource(R.string.second_rate_toggle)) },
+                supportingContent = { Text(stringResource(R.string.second_rate_toggle_summary)) },
+                trailingContent = { Switch(checked = secondEnabled, onCheckedChange = null) },
+            )
+            AnimatedVisibility(secondEnabled) {
+                Column {
+                    OutlinedTextField(
+                        value = secondRate,
+                        onValueChange = { secondRate = it },
+                        label = { Text(stringResource(R.string.second_rate)) },
+                        suffix = { Text("zł/h") },
+                        singleLine = true,
+                        isError = showErrors && secondRateError,
+                        supportingText = if (showErrors && secondRateError) {
+                            { Text(stringResource(R.string.error_rate_invalid)) }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        PickerField(
+                            label = stringResource(R.string.second_rate_from),
+                            value = Formatters.time(fromTime),
+                            icon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
+                            onClick = { pickingFrom = true },
+                            modifier = Modifier.weight(1f),
+                        )
+                        PickerField(
+                            label = stringResource(R.string.second_rate_to),
+                            value = Formatters.time(toTime),
+                            icon = { Icon(Icons.Filled.NightsStay, contentDescription = null) },
+                            onClick = { pickingTo = true },
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (windowError) {
+                        Text(
+                            stringResource(R.string.error_window_empty),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.job_color), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(12.dp))
@@ -250,10 +334,13 @@ private fun JobEditorSheet(
                 }
                 Button(
                     onClick = {
-                        if (nameError || rateError) {
+                        if (nameError || rateError || secondRateError || windowError) {
                             showErrors = true
                         } else {
-                            onSave(job.copy(name = name, hourlyRateGrosze = rateGrosze, color = color))
+                            val second = if (secondEnabled && secondRateGrosze != null) {
+                                TimedRate(secondRateGrosze, fromTime, toTime)
+                            } else null
+                            onSave(job.copy(name = name, hourlyRateGrosze = rateGrosze, color = color, secondRate = second))
                         }
                     },
                     modifier = Modifier.weight(1f).height(52.dp),
@@ -263,6 +350,37 @@ private fun JobEditorSheet(
             }
         }
     }
+
+    if (pickingFrom) {
+        TimeDialog(
+            title = stringResource(R.string.second_rate_from),
+            initial = fromTime,
+            onConfirm = { secondFrom = it.hour * 60 + it.minute; pickingFrom = false },
+            onDismiss = { pickingFrom = false },
+        )
+    }
+    if (pickingTo) {
+        TimeDialog(
+            title = stringResource(R.string.second_rate_to),
+            initial = toTime,
+            onConfirm = { secondTo = it.hour * 60 + it.minute; pickingTo = false },
+            onDismiss = { pickingTo = false },
+        )
+    }
+}
+
+/** "33,00 zł/h · 23:00–06:00: 37,00 zł/h" */
+@Composable
+fun jobRatesLabel(job: Job): String {
+    val locale = currentLocale()
+    val base = Formatters.rate(job.hourlyRateGrosze, locale)
+    val second = job.secondRate ?: return base
+    return base + " · " + stringResource(
+        R.string.second_rate_summary,
+        Formatters.time(second.from),
+        Formatters.time(second.to),
+        Formatters.rate(second.rateGrosze, locale),
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)

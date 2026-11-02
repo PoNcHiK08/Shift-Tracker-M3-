@@ -9,6 +9,7 @@ import androidx.room.PrimaryKey
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.TimedRate
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -18,6 +19,10 @@ data class JobEntity(
     val name: String,
     @ColumnInfo(name = "hourly_rate_grosze") val hourlyRateGrosze: Long,
     val color: Int,
+    /** Optional second rate; null when the job has a single rate. Added in DB version 2. */
+    @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
+    @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
+    @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
 )
 
 @Entity(
@@ -43,6 +48,10 @@ data class ShiftEntity(
     @ColumnInfo(name = "hourly_rate_grosze") val hourlyRateGrosze: Long,
     val note: String?,
     @ColumnInfo(name = "external_uid") val externalUid: String?,
+    /** Snapshot of the job's second rate when the shift was saved. Added in DB version 2. */
+    @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
+    @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
+    @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
 )
 
 data class ShiftWithJobRow(
@@ -50,31 +59,56 @@ data class ShiftWithJobRow(
     @Embedded(prefix = "j_") val job: JobEntity,
 )
 
-fun JobEntity.toDomain() = Job(id = id, name = name, hourlyRateGrosze = hourlyRateGrosze, color = color)
-fun Job.toEntity() = JobEntity(id = id, name = name, hourlyRateGrosze = hourlyRateGrosze, color = color)
+internal fun minuteToTime(minute: Int): LocalTime = LocalTime.of(minute / 60 % 24, minute % 60)
+internal fun LocalTime.toMinute(): Int = hour * 60 + minute
+
+private fun timedRate(grosze: Long?, fromMinute: Int, toMinute: Int): TimedRate? =
+    grosze?.let { TimedRate(it, minuteToTime(fromMinute), minuteToTime(toMinute)) }
+
+fun JobEntity.toDomain() = Job(
+    id = id,
+    name = name,
+    hourlyRateGrosze = hourlyRateGrosze,
+    color = color,
+    secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
+)
+
+fun Job.toEntity() = JobEntity(
+    id = id,
+    name = name,
+    hourlyRateGrosze = hourlyRateGrosze,
+    color = color,
+    secondRateGrosze = secondRate?.rateGrosze,
+    secondRateFromMinute = (secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toMinute(),
+    secondRateToMinute = (secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toMinute(),
+)
 
 fun ShiftEntity.toDomain() = Shift(
     id = id,
     jobId = jobId,
     date = LocalDate.ofEpochDay(dateEpochDay),
-    start = LocalTime.of(startMinute / 60, startMinute % 60),
-    end = LocalTime.of(endMinute / 60, endMinute % 60),
+    start = minuteToTime(startMinute),
+    end = minuteToTime(endMinute),
     unpaidBreakMinutes = unpaidBreakMinutes,
     hourlyRateGrosze = hourlyRateGrosze,
     note = note,
     externalUid = externalUid,
+    secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
 )
 
 fun Shift.toEntity() = ShiftEntity(
     id = id,
     jobId = jobId,
     dateEpochDay = date.toEpochDay(),
-    startMinute = start.hour * 60 + start.minute,
-    endMinute = end.hour * 60 + end.minute,
+    startMinute = start.toMinute(),
+    endMinute = end.toMinute(),
     unpaidBreakMinutes = unpaidBreakMinutes,
     hourlyRateGrosze = hourlyRateGrosze,
     note = note?.takeIf { it.isNotBlank() },
     externalUid = externalUid,
+    secondRateGrosze = secondRate?.rateGrosze,
+    secondRateFromMinute = (secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toMinute(),
+    secondRateToMinute = (secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toMinute(),
 )
 
 fun ShiftWithJobRow.toDomain() = ShiftWithJob(shift = shift.toDomain(), job = job.toDomain())

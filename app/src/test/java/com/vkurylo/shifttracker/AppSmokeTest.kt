@@ -41,6 +41,14 @@ class AppSmokeTest {
 
     private fun str(id: Int) = composeRule.activity.getString(id)
 
+    /** Waits until a clickable node with this text (or content description) exists, then clicks it. */
+    private fun clickOn(label: String) {
+        val matcher = (hasText(label) or hasContentDescription(label)) and hasClickAction()
+        composeRule.waitUntilExactlyOneExists(matcher, timeoutMillis = 10_000)
+        composeRule.onNode(matcher).performClick()
+        composeRule.waitForIdle()
+    }
+
     private fun waitForText(text: String) {
         composeRule.waitUntilAtLeastOneExists(hasText(text, substring = true), timeoutMillis = 10_000)
         composeRule.waitForIdle() // let screen transitions finish
@@ -58,9 +66,14 @@ class AppSmokeTest {
         waitForText(str(R.string.new_job))
         composeRule.onNode(hasSetTextAction() and hasText(str(R.string.job_name))).performTextInput("Kawiarnia")
         composeRule.onNode(hasSetTextAction() and hasText(str(R.string.hourly_rate))).performTextInput("30,50")
-        composeRule.onNodeWithText(str(R.string.save)).performClick()
+        // Second (night) rate: 37 zł/h 23:00–06:00 — doesn't touch the default 08–16 shift below.
+        composeRule.onNodeWithText(str(R.string.second_rate_toggle)).performClick()
+        waitForText(str(R.string.second_rate))
+        composeRule.onNode(hasSetTextAction() and hasText(str(R.string.second_rate))).performTextInput("37")
+        composeRule.onNodeWithText(str(R.string.save)).performScrollTo().performClick()
         waitForText("Kawiarnia")
-        composeRule.onNodeWithContentDescription(str(R.string.back)).performClick()
+        waitForText("23:00–06:00")
+        clickOn(str(R.string.back))
 
         // Calendar -> add a shift (08:00–16:00 default).
         composeRule.waitUntilAtLeastOneExists(hasContentDescription(str(R.string.add_shift)), 10_000)
@@ -73,19 +86,28 @@ class AppSmokeTest {
         composeRule.onAllNodesWithText("Kawiarnia").onFirst().assertExists()
 
         // Summary and settings render.
-        composeRule.onNodeWithText(str(R.string.nav_summary)).performClick()
-        waitForText(str(R.string.total_earnings))
+        clickOn(str(R.string.nav_summary))
+        waitForText(str(R.string.earnings_month))
         waitForText("244")
-        composeRule.onNodeWithText(str(R.string.nav_settings)).performClick()
+        clickOn(str(R.string.period_year))
+        waitForText(str(R.string.earnings_year))
+        waitForText(str(R.string.by_month))
+        clickOn(str(R.string.period_week))
+        waitForText(str(R.string.earnings_week))
+        clickOn(str(R.string.previous_period))
+        clickOn(str(R.string.current_period))
+        clickOn(str(R.string.period_month))
+        waitForText(str(R.string.earnings_month))
+        clickOn(str(R.string.nav_settings))
         waitForText(str(R.string.jobs_and_rates))
-        composeRule.onNodeWithText(str(R.string.theme_dark)).performClick()
-        composeRule.onNodeWithText(str(R.string.nav_calendar)).performClick()
+        clickOn(str(R.string.theme_dark))
+        clickOn(str(R.string.nav_calendar))
 
         // Open the shift and delete it.
         waitForText("Kawiarnia")
         composeRule.onAllNodesWithText("Kawiarnia").onFirst().performScrollTo().performClick()
         waitForText(str(R.string.edit_shift))
-        composeRule.onNodeWithContentDescription(str(R.string.delete_shift)).performClick()
+        clickOn(str(R.string.delete_shift))
         waitForText(str(R.string.delete_shift_title))
         composeRule.onNodeWithText(str(R.string.delete)).performClick()
         waitForText(str(R.string.no_shifts_title))

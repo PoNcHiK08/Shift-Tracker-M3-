@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Serializable
 data class BackupFile(
     val format: String = FORMAT,
-    val version: Int = 1,
+    val version: Int = 2,
     @SerialName("exported_at") val exportedAt: String,
     val jobs: List<BackupJob>,
     val shifts: List<BackupShift>,
@@ -30,6 +30,15 @@ data class BackupJob(
     val name: String,
     @SerialName("hourly_rate_grosze") val hourlyRateGrosze: Long,
     val color: Int,
+    @SerialName("second_rate") val secondRate: BackupTimedRate? = null,
+)
+
+/** Optional second rate between [from] and [to] (HH:mm). Added in backup version 2. */
+@Serializable
+data class BackupTimedRate(
+    @SerialName("rate_grosze") val rateGrosze: Long,
+    val from: String,
+    val to: String,
 )
 
 @Serializable
@@ -44,6 +53,7 @@ data class BackupShift(
     @SerialName("hourly_rate_grosze") val hourlyRateGrosze: Long,
     val note: String? = null,
     @SerialName("external_uid") val externalUid: String? = null,
+    @SerialName("second_rate") val secondRate: BackupTimedRate? = null,
 )
 
 class InvalidBackupException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -64,7 +74,15 @@ class JsonBackupRepository @Inject constructor(
         val shifts = db.shiftDao().getAll()
         val file = BackupFile(
             exportedAt = java.time.OffsetDateTime.now().toString(),
-            jobs = jobs.map { BackupJob(it.id, it.name, it.hourlyRateGrosze, it.color) },
+            jobs = jobs.map {
+                BackupJob(
+                    id = it.id,
+                    name = it.name,
+                    hourlyRateGrosze = it.hourlyRateGrosze,
+                    color = it.color,
+                    secondRate = backupRate(it.secondRateGrosze, it.secondRateFromMinute, it.secondRateToMinute),
+                )
+            },
             shifts = shifts.map {
                 BackupShift(
                     jobId = it.jobId,
@@ -75,6 +93,7 @@ class JsonBackupRepository @Inject constructor(
                     hourlyRateGrosze = it.hourlyRateGrosze,
                     note = it.note,
                     externalUid = it.externalUid,
+                    secondRate = backupRate(it.secondRateGrosze, it.secondRateFromMinute, it.secondRateToMinute),
                 )
             },
         )
@@ -102,19 +121,46 @@ class JsonBackupRepository @Inject constructor(
                     hourlyRateGrosze = it.hourlyRateGrosze,
                     note = it.note,
                     externalUid = it.externalUid,
+                    secondRateGrosze = it.secondRate?.rateGrosze,
+                    secondRateFromMinute = it.secondRate?.let { r -> textToMinute(r.from) } ?: DEFAULT_FROM,
+                    secondRateToMinute = it.secondRate?.let { r -> textToMinute(r.to) } ?: DEFAULT_TO,
                 )
             }
         } catch (e: Exception) {
             throw InvalidBackupException("Backup contains invalid shifts", e)
         }
 
+        val jobs = try {
+            file.jobs.map {
+                JobEntity(
+                    id = it.id,
+                    name = it.name,
+                    hourlyRateGrosze = it.hourlyRateGrosze,
+                    color = it.color,
+                    secondRateGrosze = it.secondRate?.rateGrosze,
+                    secondRateFromMinute = it.secondRate?.let { r -> textToMinute(r.from) } ?: DEFAULT_FROM,
+                    secondRateToMinute = it.secondRate?.let { r -> textToMinute(r.to) } ?: DEFAULT_TO,
+                )
+            }
+        } catch (e: Exception) {
+            throw InvalidBackupException("Backup contains invalid jobs", e)
+        }
+
         db.withTransaction {
             db.shiftDao().deleteAll()
             db.jobDao().deleteAll()
-            db.jobDao().insertAll(file.jobs.map { JobEntity(it.id, it.name, it.hourlyRateGrosze, it.color) })
+            db.jobDao().insertAll(jobs)
             db.shiftDao().insertAll(shifts)
         }
         return file.jobs.size to shifts.size
+    }
+
+    private fun backupRate(grosze: Long?, fromMinute: Int, toMinute: Int): BackupTimedRate? =
+        grosze?.let { BackupTimedRate(it, minuteToText(fromMinute), minuteToText(toMinute)) }
+
+    private companion object {
+        const val DEFAULT_FROM = 23 * 60
+        const val DEFAULT_TO = 6 * 60
     }
 
     private fun minuteToText(minute: Int) = "%02d:%02d".format(minute / 60, minute % 60)

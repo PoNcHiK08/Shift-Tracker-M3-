@@ -16,11 +16,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      VERSION_CODE: ${{ github.run_number }}
 
     steps:
       - uses: actions/checkout@v4
+
+      # Offset keeps CI builds above the versionCodes of APKs built by hand (1, 2, …),
+      # so every CI build installs as an update.
+      - name: Set version code
+        run: echo "VERSION_CODE=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
 
       - uses: actions/setup-java@v4
         with:
@@ -44,7 +47,7 @@ jobs:
       - name: Upload APKs as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShiftTracker-${{ github.run_number }}
+          name: ShiftTracker-${{ env.VERSION_CODE }}
           path: dist/*.apk
           retention-days: 30
 
@@ -65,6 +68,6 @@ jobs:
           gh release delete latest-build --yes --cleanup-tag || true
           gh release create latest-build dist/ShiftTracker.apk dist/ShiftTracker-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "Latest build #${{ github.run_number }} (${GITHUB_REF_NAME})" \
+            --title "Latest build ${VERSION_CODE} (${GITHUB_REF_NAME})" \
             --notes "Automatic build of ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}. Install ShiftTracker.apk; ShiftTracker-debug.apk is a separate debug copy." \
             --prerelease

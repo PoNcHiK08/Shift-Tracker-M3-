@@ -40,7 +40,6 @@ import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
-import java.time.YearMonth
 
 fun Job.composeColor(): Color = Color(color)
 
@@ -122,29 +121,28 @@ fun ShiftListItem(
 }
 
 @Composable
-fun MonthSwitcher(
-    month: YearMonth,
+fun PeriodSwitcher(
+    label: String,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val locale = currentLocale()
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         FilledTonalIconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.previous_month))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.previous_period))
         }
         Text(
-            text = Formatters.monthYear(month, locale),
+            text = label,
             style = MaterialTheme.typography.titleLarge,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f).semantics { heading() },
         )
         FilledTonalIconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.next_month))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.next_period))
         }
     }
 }

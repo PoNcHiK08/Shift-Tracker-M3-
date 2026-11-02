@@ -34,6 +34,7 @@ object ImportPlanner {
         hourlyRateGrosze = job.hourlyRateGrosze,
         note = event.summary,
         externalUid = event.uid,
+        secondRate = job.secondRate,
     )
 
     private fun java.time.LocalTime.withSecondAndNano() = withSecond(0).withNano(0)

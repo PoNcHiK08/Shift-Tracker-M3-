@@ -51,6 +51,17 @@ object Formatters {
     fun monthYear(month: YearMonth, locale: Locale): String =
         DateTimeFormatter.ofPattern("LLLL yyyy", locale).format(month).replaceFirstChar { it.titlecase(locale) }
 
+    fun monthName(month: YearMonth, locale: Locale): String =
+        DateTimeFormatter.ofPattern("LLLL", locale).format(month).replaceFirstChar { it.titlecase(locale) }
+
+    /** "27 жовт. – 2 лист. 2026"; the year is shown once when both ends share it. */
+    fun dateRange(from: LocalDate, to: LocalDate, locale: Locale): String {
+        val dayMonth = DateTimeFormatter.ofPattern("d MMM", locale)
+        val full = DateTimeFormatter.ofPattern("d MMM yyyy", locale)
+        val start = if (from.year == to.year) dayMonth.format(from) else full.format(from)
+        return "$start – ${full.format(to)}"
+    }
+
     fun fullDate(date: LocalDate, locale: Locale): String =
         DateTimeFormatter.ofPattern("EEEE, d MMMM", locale).format(date).replaceFirstChar { it.titlecase(locale) }
 

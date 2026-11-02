@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.domain.ics
 
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.TimedRate
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate
@@ -35,6 +36,15 @@ class ImportPlannerTest {
             existing,
         )
         assertEquals(listOf(true, true, false, true), plan.map { it.isDuplicate })
+    }
+
+    @Test
+    fun `converted shift snapshots the job's second rate`() {
+        val night = TimedRate(3700, LocalTime.of(23, 0), LocalTime.of(6, 0))
+        val job = Job(id = 3, name = "Burger King", hourlyRateGrosze = 3300, color = 0, secondRate = night)
+        val shift = ImportPlanner.toShift(event("n1", 7, 18, 23).copy(end = LocalDateTime.of(2026, 11, 8, 2, 0)), job)
+        assertEquals(night, shift.secondRate)
+        assertEquals(27600L, shift.earningsGrosze)
     }
 
     @Test

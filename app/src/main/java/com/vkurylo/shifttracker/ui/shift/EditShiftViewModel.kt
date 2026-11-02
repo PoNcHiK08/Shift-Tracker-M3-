@@ -8,6 +8,8 @@ import com.vkurylo.shifttracker.di.ApplicationScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.ShiftPay
+import com.vkurylo.shifttracker.domain.model.TimedRate
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import com.vkurylo.shifttracker.ui.navigation.EditShiftRoute
@@ -35,21 +37,25 @@ data class EditShiftUiState(
     val end: LocalTime = LocalTime.of(16, 0),
     val breakMinutes: String = "0",
     val note: String = "",
-    /** Rate saved with the shift (snapshot). */
+    /** Rates saved with the shift (snapshot). */
     val rateGrosze: Long = 0,
+    val secondRate: TimedRate? = null,
     val showErrors: Boolean = false,
     val confirmDelete: Boolean = false,
 ) {
     val selectedJob: Job? get() = jobs.firstOrNull { it.id == jobId }
     val breakValue: Int? get() = breakMinutes.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..1440 }
     val durationMinutes: Long get() = ShiftCalculator.durationMinutes(start, end)
-    val paidMinutes: Long get() = ShiftCalculator.paidMinutes(start, end, breakValue ?: 0)
-    val earningsGrosze: Long get() = ShiftCalculator.earningsGrosze(paidMinutes, rateGrosze)
+    val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)
+    val paidMinutes: Long get() = pay.paidMinutes
+    val earningsGrosze: Long get() = pay.earningsGrosze
     val isOvernight: Boolean get() = ShiftCalculator.isOvernight(start, end)
     val breakTooLong: Boolean get() = (breakValue ?: 0) >= durationMinutes
     val jobMissing: Boolean get() = selectedJob == null
     /** The job's current rate differs from the snapshot stored on an existing shift. */
-    val rateOutdated: Boolean get() = !isNew && selectedJob != null && selectedJob!!.hourlyRateGrosze != rateGrosze
+    val rateOutdated: Boolean
+        get() = !isNew && selectedJob != null &&
+            (selectedJob!!.hourlyRateGrosze != rateGrosze || selectedJob!!.secondRate != secondRate)
     val canSave: Boolean get() = !jobMissing && breakValue != null && !breakTooLong
 }
 
@@ -92,6 +98,7 @@ class EditShiftViewModel @Inject constructor(
                     breakMinutes = existing.unpaidBreakMinutes.toString(),
                     note = existing.note.orEmpty(),
                     rateGrosze = existing.hourlyRateGrosze,
+                    secondRate = existing.secondRate,
                 )
             } else {
                 val job = jobs.singleOrNull() ?: jobs.firstOrNull()
@@ -102,6 +109,7 @@ class EditShiftViewModel @Inject constructor(
                     jobId = job?.id,
                     date = route.dateEpochDay.takeIf { it != EditShiftRoute.NO_DATE }?.let(LocalDate::ofEpochDay) ?: LocalDate.now(),
                     rateGrosze = job?.hourlyRateGrosze ?: 0,
+                    secondRate = job?.secondRate,
                 )
             }
         }
@@ -111,8 +119,13 @@ class EditShiftViewModel @Inject constructor(
                 _uiState.update { state ->
                     val keepJob = state.jobId != null && jobs.any { it.id == state.jobId }
                     val jobId = if (keepJob) state.jobId else jobs.firstOrNull()?.id
-                    val rate = if (keepJob || !state.isNew) state.rateGrosze else jobs.firstOrNull()?.hourlyRateGrosze ?: 0
-                    state.copy(jobs = jobs, jobId = jobId, rateGrosze = rate)
+                    val keepRates = keepJob || !state.isNew
+                    state.copy(
+                        jobs = jobs,
+                        jobId = jobId,
+                        rateGrosze = if (keepRates) state.rateGrosze else jobs.firstOrNull()?.hourlyRateGrosze ?: 0,
+                        secondRate = if (keepRates) state.secondRate else jobs.firstOrNull()?.secondRate,
+                    )
                 }
             }
         }
@@ -120,7 +133,7 @@ class EditShiftViewModel @Inject constructor(
 
     fun selectJob(job: Job) = _uiState.update {
         // Picking a different job always uses that job's current rate.
-        if (it.jobId == job.id) it else it.copy(jobId = job.id, rateGrosze = job.hourlyRateGrosze)
+        if (it.jobId == job.id) it else it.copy(jobId = job.id, rateGrosze = job.hourlyRateGrosze, secondRate = job.secondRate)
     }
 
     fun setDate(date: LocalDate) = _uiState.update { it.copy(date = date) }
@@ -128,7 +141,9 @@ class EditShiftViewModel @Inject constructor(
     fun setEnd(time: LocalTime) = _uiState.update { it.copy(end = time) }
     fun setBreak(text: String) = _uiState.update { it.copy(breakMinutes = text.filter(Char::isDigit).take(4)) }
     fun setNote(text: String) = _uiState.update { it.copy(note = text) }
-    fun useCurrentRate() = _uiState.update { s -> s.selectedJob?.let { s.copy(rateGrosze = it.hourlyRateGrosze) } ?: s }
+    fun useCurrentRate() = _uiState.update { s ->
+        s.selectedJob?.let { s.copy(rateGrosze = it.hourlyRateGrosze, secondRate = it.secondRate) } ?: s
+    }
 
     fun save() {
         val state = _uiState.value
@@ -147,6 +162,7 @@ class EditShiftViewModel @Inject constructor(
             hourlyRateGrosze = state.rateGrosze,
             note = state.note.trim().ifEmpty { null },
             externalUid = original?.externalUid,
+            secondRate = state.secondRate,
         )
         viewModelScope.launch {
             shiftRepository.upsert(shift)

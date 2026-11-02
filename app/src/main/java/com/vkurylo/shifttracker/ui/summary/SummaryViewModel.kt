@@ -1,44 +1,130 @@
 package com.vkurylo.shifttracker.ui.summary
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.TemporalAdjusters
 import javax.inject.Inject
 
+enum class SummaryPeriod { WEEK, MONTH, YEAR }
+
+/** The concrete date range a period + anchor date resolves to (inclusive). */
+data class PeriodRange(val period: SummaryPeriod, val from: LocalDate, val to: LocalDate) {
+    companion object {
+        fun of(period: SummaryPeriod, anchor: LocalDate): PeriodRange = when (period) {
+            SummaryPeriod.WEEK -> {
+                val monday = anchor.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                PeriodRange(period, monday, monday.plusDays(6))
+            }
+            SummaryPeriod.MONTH -> {
+                val month = YearMonth.from(anchor)
+                PeriodRange(period, month.atDay(1), month.atEndOfMonth())
+            }
+            SummaryPeriod.YEAR -> PeriodRange(period, anchor.withDayOfYear(1), anchor.withDayOfYear(anchor.lengthOfYear()))
+        }
+    }
+
+    operator fun contains(date: LocalDate): Boolean = !date.isBefore(from) && !date.isAfter(to)
+}
+
+/** One row of the week (per day) or year (per month) breakdown. */
+data class BreakdownEntry(
+    val date: LocalDate,
+    val paidMinutes: Long,
+    val earningsGrosze: Long,
+    val shiftCount: Int,
+)
+
 data class SummaryUiState(
-    val month: YearMonth = YearMonth.now(),
+    val range: PeriodRange = PeriodRange.of(SummaryPeriod.MONTH, LocalDate.now()),
     val summary: MonthSummary = MonthSummary.EMPTY,
+    /** Days of the week (WEEK) or months of the year (YEAR); empty for MONTH. */
+    val breakdown: List<BreakdownEntry> = emptyList(),
     val loading: Boolean = true,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class SummaryViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     shiftRepository: ShiftRepository,
 ) : ViewModel() {
 
-    private val month = MutableStateFlow(YearMonth.now())
+    private val period = savedStateHandle.getStateFlow(KEY_PERIOD, SummaryPeriod.MONTH.name)
+    private val anchor = savedStateHandle.getStateFlow(KEY_ANCHOR, LocalDate.now().toEpochDay())
 
-    val uiState: StateFlow<SummaryUiState> = month
-        .flatMapLatest { m ->
-            shiftRepository.observeMonth(m).map { shifts ->
-                SummaryUiState(month = m, summary = ShiftCalculator.summarize(shifts), loading = false)
+    val uiState: StateFlow<SummaryUiState> = combine(period, anchor) { p, a ->
+        PeriodRange.of(SummaryPeriod.valueOf(p), LocalDate.ofEpochDay(a))
+    }
+        .flatMapLatest { range ->
+            shiftRepository.observeShifts(range.from, range.to).map { shifts ->
+                SummaryUiState(
+                    range = range,
+                    summary = ShiftCalculator.summarize(shifts),
+                    breakdown = breakdown(range, shifts),
+                    loading = false,
+                )
             }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SummaryUiState())
 
-    fun previousMonth() = month.update { it.minusMonths(1) }
-    fun nextMonth() = month.update { it.plusMonths(1) }
+    fun setPeriod(value: SummaryPeriod) {
+        savedStateHandle[KEY_PERIOD] = value.name
+    }
+
+    fun previous() = shift(-1)
+    fun next() = shift(1)
+
+    fun goToToday() {
+        savedStateHandle[KEY_ANCHOR] = LocalDate.now().toEpochDay()
+    }
+
+    private fun shift(step: Long) {
+        val current = LocalDate.ofEpochDay(anchor.value)
+        val moved = when (SummaryPeriod.valueOf(period.value)) {
+            SummaryPeriod.WEEK -> current.plusWeeks(step)
+            SummaryPeriod.MONTH -> current.plusMonths(step)
+            SummaryPeriod.YEAR -> current.plusYears(step)
+        }
+        savedStateHandle[KEY_ANCHOR] = moved.toEpochDay()
+    }
+
+    private fun breakdown(range: PeriodRange, shifts: List<ShiftWithJob>): List<BreakdownEntry> = when (range.period) {
+        SummaryPeriod.WEEK -> (0L..6L).map { offset ->
+            val day = range.from.plusDays(offset)
+            entry(day, shifts.filter { it.shift.date == day })
+        }
+        SummaryPeriod.YEAR -> (1..12).map { month ->
+            val first = range.from.withMonth(month).withDayOfMonth(1)
+            entry(first, shifts.filter { it.shift.date.monthValue == month })
+        }
+        SummaryPeriod.MONTH -> emptyList()
+    }
+
+    private fun entry(date: LocalDate, shifts: List<ShiftWithJob>) = BreakdownEntry(
+        date = date,
+        paidMinutes = shifts.sumOf { it.shift.paidMinutes },
+        earningsGrosze = shifts.sumOf { it.shift.earningsGrosze },
+        shiftCount = shifts.size,
+    )
+
+    private companion object {
+        const val KEY_PERIOD = "period"
+        const val KEY_ANCHOR = "anchor"
+    }
 }

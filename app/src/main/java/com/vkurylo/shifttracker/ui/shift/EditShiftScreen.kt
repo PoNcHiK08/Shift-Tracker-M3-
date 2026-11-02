@@ -67,8 +67,11 @@ import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
+import com.vkurylo.shifttracker.ui.components.PickerField
+import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.StatBlock
 import com.vkurylo.shifttracker.ui.components.composeColor
+import com.vkurylo.shifttracker.ui.jobs.jobRatesLabel
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
@@ -291,58 +294,11 @@ private fun FieldLabel(text: String) {
     )
 }
 
-/** Read-only text field that opens a picker; keeps native field visuals and accessibility. */
-@Composable
-private fun PickerField(
-    label: String,
-    value: String,
-    icon: @Composable () -> Unit,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    supporting: String? = null,
-) {
-    val interactionSource = remember { MutableInteractionSource() }
-    LaunchedEffect(interactionSource) {
-        interactionSource.interactions.collect { if (it is PressInteraction.Release) onClick() }
-    }
-    OutlinedTextField(
-        value = value,
-        onValueChange = {},
-        readOnly = true,
-        label = { Text(label) },
-        leadingIcon = icon,
-        singleLine = true,
-        supportingText = supporting?.let { { Text(it) } },
-        interactionSource = interactionSource,
-        modifier = modifier.fillMaxWidth(),
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TimeDialog(
-    title: String,
-    initial: LocalTime,
-    onConfirm: (LocalTime) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val state = rememberTimePickerState(initialHour = initial.hour, initialMinute = initial.minute, is24Hour = true)
-    TimePickerDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(LocalTime.of(state.hour, state.minute)) }) { Text(stringResource(R.string.ok)) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    ) {
-        TimePicker(state = state)
-    }
-}
-
 @Composable
 private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
     val locale = currentLocale()
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val pay = state.pay
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -352,26 +308,56 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             Row(verticalAlignment = Alignment.Bottom) {
                 StatBlock(
                     label = stringResource(R.string.earnings),
-                    value = Formatters.money(state.earningsGrosze, locale),
+                    value = Formatters.money(pay.earningsGrosze, locale),
                     color = onColor,
                     modifier = Modifier.weight(1f),
                 )
                 StatBlock(
                     label = stringResource(R.string.paid_hours),
-                    value = Formatters.hoursMinutes(state.paidMinutes),
+                    value = Formatters.hoursMinutes(pay.paidMinutes),
                     color = onColor,
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, locale)),
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            Spacer(Modifier.height(12.dp))
+            val second = state.secondRate
+            if (second == null) {
+                Text(
+                    stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, locale)),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            } else {
+                // Per-rate split, e.g. "33,00 zł/h · 6:00" and "23:00–06:00 · 37,00 zł/h · 2:00".
+                Text(
+                    stringResource(
+                        R.string.rate_line_base,
+                        Formatters.rate(state.rateGrosze, locale),
+                        Formatters.hoursMinutes(pay.baseRateMinutes),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    stringResource(
+                        R.string.rate_line_second,
+                        Formatters.time(second.from),
+                        Formatters.time(second.to),
+                        Formatters.rate(second.rateGrosze, locale),
+                        Formatters.hoursMinutes(pay.secondRateMinutes),
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if ((state.breakValue ?: 0) > 0 && pay.secondRateMinutes > 0 && pay.baseRateMinutes > 0) {
+                    Text(
+                        stringResource(R.string.break_split_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = onColor.copy(alpha = 0.75f),
+                    )
+                }
+            }
             AnimatedVisibility(state.rateOutdated) {
                 Column {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        stringResource(R.string.rate_changed_hint, Formatters.rate(state.selectedJob?.hourlyRateGrosze ?: 0, locale)),
+                        stringResource(R.string.rate_changed_hint, state.selectedJob?.let { jobRatesLabel(it) } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                     )
                     TextButton(onClick = onUseCurrentRate) { Text(stringResource(R.string.use_current_rate)) }

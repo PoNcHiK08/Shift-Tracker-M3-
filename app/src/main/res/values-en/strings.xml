@@ -36,12 +36,37 @@
 
     <!-- Summary -->
     <string name="summary_title">Summary</string>
-    <string name="total_earnings">Earned this month</string>
     <string name="average_rate">Average rate</string>
     <string name="by_job">By job</string>
     <string name="share_of_earnings">%1$d%% of this month\'s earnings</string>
     <string name="summary_empty_title">Nothing to count yet</string>
-    <string name="summary_empty_message">Once you add shifts for this month, hours and earnings show up here.</string>
+    <string name="summary_empty_message">Once you add shifts for this period, hours and earnings show up here.</string>
+
+    <!-- Summary periods -->
+    <string name="period_week">Week</string>
+    <string name="period_month">Month</string>
+    <string name="period_year">Year</string>
+    <string name="earnings_week">Earned this week</string>
+    <string name="earnings_month">Earned this month</string>
+    <string name="earnings_year">Earned this year</string>
+    <string name="by_day">By day</string>
+    <string name="by_month">By month</string>
+    <string name="previous_period">Previous period</string>
+    <string name="next_period">Next period</string>
+    <string name="current_period">Current period</string>
+
+    <!-- Second (timed) rate -->
+    <string name="base_rate">Base rate</string>
+    <string name="second_rate_toggle">Second rate by time</string>
+    <string name="second_rate_toggle_summary">A different rate during certain hours, e.g. night 23:00–06:00</string>
+    <string name="second_rate">Second rate</string>
+    <string name="second_rate_from">From</string>
+    <string name="second_rate_to">Until</string>
+    <string name="error_window_empty">Start and end must differ</string>
+    <string name="second_rate_summary">%1$s–%2$s: %3$s</string>
+    <string name="rate_line_base">%1$s · %2$s h</string>
+    <string name="rate_line_second">%1$s–%2$s: %3$s · %4$s h</string>
+    <string name="break_split_hint">The break is taken from both rates proportionally</string>
 
     <!-- Jobs -->
     <string name="jobs_title">Jobs</string>

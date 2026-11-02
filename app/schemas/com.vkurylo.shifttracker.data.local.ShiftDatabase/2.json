@@ -1,0 +1,193 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "08d057cc454e5eebc9bc153791fe1bce",
+    "entities": [
+      {
+        "tableName": "jobs",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `hourly_rate_grosze` INTEGER NOT NULL, `color` INTEGER NOT NULL, `second_rate_grosze` INTEGER, `second_rate_from_minute` INTEGER NOT NULL DEFAULT 1380, `second_rate_to_minute` INTEGER NOT NULL DEFAULT 360)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "name",
+            "columnName": "name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hourlyRateGrosze",
+            "columnName": "hourly_rate_grosze",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "color",
+            "columnName": "color",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "secondRateGrosze",
+            "columnName": "second_rate_grosze",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "secondRateFromMinute",
+            "columnName": "second_rate_from_minute",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1380"
+          },
+          {
+            "fieldPath": "secondRateToMinute",
+            "columnName": "second_rate_to_minute",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "360"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      },
+      {
+        "tableName": "shifts",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `job_id` INTEGER NOT NULL, `date_epoch_day` INTEGER NOT NULL, `start_minute` INTEGER NOT NULL, `end_minute` INTEGER NOT NULL, `unpaid_break_minutes` INTEGER NOT NULL, `hourly_rate_grosze` INTEGER NOT NULL, `note` TEXT, `external_uid` TEXT, `second_rate_grosze` INTEGER, `second_rate_from_minute` INTEGER NOT NULL DEFAULT 1380, `second_rate_to_minute` INTEGER NOT NULL DEFAULT 360, FOREIGN KEY(`job_id`) REFERENCES `jobs`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "jobId",
+            "columnName": "job_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateEpochDay",
+            "columnName": "date_epoch_day",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "startMinute",
+            "columnName": "start_minute",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "endMinute",
+            "columnName": "end_minute",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "unpaidBreakMinutes",
+            "columnName": "unpaid_break_minutes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "hourlyRateGrosze",
+            "columnName": "hourly_rate_grosze",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "note",
+            "columnName": "note",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "externalUid",
+            "columnName": "external_uid",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "secondRateGrosze",
+            "columnName": "second_rate_grosze",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "secondRateFromMinute",
+            "columnName": "second_rate_from_minute",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "1380"
+          },
+          {
+            "fieldPath": "secondRateToMinute",
+            "columnName": "second_rate_to_minute",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "360"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_shifts_job_id",
+            "unique": false,
+            "columnNames": [
+              "job_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shifts_job_id` ON `${TABLE_NAME}` (`job_id`)"
+          },
+          {
+            "name": "index_shifts_date_epoch_day",
+            "unique": false,
+            "columnNames": [
+              "date_epoch_day"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shifts_date_epoch_day` ON `${TABLE_NAME}` (`date_epoch_day`)"
+          },
+          {
+            "name": "index_shifts_external_uid",
+            "unique": false,
+            "columnNames": [
+              "external_uid"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_shifts_external_uid` ON `${TABLE_NAME}` (`external_uid`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "jobs",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "job_id"
+            ],
+            "referencedColumns": [
+              "id"
+            ]
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '08d057cc454e5eebc9bc153791fe1bce')"
+    ]
+  }
+}

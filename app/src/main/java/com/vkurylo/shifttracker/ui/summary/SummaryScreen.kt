@@ -21,15 +21,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QueryStats
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -38,8 +44,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,7 +57,7 @@ import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
-import com.vkurylo.shifttracker.ui.components.MonthSwitcher
+import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
 import com.vkurylo.shifttracker.ui.components.SectionHeader
 import com.vkurylo.shifttracker.ui.components.StatBlock
 import com.vkurylo.shifttracker.ui.components.composeColor
@@ -56,18 +65,28 @@ import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
 import com.vkurylo.shifttracker.ui.util.shiftsCountLabel
+import java.time.LocalDate
+import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val range = state.range
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             LargeTopAppBar(
                 title = { Text(stringResource(R.string.summary_title)) },
+                actions = {
+                    if (LocalDate.now() !in range) {
+                        IconButton(onClick = viewModel::goToToday) {
+                            Icon(Icons.Filled.Today, stringResource(R.string.current_period))
+                        }
+                    }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -76,25 +95,37 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
         ) {
+            item(key = "period") {
+                PeriodSelector(
+                    selected = range.period,
+                    onSelect = viewModel::setPeriod,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
             item(key = "switcher") {
-                MonthSwitcher(
-                    month = state.month,
-                    onPrevious = viewModel::previousMonth,
-                    onNext = viewModel::nextMonth,
+                PeriodSwitcher(
+                    label = periodLabel(range),
+                    onPrevious = viewModel::previous,
+                    onNext = viewModel::next,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             item(key = "hero") {
                 AnimatedContent(
-                    targetState = state.month to state.summary,
+                    targetState = state,
+                    contentKey = { it.range },
                     transitionSpec = {
-                        val forward = targetState.first > initialState.first
-                        (slideInHorizontally { if (forward) it / 6 else -it / 6 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { if (forward) -it / 6 else it / 6 } + fadeOut())
+                        if (targetState.range.period != initialState.range.period) {
+                            fadeIn() togetherWith fadeOut()
+                        } else {
+                            val forward = targetState.range.from > initialState.range.from
+                            (slideInHorizontally { if (forward) it / 6 else -it / 6 } + fadeIn()) togetherWith
+                                (slideOutHorizontally { if (forward) -it / 6 else it / 6 } + fadeOut())
+                        }
                     },
                     label = "summaryHero",
-                ) { (_, summary) ->
-                    TotalsCard(summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                ) { target ->
+                    TotalsCard(target.range.period, target.summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
                 }
             }
             if (!state.loading && state.summary.shiftCount == 0) {
@@ -105,32 +136,98 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                         message = stringResource(R.string.summary_empty_message),
                     )
                 }
-            } else if (state.summary.perJob.isNotEmpty()) {
-                item(key = "by-job-header") { SectionHeader(stringResource(R.string.by_job)) }
-                items(state.summary.perJob, key = { it.job.id }) { jobSummary ->
-                    JobSummaryCard(
-                        summary = jobSummary,
-                        totalEarnings = state.summary.totalEarningsGrosze,
-                        modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 6.dp),
-                    )
+            } else {
+                if (state.summary.perJob.isNotEmpty()) {
+                    item(key = "by-job-header") { SectionHeader(stringResource(R.string.by_job)) }
+                    items(state.summary.perJob, key = { "job-${it.job.id}" }) { jobSummary ->
+                        JobSummaryCard(
+                            summary = jobSummary,
+                            totalEarnings = state.summary.totalEarningsGrosze,
+                            modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
+                }
+                if (state.breakdown.isNotEmpty()) {
+                    item(key = "breakdown-header") {
+                        SectionHeader(stringResource(if (range.period == SummaryPeriod.WEEK) R.string.by_day else R.string.by_month))
+                    }
+                    item(key = "breakdown") {
+                        BreakdownCard(
+                            period = range.period,
+                            entries = state.breakdown,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        )
+                    }
                 }
             }
         }
     }
 }
 
+/** M3 Expressive connected button group: Week | Month | Year. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TotalsCard(summary: MonthSummary, modifier: Modifier = Modifier) {
+private fun PeriodSelector(
+    selected: SummaryPeriod,
+    onSelect: (SummaryPeriod) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val options = listOf(
+        SummaryPeriod.WEEK to R.string.period_week,
+        SummaryPeriod.MONTH to R.string.period_month,
+        SummaryPeriod.YEAR to R.string.period_year,
+    )
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+    ) {
+        options.forEachIndexed { index, (period, label) ->
+            ToggleButton(
+                checked = period == selected,
+                onCheckedChange = { onSelect(period) },
+                shapes = when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(48.dp)
+                    .semantics { role = Role.RadioButton },
+            ) {
+                Text(stringResource(label), maxLines = 1)
+            }
+        }
+    }
+}
+
+@Composable
+private fun periodLabel(range: PeriodRange): String {
+    val locale = currentLocale()
+    return when (range.period) {
+        SummaryPeriod.WEEK -> Formatters.dateRange(range.from, range.to, locale)
+        SummaryPeriod.MONTH -> Formatters.monthYear(YearMonth.from(range.from), locale)
+        SummaryPeriod.YEAR -> range.from.year.toString()
+    }
+}
+
+@Composable
+private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val onColor = MaterialTheme.colorScheme.onPrimaryContainer
     val average = if (summary.totalPaidMinutes > 0) summary.totalEarningsGrosze * 60 / summary.totalPaidMinutes else 0
+    val title = when (period) {
+        SummaryPeriod.WEEK -> R.string.earnings_week
+        SummaryPeriod.MONTH -> R.string.earnings_month
+        SummaryPeriod.YEAR -> R.string.earnings_year
+    }
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = onColor),
     ) {
         Column(Modifier.padding(24.dp)) {
-            Text(stringResource(R.string.total_earnings), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+            Text(stringResource(title), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
             Text(
                 Formatters.money(summary.totalEarningsGrosze, locale),
                 style = MaterialTheme.typography.displaySmall,
@@ -176,6 +273,70 @@ private fun JobSummaryCard(summary: JobSummary, totalEarnings: Long, modifier: M
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 strokeCap = StrokeCap.Round,
             )
+        }
+    }
+}
+
+/** Per-day (week) or per-month (year) earnings, each with a bar relative to the best entry. */
+@Composable
+private fun BreakdownCard(period: SummaryPeriod, entries: List<BreakdownEntry>, modifier: Modifier = Modifier) {
+    val locale = currentLocale()
+    val max = entries.maxOf { it.earningsGrosze }.coerceAtLeast(1)
+    val today = LocalDate.now()
+    ElevatedCard(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(Modifier.padding(vertical = 8.dp)) {
+            entries.forEach { entry ->
+                val isCurrent = when (period) {
+                    SummaryPeriod.WEEK -> entry.date == today
+                    else -> YearMonth.from(entry.date) == YearMonth.from(today)
+                }
+                val label = when (period) {
+                    SummaryPeriod.WEEK -> Formatters.shortDate(entry.date, locale)
+                    else -> Formatters.monthName(YearMonth.from(entry.date), locale)
+                }
+                val empty = entry.shiftCount == 0
+                val valueText = Formatters.money(entry.earningsGrosze, locale)
+                val hoursText = hoursLabel(entry.paidMinutes)
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clearAndSetSemantics { contentDescription = "$label: $valueText, $hoursText" },
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            label,
+                            style = if (isCurrent) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        if (!empty) {
+                            Text(
+                                hoursText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Text(
+                            if (empty) "—" else valueText,
+                            style = MaterialTheme.typography.titleSmall,
+                            color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        )
+                    }
+                    if (!empty) {
+                        Spacer(Modifier.height(6.dp))
+                        val progress by animateFloatAsState(entry.earningsGrosze.toFloat() / max, label = "breakdown")
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier.fillMaxWidth().height(6.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            strokeCap = StrokeCap.Round,
+                        )
+                    }
+                }
+            }
         }
     }
 }

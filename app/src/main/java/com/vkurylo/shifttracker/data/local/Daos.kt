@@ -39,7 +39,10 @@ interface ShiftDao {
     @Query(
         """
         SELECT s.*, j.id AS j_id, j.name AS j_name,
-               j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color
+               j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color,
+               j.second_rate_grosze AS j_second_rate_grosze,
+               j.second_rate_from_minute AS j_second_rate_from_minute,
+               j.second_rate_to_minute AS j_second_rate_to_minute
         FROM shifts s INNER JOIN jobs j ON j.id = s.job_id
         WHERE s.date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
         ORDER BY s.date_epoch_day, s.start_minute

@@ -39,12 +39,37 @@
 
     <!-- Summary -->
     <string name="summary_title">Підсумок</string>
-    <string name="total_earnings">Заробіток за місяць</string>
     <string name="average_rate">Середня ставка</string>
     <string name="by_job">За роботами</string>
     <string name="share_of_earnings">%1$d%% заробітку за місяць</string>
     <string name="summary_empty_title">Поки нічого рахувати</string>
-    <string name="summary_empty_message">Коли додаси зміни за цей місяць, тут з\'являться години й заробіток.</string>
+    <string name="summary_empty_message">Коли додаси зміни за цей період, тут з\'являться години й заробіток.</string>
+
+    <!-- Summary periods -->
+    <string name="period_week">Тиждень</string>
+    <string name="period_month">Місяць</string>
+    <string name="period_year">Рік</string>
+    <string name="earnings_week">Заробіток за тиждень</string>
+    <string name="earnings_month">Заробіток за місяць</string>
+    <string name="earnings_year">Заробіток за рік</string>
+    <string name="by_day">По днях</string>
+    <string name="by_month">По місяцях</string>
+    <string name="previous_period">Попередній період</string>
+    <string name="next_period">Наступний період</string>
+    <string name="current_period">Поточний період</string>
+
+    <!-- Second (timed) rate -->
+    <string name="base_rate">Основна ставка</string>
+    <string name="second_rate_toggle">Друга ставка за часом</string>
+    <string name="second_rate_toggle_summary">Інша ставка в певні години, напр. нічна з 23:00 до 06:00</string>
+    <string name="second_rate">Друга ставка</string>
+    <string name="second_rate_from">Діє з</string>
+    <string name="second_rate_to">До</string>
+    <string name="error_window_empty">Початок і кінець мають відрізнятися</string>
+    <string name="second_rate_summary">%1$s–%2$s: %3$s</string>
+    <string name="rate_line_base">%1$s · %2$s год</string>
+    <string name="rate_line_second">%1$s–%2$s: %3$s · %4$s год</string>
+    <string name="break_split_hint">Перерва віднімається з обох ставок пропорційно</string>
 
     <!-- Jobs -->
     <string name="jobs_title">Роботи</string>
