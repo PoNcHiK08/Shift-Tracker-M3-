@@ -88,6 +88,13 @@
     <string name="including_bonuses">у т.ч. бонуси %1$s</string>
     <string name="bonuses_value">бонуси %1$s</string>
 
+    <!-- Crash report -->
+    <string name="crash_title">Минулого разу застосунок закрився з помилкою</string>
+    <string name="crash_message">Скопіюй цей текст і надішли розробнику — так помилку можна точно виправити.</string>
+    <string name="crash_copy">Копіювати</string>
+    <string name="crash_share">Поділитися</string>
+    <string name="crash_copied">Скопійовано</string>
+
     <!-- Jobs -->
     <string name="jobs_title">Роботи</string>
     <string name="add_job">Додати роботу</string>

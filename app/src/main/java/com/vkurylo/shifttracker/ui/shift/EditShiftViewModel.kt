@@ -75,7 +75,7 @@ class EditShiftViewModel @Inject constructor(
     private val route = savedStateHandle.toRoute<EditShiftRoute>()
     private var original: Shift? = null
 
-    private val _uiState = MutableStateFlow(EditShiftUiState())
+    private val _uiState = MutableStateFlow(EditShiftUiState(isNew = route.shiftId == 0L))
     val uiState: StateFlow<EditShiftUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<EditShiftEvent>(Channel.BUFFERED)

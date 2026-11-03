@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vkurylo.shifttracker.ui.components.CrashReportDialog
 import com.vkurylo.shifttracker.ui.navigation.ShiftTrackerNavHost
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.theme.isDark
@@ -47,8 +51,17 @@ class MainActivity : AppCompatActivity() {
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                     ShiftTrackerNavHost()
                 }
+                // A crash/unexpected close last time? Show it so it can be copied and sent.
+                var crashReport by remember { mutableStateOf(CrashReporter.consume(this@MainActivity)) }
+                crashReport?.let { report -> CrashReportDialog(report, onDismiss = { crashReport = null }) }
             }
         }
+    }
+
+    override fun finish() {
+        // Leaving the app is only expected from the home screen; anything else is a bug worth reporting.
+        if (CrashReporter.currentScreen != "home") CrashReporter.recordUnexpectedFinish(this)
+        super.finish()
     }
 
     private companion object {

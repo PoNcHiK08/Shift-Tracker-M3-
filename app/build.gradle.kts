@@ -81,6 +81,8 @@ android {
         unitTests.all { test ->
             // Optional mirror for the Android runtime jars Robolectric downloads.
             System.getenv("ROBOLECTRIC_REPO_URL")?.let { test.systemProperty("robolectric.dependency.repo.url", it) }
+            // Robolectric's Android 16 (SDK 36) runtime needs this on JDK 21.
+            test.jvmArgs("--add-opens=java.base/jdk.internal.access=ALL-UNNAMED")
         }
     }
 }

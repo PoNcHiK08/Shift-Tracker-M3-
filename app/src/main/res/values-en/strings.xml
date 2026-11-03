@@ -85,6 +85,13 @@
     <string name="including_bonuses">incl. bonuses %1$s</string>
     <string name="bonuses_value">bonuses %1$s</string>
 
+    <!-- Crash report -->
+    <string name="crash_title">The app closed with an error last time</string>
+    <string name="crash_message">Copy this text and send it to the developer so the bug can be fixed precisely.</string>
+    <string name="crash_copy">Copy</string>
+    <string name="crash_share">Share</string>
+    <string name="crash_copied">Copied</string>
+
     <!-- Jobs -->
     <string name="jobs_title">Jobs</string>
     <string name="add_job">Add job</string>

@@ -42,6 +42,12 @@ file manager the first time.
 > `SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`
 > environment variables (e.g. from GitHub Secrets). The dev key in this repo is public and only meant for testing.
 
+## Crash reports
+
+Sideloaded APKs have no Play Console, so the app keeps its own: if it crashes (or closes itself while a
+detail screen is open), the next launch shows the error with **Copy** / **Share** buttons. Release builds
+are shrunk but not obfuscated, so the report is readable without a mapping file.
+
 ## Build locally
 
 Requirements: JDK 17+ and the Android SDK (Android Studio installs both).

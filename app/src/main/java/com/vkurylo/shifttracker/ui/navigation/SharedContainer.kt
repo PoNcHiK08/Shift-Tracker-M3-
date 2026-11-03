@@ -13,7 +13,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.wrapContentSize
@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavBackStackEntry
@@ -117,14 +118,17 @@ fun ContainerTransformHost(
         transitionSpec = { AppMotion.containerTransform(0.001f) },
         label = "editorScrim",
     ) { state -> if (state == EnterExitState.Visible) 0.32f else 0f }
-    BoxWithConstraints(
+    // The destination fills the (edge-to-edge) window, so the editor's final size is the window size.
+    // Read it directly instead of BoxWithConstraints: no subcomposition inside the shared transition.
+    val windowSize = LocalWindowInfo.current.containerDpSize
+    Box(
         Modifier
             .fillMaxSize()
             .drawBehind { drawRect(Color.Black.copy(alpha = scrim.coerceIn(0f, 1f))) },
     ) {
         val fullSize = Modifier
             .wrapContentSize(Alignment.TopStart, unbounded = true)
-            .requiredSize(maxWidth, maxHeight)
+            .requiredSize(windowSize)
         content(RoundedCornerShape(corner), fullSize)
     }
 }

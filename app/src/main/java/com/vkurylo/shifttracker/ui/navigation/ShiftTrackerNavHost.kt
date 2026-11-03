@@ -18,6 +18,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
+import com.vkurylo.shifttracker.CrashReporter
 import com.vkurylo.shifttracker.ui.bonus.EditBonusScreen
 import com.vkurylo.shifttracker.ui.calendar.CalendarScreen
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -65,6 +67,9 @@ fun ShiftTrackerNavHost() {
     val rootEntry by rootNav.currentBackStackEntryAsState()
     val onHome = rootEntry?.destination?.hasRoute(MainRoute::class) != false
     val transitions = rememberM3Transitions()
+    SideEffect {
+        CrashReporter.currentScreen = if (onHome) "home" else rootEntry?.destination?.route ?: "?"
+    }
 
     CompositionLocalProvider(LocalSnackbarController provides snackbarController) {
         Box(Modifier.fillMaxSize()) {
@@ -114,7 +119,7 @@ fun ShiftTrackerNavHost() {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
                                 Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
                                             EditShiftScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -130,7 +135,7 @@ fun ShiftTrackerNavHost() {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
                                 Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
                                             EditBonusScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -199,8 +204,10 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
             exitTransition = { transitions.fadeThroughExit() },
             popEnterTransition = { transitions.fadeThroughEnter() },
             popExitTransition = { transitions.fadeThroughExit() },
-            predictivePopEnterTransition = { transitions.fadeThroughEnter() },
-            predictivePopExitTransition = { transitions.fadeThroughExit() },
+            // Back gesture from Summary/Settings: the tab shrinks away over the calendar (M3 predictive
+            // back) instead of two half-transparent screens cross-fading under the finger.
+            predictivePopEnterTransition = { transitions.predictiveBackEnter() },
+            predictivePopExitTransition = { swipeEdge -> transitions.predictiveBackExit(swipeEdge) },
         ) {
             composable<CalendarRoute> {
                 CalendarScreen(
@@ -216,13 +223,15 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                 )
             }
             composable<SummaryRoute> {
-                SummaryScreen()
+                Box(Modifier.closingScreenShape(this)) { SummaryScreen() }
             }
             composable<SettingsRoute> {
-                SettingsScreen(
-                    onManageJobs = { rootNav.navigate(JobsRoute) },
-                    onImportIcs = { uri -> rootNav.navigate(ImportIcsRoute(uri.toString())) },
-                )
+                Box(Modifier.closingScreenShape(this)) {
+                    SettingsScreen(
+                        onManageJobs = { rootNav.navigate(JobsRoute) },
+                        onImportIcs = { uri -> rootNav.navigate(ImportIcsRoute(uri.toString())) },
+                    )
+                }
             }
         }
     }

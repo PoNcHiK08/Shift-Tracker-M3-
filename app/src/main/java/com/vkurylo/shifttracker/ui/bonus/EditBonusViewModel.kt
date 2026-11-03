@@ -57,7 +57,7 @@ class EditBonusViewModel @Inject constructor(
     private val route = savedStateHandle.toRoute<EditBonusRoute>()
     private var original: Bonus? = null
 
-    private val _uiState = MutableStateFlow(EditBonusUiState())
+    private val _uiState = MutableStateFlow(EditBonusUiState(isNew = route.bonusId == 0L))
     val uiState: StateFlow<EditBonusUiState> = _uiState.asStateFlow()
 
     private val _events = Channel<EditBonusEvent>(Channel.BUFFERED)
