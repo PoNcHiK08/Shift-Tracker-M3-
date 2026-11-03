@@ -129,11 +129,13 @@ fun Modifier.closingScreenShape(scope: AnimatedVisibilityScope): Modifier {
     val closing by scope.transition.animateFloat(transitionSpec = { predictiveSpec() }, label = "closing") { state ->
         if (state == EnterExitState.PostExit) 1f else 0f
     }
-    if (closing <= 0f) return this
+    // Clamp: shapes and shadows reject negative sizes, and gesture seeking may land just outside 0..1.
+    val progress = closing.coerceIn(0f, 1f)
+    if (progress <= 0f) return this
     return graphicsLayer {
-        shape = RoundedCornerShape(PredictiveBackCorner * closing)
+        shape = RoundedCornerShape(PredictiveBackCorner * progress)
         clip = true
-        shadowElevation = PredictiveBackShadow.toPx() * closing
+        shadowElevation = PredictiveBackShadow.toPx() * progress
     }
 }
 

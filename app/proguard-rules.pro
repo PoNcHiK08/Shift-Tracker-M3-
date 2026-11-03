@@ -12,9 +12,6 @@
 -keep @kotlinx.serialization.Serializable class com.vkurylo.shifttracker.ui.navigation.** { *; }
 -keep class com.vkurylo.shifttracker.ui.navigation.**$$serializer { *; }
 
-# Shrinking stays on, but no optimisation/obfuscation for now:
-#  - "open shift editor closes the app" happened only in the optimised release build (debug and an
-#    unoptimised release behave correctly), so optimisation is off until the cause is pinned down;
-#  - without obfuscation the in-app crash report (CrashReporter) shows readable class/method names.
--dontoptimize
+# No obfuscation: the in-app crash report (CrashReporter) then shows readable class and method names,
+# which is what pinned down the container-transform crash. Shrinking and optimisation stay on.
 -dontobfuscate

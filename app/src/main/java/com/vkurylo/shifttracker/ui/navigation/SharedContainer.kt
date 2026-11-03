@@ -129,7 +129,10 @@ fun ContainerTransformHost(
         val fullSize = Modifier
             .wrapContentSize(Alignment.TopStart, unbounded = true)
             .requiredSize(windowSize)
-        content(RoundedCornerShape(corner), fullSize)
+        // The spatial spring overshoots a little: near the end of the transform the radius dips just
+        // below zero, and a RoundedCornerShape with a negative radius throws while drawing (this was
+        // the "opening a shift closes the app" crash). Never hand a negative radius to the shape.
+        content(RoundedCornerShape(corner.coerceAtLeast(0.dp)), fullSize)
     }
 }
 
