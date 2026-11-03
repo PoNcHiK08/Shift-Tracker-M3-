@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.ui.theme
 
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Indication
@@ -28,9 +29,26 @@ import androidx.compose.ui.semantics.Role
  * Screen transitions follow the M3 transition patterns (ui/navigation/M3Transitions.kt).
  */
 object AppMotion {
+    /**
+     * Screen transitions run about 15 % quicker than the stock springs: same damping (same character
+     * and bounce), stiffness × this. A spring's duration goes with 1/√stiffness, so × 1.38 ≈ × 0.85 time.
+     */
+    const val TRANSITION_STIFFNESS_FACTOR = 1.38f
+
     /** Container transform (card -> full screen editor): bouncy enough to feel physical, no wobble. */
-    fun <T> containerTransform(visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = visibilityThreshold)
+    fun <T> containerTransform(visibilityThreshold: T? = null): FiniteAnimationSpec<T> = spring(
+        dampingRatio = 0.86f,
+        stiffness = Spring.StiffnessMediumLow * TRANSITION_STIFFNESS_FACTOR,
+        visibilityThreshold = visibilityThreshold,
+    )
+
+    /** A motion-scheme spring made quicker for screen transitions; any other spec is returned as is. */
+    fun <T> quicker(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =
+        if (spec is SpringSpec<T>) {
+            spring(spec.dampingRatio, spec.stiffness * TRANSITION_STIFFNESS_FACTOR, spec.visibilityThreshold)
+        } else {
+            spec
+        }
 }
 
 /**

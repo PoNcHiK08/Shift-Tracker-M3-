@@ -37,6 +37,7 @@ import androidx.navigation.NavBackStackEntry
 import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.vkurylo.shifttracker.ui.theme.AppMotion
 
 /*
  * Material 3 Expressive screen transitions (m3.material.io → Motion → Transition patterns), with
@@ -72,7 +73,7 @@ private val PredictiveBackShadow = 12.dp
  * the finger lifts the rest of it plays in real time, so the exit after release takes
  * (1 - progress at release) * this.
  */
-internal const val PREDICTIVE_BACK_MS = 300
+internal const val PREDICTIVE_BACK_MS = 250
 
 /** The curve Material 3 components use to map predictive back progress (fast start, gentle end). */
 private val PredictiveBackEasing = CubicBezierEasing(0.1f, 0.1f, 0f, 1f)
@@ -116,10 +117,11 @@ class M3Transitions internal constructor(
 fun rememberM3Transitions(): M3Transitions {
     val motion = MaterialTheme.motionScheme
     val density = LocalDensity.current
-    val spatial = motion.defaultSpatialSpec<IntOffset>()
-    val scaleSpec = motion.defaultSpatialSpec<Float>()
-    val fadeInSpec = motion.defaultEffectsSpec<Float>()
-    val fadeOutSpec = motion.fastEffectsSpec<Float>()
+    // The scheme's springs, a little quicker for screen transitions (see AppMotion).
+    val spatial = AppMotion.quicker(motion.defaultSpatialSpec<IntOffset>())
+    val scaleSpec = AppMotion.quicker(motion.defaultSpatialSpec<Float>())
+    val fadeInSpec = AppMotion.quicker(motion.defaultEffectsSpec<Float>())
+    val fadeOutSpec = AppMotion.quicker(motion.fastEffectsSpec<Float>())
     return remember(motion, density) {
         M3Transitions(
             axisPx = with(density) { SharedAxisDistance.roundToPx() },

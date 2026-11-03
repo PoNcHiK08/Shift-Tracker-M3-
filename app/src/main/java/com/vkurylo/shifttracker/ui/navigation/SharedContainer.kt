@@ -87,7 +87,7 @@ fun Modifier.sharedContainer(key: String?, shape: Shape, isEditor: Boolean = fal
     val sharedScope = LocalSharedTransitionScope.current ?: return this
     val visibilityScope = LocalRootAnimatedVisibilityScope.current ?: return this
     if (key == null) return this
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val effects = AppMotion.quicker(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val gesture = PredictiveBackGesture.closingEntryId != null
     return with(sharedScope) {
         this@sharedContainer.sharedBounds(
