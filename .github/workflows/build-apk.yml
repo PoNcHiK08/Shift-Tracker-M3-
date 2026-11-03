@@ -35,7 +35,11 @@ jobs:
       - name: Unit tests (calculator, .ics parser, UI smoke test)
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # The GitHub builds are signed with the public dev key on purpose, so each one installs
+      # over the previous one. The release build refuses that key unless it is allowed here.
       - name: Build APKs
+        env:
+          ALLOW_DEV_RELEASE_SIGNING: "true"
         run: ./gradlew assembleRelease assembleDebug --stacktrace
 
       - name: Rename APKs

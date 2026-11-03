@@ -7,6 +7,20 @@ plugins {
     alias(libs.plugins.room)
 }
 
+// Release signing policy (see README, "Signing"):
+//  1. SIGNING_KEYSTORE_PATH (+ SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS, SIGNING_KEY_PASSWORD) → that key.
+//  2. Otherwise the public dev key from the repo, but only on an explicit opt-in
+//     (env ALLOW_DEV_RELEASE_SIGNING=true or -PallowDevReleaseSigning=true), and with a warning in the log.
+//  3. Neither → the release build stops before signing and says what to do.
+// Debug builds always use the dev key.
+val releaseKeystorePath: String? = System.getenv("SIGNING_KEYSTORE_PATH")?.takeIf { it.isNotBlank() }
+val missingReleaseSigningVars: List<String> =
+    if (releaseKeystorePath == null) emptyList()
+    else listOf("SIGNING_STORE_PASSWORD", "SIGNING_KEY_ALIAS", "SIGNING_KEY_PASSWORD").filter { System.getenv(it).isNullOrEmpty() }
+val allowDevReleaseSigning: Boolean =
+    System.getenv("ALLOW_DEV_RELEASE_SIGNING").equals("true", ignoreCase = true) ||
+        providers.gradleProperty("allowDevReleaseSigning").orNull.equals("true", ignoreCase = true)
+
 android {
     namespace = "com.vkurylo.shifttracker"
     compileSdk = 37
@@ -23,9 +37,9 @@ android {
     }
 
     signingConfigs {
-        // Development key that lives in the repo, so every CI build has the same
-        // signature and can be installed as an update over the previous one.
-        // For a Play Store release, provide your own key via the SIGNING_* env vars.
+        // Development key that lives in the repo (its password is public), so every GitHub build
+        // has the same signature and installs as an update over the previous one. It is not a
+        // secret: anyone can sign an APK with it. For a store release, use the SIGNING_* env vars.
         create("dev") {
             storeFile = file("signing/dev.keystore")
             storePassword = "shifttracker"
@@ -33,13 +47,13 @@ android {
             keyPassword = "shifttracker"
         }
         create("release") {
-            val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
+            if (releaseKeystorePath != null) {
+                storeFile = file(releaseKeystorePath)
                 storePassword = System.getenv("SIGNING_STORE_PASSWORD")
                 keyAlias = System.getenv("SIGNING_KEY_ALIAS")
                 keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
             } else {
+                // Only used if checkReleaseSigning (below) lets the build through: explicit opt-in.
                 initWith(getByName("dev"))
             }
         }
@@ -90,6 +104,48 @@ android {
 room {
     schemaDirectory("$projectDir/schemas")
 }
+
+// Runs whenever a release is about to be signed (APK or bundle), never for debug builds or tests.
+// Runs on every such build (no outputs), so the warning shows even when the configuration is cached.
+val checkReleaseSigning = tasks.register("checkReleaseSigning") {
+    group = "verification"
+    description = "Stops a release build that has neither a release key nor an explicit dev-key opt-in."
+    val keystore = releaseKeystorePath
+    val missing = missingReleaseSigningVars
+    val allowDev = allowDevReleaseSigning
+    doLast {
+        when {
+            keystore != null && missing.isNotEmpty() -> throw GradleException(
+                "Release signing: SIGNING_KEYSTORE_PATH is set, but ${missing.joinToString()} " +
+                    (if (missing.size == 1) "is" else "are") + " missing.",
+            )
+            keystore != null -> logger.lifecycle("Release signing: using the key from SIGNING_KEYSTORE_PATH.")
+            allowDev -> logger.warn(
+                """
+                |
+                |============================================================================
+                | WARNING: this release APK is signed with the PUBLIC DEVELOPMENT KEY
+                | (app/signing/dev.keystore). Its password is in the repo, so anyone can sign
+                | an APK with it. Fine for the GitHub test builds, NOT for a store release.
+                | Explicitly allowed by ALLOW_DEV_RELEASE_SIGNING / -PallowDevReleaseSigning.
+                |============================================================================
+                |
+                """.trimMargin(),
+            )
+            else -> throw GradleException(
+                """
+                |Release signing is not configured.
+                |  - To sign with your own key, set SIGNING_KEYSTORE_PATH, SIGNING_STORE_PASSWORD,
+                |    SIGNING_KEY_ALIAS and SIGNING_KEY_PASSWORD.
+                |  - To sign with the public development key (GitHub test builds only), opt in
+                |    explicitly: ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
+                |    or ./gradlew assembleRelease -PallowDevReleaseSigning=true
+                """.trimMargin(),
+            )
+        }
+    }
+}
+tasks.matching { it.name == "validateSigningRelease" }.configureEach { dependsOn(checkReleaseSigning) }
 
 dependencies {
     implementation(libs.androidx.core.ktx)
