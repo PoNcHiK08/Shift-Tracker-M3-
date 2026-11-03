@@ -16,7 +16,10 @@ UI in **Ukrainian** by default with **English** as an alternative.
   earnings (the editor offers "use current rate" when they differ).
 - **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
   calendar and summary, but not towards hours or the average hourly rate.
-- **Calendar** — swipeable month grid with colored dots per job; tap a day for a bottom sheet with its shifts and bonuses and "Add shift" / "Bonus" buttons.
+- **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
+  M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
+  "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. Below it, Bento tiles
+  for the month's earnings, hours and shifts.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year.
 - **Settings** — jobs & rates, theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
@@ -54,8 +57,9 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 | Area | Choice |
 | --- | --- |
 | UI | Jetpack Compose, Material 3 Expressive (material3 1.5.0-beta02 on Compose BOM 2026.09), dynamic color, edge-to-edge |
+| Motion | Springs only (MotionScheme.expressive): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press-to-squeeze feedback on cards and cells; circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
-| Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) with a One UI-style slide-over transition (420 ms, cubic-bezier(0.22, 0.25, 0, 1), 31 % parallax, 16 % dim — measured from a screen recording) that also drives predictive back, and a nested tab host with fade-through. Icon-only bottom bar built from M3 Expressive toggle buttons |
+| Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) with a One UI-style slide-over transition (a spring with damping 1.15 / stiffness 580 fitted to a 120 fps recording of Samsung Settings, 31 % parallax, 16 % dim) that also drives predictive back, and a nested tab host with a spring fade-through. Icon-only bottom bar built from M3 Expressive toggle buttons |
 | Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |

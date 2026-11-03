@@ -1,21 +1,26 @@
 package com.vkurylo.shifttracker.ui.navigation
 
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -29,6 +34,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.vkurylo.shifttracker.ui.bonus.EditBonusScreen
 import com.vkurylo.shifttracker.ui.calendar.CalendarScreen
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -44,16 +50,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object MainRoute
 
-// Fade-through between bottom navigation tabs.
-private val fadeThroughEnter = fadeIn(tween(220, delayMillis = 90)) + scaleIn(tween(220, delayMillis = 90), initialScale = 0.96f)
-private val fadeThroughExit = fadeOut(tween(90))
-
 /**
- * Two levels of navigation:
- *  - the root stack holds the tabbed home screen and every detail screen, and moves between them
- *    with the One UI-style slide-over (the whole home screen, bottom bar included, slides away);
- *  - the tabs live in their own nested NavHost and switch with a fade-through.
+ * Two levels of navigation inside one SharedTransitionLayout:
+ *  - the root stack holds the tabbed home screen and every detail screen. Editors opened from a
+ *    card/button grow out of it (container transform); everything else uses the One UI slide-over;
+ *  - the tabs live in their own nested NavHost and switch with a spring fade-through.
  */
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun ShiftTrackerNavHost() {
     val rootNav = rememberNavController()
@@ -65,45 +68,81 @@ fun ShiftTrackerNavHost() {
 
     CompositionLocalProvider(LocalSnackbarController provides snackbarController) {
         Box(Modifier.fillMaxSize()) {
-            NavHost(
-                navController = rootNav,
-                startDestination = MainRoute,
-                modifier = Modifier.fillMaxSize(),
-                enterTransition = { slideOverEnter() },
-                exitTransition = { slideOverExit() },
-                popEnterTransition = { slideOverPopEnter() },
-                popExitTransition = { slideOverPopExit() },
-            ) {
-                composable<MainRoute> {
-                    Box(Modifier.slideOverScrim(this)) { HomeScreen(rootNav) }
-                }
-                composable<JobsRoute> {
-                    Box(Modifier.slideOverScrim(this)) {
-                        JobsScreen(onBack = { rootNav.navigateUp() })
-                    }
-                }
-                composable<EditShiftRoute> {
-                    Box(Modifier.slideOverScrim(this)) {
-                        EditShiftScreen(
-                            onClose = { rootNav.navigateUp() },
-                            onManageJobs = { rootNav.navigate(JobsRoute) },
-                        )
-                    }
-                }
-                composable<EditBonusRoute> {
-                    Box(Modifier.slideOverScrim(this)) {
-                        EditBonusScreen(
-                            onClose = { rootNav.navigateUp() },
-                            onManageJobs = { rootNav.navigate(JobsRoute) },
-                        )
-                    }
-                }
-                composable<ImportIcsRoute> {
-                    Box(Modifier.slideOverScrim(this)) {
-                        ImportIcsScreen(
-                            onClose = { rootNav.navigateUp() },
-                            onManageJobs = { rootNav.navigate(JobsRoute) },
-                        )
+            SharedTransitionLayout(Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalSharedTransitionScope provides this) {
+                    NavHost(
+                        navController = rootNav,
+                        startDestination = MainRoute,
+                        modifier = Modifier.fillMaxSize(),
+                        // Container transform: the editor itself is the shared element, the screen below
+                        // stays put until the card has finished growing.
+                        enterTransition = {
+                            if (targetState.containerKey() != null) EnterTransition.None else slideOverEnter()
+                        },
+                        exitTransition = {
+                            if (targetState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else slideOverExit()
+                        },
+                        popEnterTransition = {
+                            if (initialState.containerKey() != null) EnterTransition.None else slideOverPopEnter()
+                        },
+                        popExitTransition = {
+                            if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else slideOverPopExit()
+                        },
+                    ) {
+                        composable<MainRoute> {
+                            CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
+                                Box(Modifier.slideOverScrim(this@composable)) { HomeScreen(rootNav) }
+                            }
+                        }
+                        composable<JobsRoute> {
+                            CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
+                                Box(Modifier.slideOverScrim(this@composable)) {
+                                    JobsScreen(onBack = { rootNav.navigateUp() })
+                                }
+                            }
+                        }
+                        composable<EditShiftRoute> { entry ->
+                            val key = entry.toRoute<EditShiftRoute>().sharedKey
+                            CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
+                                Box(Modifier.slideOverScrim(this@composable)) {
+                                    ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
+                                        Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                            EditShiftScreen(
+                                                onClose = { rootNav.navigateUp() },
+                                                onManageJobs = { rootNav.navigate(JobsRoute) },
+                                                modifier = contentModifier,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        composable<EditBonusRoute> { entry ->
+                            val key = entry.toRoute<EditBonusRoute>().sharedKey
+                            CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
+                                Box(Modifier.slideOverScrim(this@composable)) {
+                                    ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
+                                        Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                            EditBonusScreen(
+                                                onClose = { rootNav.navigateUp() },
+                                                onManageJobs = { rootNav.navigate(JobsRoute) },
+                                                modifier = contentModifier,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        composable<ImportIcsRoute> {
+                            CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
+                                Box(Modifier.slideOverScrim(this@composable)) {
+                                    ImportIcsScreen(
+                                        onClose = { rootNav.navigateUp() },
+                                        onManageJobs = { rootNav.navigate(JobsRoute) },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -124,6 +163,11 @@ private fun HomeScreen(rootNav: NavHostController) {
     val tabNav = rememberNavController()
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
+
+    // Fade-through between tabs, on M3 Expressive springs.
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -147,17 +191,21 @@ private fun HomeScreen(rootNav: NavHostController) {
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding),
-            enterTransition = { fadeThroughEnter },
-            exitTransition = { fadeThroughExit },
-            popEnterTransition = { fadeThroughEnter },
-            popExitTransition = { fadeThroughExit },
+            enterTransition = { fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f) },
+            exitTransition = { fadeOut(fastEffects) },
+            popEnterTransition = { fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f) },
+            popExitTransition = { fadeOut(fastEffects) },
         ) {
             composable<CalendarRoute> {
                 CalendarScreen(
-                    onAddShift = { date -> rootNav.navigate(EditShiftRoute(dateEpochDay = date.toEpochDay())) },
-                    onEditShift = { id -> rootNav.navigate(EditShiftRoute(shiftId = id)) },
-                    onAddBonus = { date -> rootNav.navigate(EditBonusRoute(dateEpochDay = date.toEpochDay())) },
-                    onEditBonus = { id -> rootNav.navigate(EditBonusRoute(bonusId = id)) },
+                    onAddShift = { date ->
+                        rootNav.navigate(EditShiftRoute(dateEpochDay = date.toEpochDay(), sharedKey = SharedKeys.NEW_SHIFT))
+                    },
+                    onEditShift = { id -> rootNav.navigate(EditShiftRoute(shiftId = id, sharedKey = SharedKeys.shift(id))) },
+                    onAddBonus = { date ->
+                        rootNav.navigate(EditBonusRoute(dateEpochDay = date.toEpochDay(), sharedKey = SharedKeys.NEW_BONUS))
+                    },
+                    onEditBonus = { id -> rootNav.navigate(EditBonusRoute(bonusId = id, sharedKey = SharedKeys.bonus(id))) },
                     onManageJobs = { rootNav.navigate(JobsRoute) },
                 )
             }

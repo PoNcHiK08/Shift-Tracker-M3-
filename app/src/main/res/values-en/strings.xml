@@ -30,6 +30,7 @@
     <string name="add_shift">Add shift</string>
     <string name="no_shifts_title">No shifts this month</string>
     <string name="no_shifts_message">Tap a day in the calendar or “Add shift” to log your first one.</string>
+    <string name="day_free">Day off — no shifts</string>
     <string name="no_shifts_this_day">No shifts on this day.</string>
     <string name="no_jobs_title">Add a job first</string>
     <string name="no_jobs_message">Give it a name and an hourly rate, then you can start logging shifts.</string>

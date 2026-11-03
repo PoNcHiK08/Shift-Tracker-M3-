@@ -51,6 +51,12 @@ class AppSmokeTest {
         composeRule.waitForIdle()
     }
 
+    /** Waits until no node shows [text] any more (e.g. an editor has closed). */
+    private fun waitGone(text: String) {
+        composeRule.waitUntil(10_000) { composeRule.onAllNodesWithText(text).fetchSemanticsNodes().isEmpty() }
+        composeRule.waitForIdle()
+    }
+
     private fun waitForText(text: String) {
         composeRule.waitUntilAtLeastOneExists(hasText(text, substring = true), timeoutMillis = 10_000)
         composeRule.waitForIdle() // let screen transitions finish
@@ -77,27 +83,36 @@ class AppSmokeTest {
         waitForText("23:00–06:00")
         clickOn(str(R.string.back))
 
-        // Calendar -> add a shift (08:00–16:00 default).
-        composeRule.waitUntilAtLeastOneExists(hasContentDescription(str(R.string.add_shift)), 10_000)
-        composeRule.onNode(hasContentDescription(str(R.string.add_shift)) and hasClickAction()).performClick()
+        // Calendar: today is selected; its day panel's "Add shift" grows into the editor (08:00–16:00 default).
+        waitForText(str(R.string.day_free))
+        clickOn(str(R.string.add_shift))
         waitForText(str(R.string.new_shift))
         composeRule.onNodeWithText(str(R.string.save)).performClick()
+        // The editor collapses back into the "Add shift" button.
+        waitGone(str(R.string.new_shift))
 
         // The shift shows up in the month list: 8 h * 30.50 = 244.00 zł.
         waitForText("244")
         composeRule.onAllNodesWithText("Kawiarnia").onFirst().assertExists()
 
-        // Add a 75 zł bonus for today through the day's bottom sheet.
+        // Tapping another day switches the panel without any sheet; tap today again.
         val locale = composeRule.activity.resources.configuration.locales[0]
-        val todayLabel = Formatters.fullDate(LocalDate.now(), locale)
-        val todayCell = hasContentDescription(todayLabel, substring = true) and hasClickAction()
-        composeRule.waitUntilAtLeastOneExists(todayCell, 10_000)
+        val today = LocalDate.now()
+        val otherDay = if (today.dayOfMonth == 1) today.plusDays(1) else today.minusDays(1)
+        val otherCell = hasContentDescription(Formatters.fullDate(otherDay, locale), substring = true) and hasClickAction()
+        composeRule.onNode(otherCell).performClick()
+        waitForText(str(R.string.day_free))
+        val todayCell = hasContentDescription(Formatters.fullDate(today, locale), substring = true) and hasClickAction()
         composeRule.onNode(todayCell).performClick()
+        waitForText("244")
+
+        // Add a 75 zł bonus for today from the day panel.
         clickOn(str(R.string.bonus))
         waitForText(str(R.string.new_bonus))
         composeRule.onNode(hasSetTextAction() and hasText(str(R.string.bonus_amount))).performTextInput("75")
         composeRule.onNode(hasSetTextAction() and hasText(str(R.string.bonus_note))).performTextInput("Premia")
         clickOn(str(R.string.save))
+        waitGone(str(R.string.new_bonus))
         waitForText("+75")
         // Month card: 244 + 75 = 319 zł.
         waitForText("319")
@@ -136,6 +151,6 @@ class AppSmokeTest {
         clickOn(str(R.string.delete_bonus))
         waitForText(str(R.string.delete_bonus_title))
         composeRule.onNodeWithText(str(R.string.delete)).performClick()
-        waitForText(str(R.string.no_shifts_title))
+        waitForText(str(R.string.day_free))
     }
 }

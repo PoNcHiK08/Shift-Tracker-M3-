@@ -1,9 +1,18 @@
 package com.vkurylo.shifttracker.ui.calendar
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,11 +23,11 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -31,54 +40,64 @@ import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
-import com.vkurylo.shifttracker.ui.components.BonusListItem
+import com.vkurylo.shifttracker.ui.components.BonusCard
+import com.vkurylo.shifttracker.ui.components.CircleToSquircle
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
-import com.vkurylo.shifttracker.ui.components.ShiftListItem
-import com.vkurylo.shifttracker.ui.components.StatBlock
+import com.vkurylo.shifttracker.ui.components.MorphShape
+import com.vkurylo.shifttracker.ui.components.RollingMoney
+import com.vkurylo.shifttracker.ui.components.RollingText
+import com.vkurylo.shifttracker.ui.components.ShiftCard
 import com.vkurylo.shifttracker.ui.components.composeColor
+import com.vkurylo.shifttracker.ui.navigation.SharedKeys
+import com.vkurylo.shifttracker.ui.navigation.sharedContainer
+import com.vkurylo.shifttracker.ui.theme.expressiveClickable
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.WeekDays
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
+import com.vkurylo.shifttracker.ui.util.shiftsCountLabel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -118,12 +137,25 @@ fun CalendarScreen(
 
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hasJobs = state.jobs.isNotEmpty()
+    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             TopAppBar(
-                title = { Text(Formatters.monthYear(visibleMonth, locale)) },
+                title = {
+                    // The month name rolls in the swipe direction.
+                    AnimatedContent(
+                        targetState = visibleMonth,
+                        transitionSpec = {
+                            val forward = targetState > initialState
+                            (slideInVertically(spatialOffset) { h -> if (forward) h else -h } + fadeIn(effects)) togetherWith
+                                (slideOutVertically(spatialOffset) { h -> if (forward) -h else h } + fadeOut(effects))
+                        },
+                        label = "monthTitle",
+                    ) { month -> Text(Formatters.monthYear(month, locale)) }
+                },
                 actions = {
                     IconButton(onClick = { goToMonth(visibleMonth.minusMonths(1)) }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.previous_month))
@@ -131,33 +163,20 @@ fun CalendarScreen(
                     IconButton(onClick = { goToMonth(visibleMonth.plusMonths(1)) }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.next_month))
                     }
-                    IconButton(onClick = { goToMonth(YearMonth.now()) }) {
+                    IconButton(onClick = {
+                        goToMonth(YearMonth.now())
+                        viewModel.selectDate(LocalDate.now())
+                    }) {
                         Icon(Icons.Filled.Today, stringResource(R.string.today))
                     }
                 },
                 scrollBehavior = scrollBehavior,
             )
         },
-        floatingActionButton = {
-            if (hasJobs) {
-                val label = stringResource(R.string.add_shift)
-                ExtendedFloatingActionButton(
-                    // M3 clears the FAB's inner text semantics; give TalkBack an explicit label.
-                    modifier = Modifier.semantics { contentDescription = label },
-                    onClick = {
-                        val today = LocalDate.now()
-                        onAddShift(if (YearMonth.from(today) == visibleMonth) today else visibleMonth.atDay(1))
-                    },
-                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    text = { Text(label) },
-                    expanded = scrollBehavior.state.contentOffset > -10f,
-                )
-            }
-        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 96.dp),
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
         ) {
             item(key = "weekdays") { WeekdayHeader() }
             item(key = "grid") {
@@ -171,17 +190,10 @@ fun CalendarScreen(
                         month = month,
                         shiftsByDate = state.shiftsByDate,
                         bonusDates = state.bonusesByDate.keys,
+                        selectedDate = state.selectedDate,
                         onDayClick = viewModel::selectDate,
                     )
                 }
-            }
-            item(key = "summary") {
-                MonthStatsCard(
-                    minutes = state.monthSummary.totalPaidMinutes,
-                    earnings = state.monthSummary.totalEarningsGrosze,
-                    shifts = state.monthSummary.shiftCount,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-                )
             }
             if (!state.loading && !hasJobs) {
                 item(key = "no-jobs") {
@@ -192,61 +204,27 @@ fun CalendarScreen(
                         action = { Button(onClick = onManageJobs) { Text(stringResource(R.string.add_job)) } },
                     )
                 }
-            } else if (!state.loading && state.monthShifts.isEmpty() && state.monthBonuses.isEmpty()) {
-                item(key = "empty") {
-                    EmptyState(
-                        icon = Icons.Filled.EventAvailable,
-                        title = stringResource(R.string.no_shifts_title),
-                        message = stringResource(R.string.no_shifts_message),
+            } else {
+                item(key = "day") {
+                    DayPanel(
+                        date = state.selectedDate,
+                        shiftsByDate = state.shiftsByDate,
+                        bonusesByDate = state.bonusesByDate,
+                        onAddShift = { onAddShift(state.selectedDate) },
+                        onEditShift = onEditShift,
+                        onAddBonus = { onAddBonus(state.selectedDate) },
+                        onEditBonus = onEditBonus,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
-            } else {
-                // Shifts and bonuses of the month in date order (bonuses after the day's shifts).
-                val entries: List<Any> = (state.monthShifts.map { it.shift.date to it } + state.monthBonuses.map { it.bonus.date to it })
-                    .sortedWith(compareBy({ it.first }, { if (it.second is ShiftWithJob) 0 else 1 }))
-                    .map { it.second }
-                items(entries, key = { if (it is ShiftWithJob) "s${it.shift.id}" else "b${(it as BonusWithJob).bonus.id}" }) { item ->
-                    when (item) {
-                        is ShiftWithJob -> ShiftListItem(
-                            item = item,
-                            showDate = true,
-                            modifier = Modifier.animateItem().clickable { onEditShift(item.shift.id) },
-                        )
-                        is BonusWithJob -> BonusListItem(
-                            item = item,
-                            showDate = true,
-                            modifier = Modifier.animateItem().clickable { onEditBonus(item.bonus.id) },
-                        )
-                    }
+                item(key = "month") {
+                    MonthTiles(
+                        summary = state.monthSummary,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                    )
                 }
             }
         }
-    }
-
-    state.selectedDate?.let { date ->
-        DayBottomSheet(
-            date = date,
-            shifts = state.shiftsByDate[date].orEmpty(),
-            bonuses = state.bonusesByDate[date].orEmpty(),
-            canAdd = hasJobs,
-            onDismiss = viewModel::dismissDay,
-            onAddShift = {
-                viewModel.dismissDay()
-                onAddShift(date)
-            },
-            onEditShift = { id ->
-                viewModel.dismissDay()
-                onEditShift(id)
-            },
-            onAddBonus = {
-                viewModel.dismissDay()
-                onAddBonus(date)
-            },
-            onEditBonus = { id ->
-                viewModel.dismissDay()
-                onEditBonus(id)
-            },
-        )
     }
 }
 
@@ -271,25 +249,25 @@ private fun MonthGrid(
     month: YearMonth,
     shiftsByDate: Map<LocalDate, List<ShiftWithJob>>,
     bonusDates: Set<LocalDate>,
+    selectedDate: LocalDate,
     onDayClick: (LocalDate) -> Unit,
 ) {
-    val firstDay = month.atDay(1)
-    val leadingBlanks = firstDay.dayOfWeek.value - 1 // Monday = 1
-    val totalCells = 42 // always 6 rows so the pager height never jumps
+    val leadingBlanks = month.atDay(1).dayOfWeek.value - 1 // Monday = 1
     val today = LocalDate.now()
 
     Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+        // Always 6 rows so the pager height never jumps.
         for (row in 0 until 6) {
             Row(Modifier.fillMaxWidth()) {
                 for (col in 0 until 7) {
-                    val index = row * 7 + col
-                    val dayNumber = index - leadingBlanks + 1
-                    Box(Modifier.weight(1f).aspectRatio(0.9f), contentAlignment = Alignment.Center) {
-                        if (index < totalCells && dayNumber in 1..month.lengthOfMonth()) {
+                    val dayNumber = row * 7 + col - leadingBlanks + 1
+                    Box(Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+                        if (dayNumber in 1..month.lengthOfMonth()) {
                             val date = month.atDay(dayNumber)
                             DayCell(
                                 date = date,
                                 isToday = date == today,
+                                isSelected = date == selectedDate,
                                 shifts = shiftsByDate[date].orEmpty(),
                                 hasBonus = date in bonusDates,
                                 onClick = { onDayClick(date) },
@@ -302,182 +280,304 @@ private fun MonthGrid(
     }
 }
 
+/**
+ * A day cell. Its background is a [MorphShape]: a circle that flows into an M3 Expressive squircle
+ * when the day gets selected, driven by a bouncy spatial spring (with a little scale pop), while
+ * the colours follow the non-overshooting effects spring.
+ */
 @Composable
 private fun DayCell(
     date: LocalDate,
     isToday: Boolean,
+    isSelected: Boolean,
     shifts: List<ShiftWithJob>,
     hasBonus: Boolean,
     onClick: () -> Unit,
 ) {
     val locale = currentLocale()
-    val hasShifts = shifts.isNotEmpty()
-    val background by animateColorAsState(
-        when {
-            isToday -> MaterialTheme.colorScheme.primary
-            hasShifts -> MaterialTheme.colorScheme.surfaceContainerHigh
-            else -> MaterialTheme.colorScheme.surface
+    val colors = MaterialTheme.colorScheme
+    val motion = MaterialTheme.motionScheme
+    val hasEntries = shifts.isNotEmpty() || hasBonus
+
+    val morph by animateFloatAsState(if (isSelected) 1f else 0f, motion.fastSpatialSpec(), label = "cellMorph")
+    val scale by animateFloatAsState(
+        targetValue = when {
+            isSelected -> 1f
+            hasEntries || isToday -> 0.86f
+            else -> 0.6f
         },
-        label = "dayBackground",
+        animationSpec = motion.fastSpatialSpec(),
+        label = "cellScale",
     )
-    val contentColor = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    val background by animateColorAsState(
+        targetValue = when {
+            isSelected -> colors.primary
+            isToday -> colors.primaryContainer
+            hasEntries -> colors.surfaceContainerHighest
+            else -> Color.Transparent
+        },
+        animationSpec = motion.defaultEffectsSpec(),
+        label = "cellColor",
+    )
+    val content by animateColorAsState(
+        targetValue = when {
+            isSelected -> colors.onPrimary
+            isToday -> colors.onPrimaryContainer
+            else -> colors.onSurface
+        },
+        animationSpec = motion.defaultEffectsSpec(),
+        label = "cellContent",
+    )
+    val shape = MorphShape(CircleToSquircle, morph)
     val jobColors = shifts.map { it.job }.distinctBy { it.id }.map { it.composeColor() }
     val description = buildString {
         append(Formatters.fullDate(date, locale))
-        if (hasShifts) append(", ").append(pluralStringResource(R.plurals.shift_count, shifts.size, shifts.size))
+        if (shifts.isNotEmpty()) append(", ").append(pluralStringResource(R.plurals.shift_count, shifts.size, shifts.size))
         if (hasBonus) append(", ").append(stringResource(R.string.bonus))
     }
 
-    Column(
+    Box(
         modifier = Modifier
             .padding(3.dp)
             .fillMaxSize()
-            .clip(MaterialTheme.shapes.medium)
-            .background(background)
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = description },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .expressiveClickable(onClick = onClick, pressedScale = 0.88f)
+            .semantics {
+                contentDescription = description
+                selected = isSelected
+            },
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = if (isToday || hasShifts) FontWeight.SemiBold else FontWeight.Normal,
-            color = contentColor,
+        Box(
+            Modifier
+                .matchParentSize()
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }
+                .clip(shape)
+                .background(background),
         )
-        Spacer(Modifier.height(4.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.height(7.dp)) {
-            jobColors.take(3).forEach { color ->
-                JobColorDot(
-                    color = color,
-                    size = 7.dp,
-                    modifier = if (isToday) Modifier.border(1.dp, MaterialTheme.colorScheme.onPrimary, CircleShape) else Modifier,
-                )
-            }
-            if (jobColors.size > 3) {
-                Text("+", style = MaterialTheme.typography.labelSmall, color = contentColor)
-            }
-            if (hasBonus) {
-                Icon(
-                    Icons.Filled.Redeem,
-                    contentDescription = null,
-                    modifier = Modifier.size(9.dp),
-                    tint = if (isToday) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.tertiary,
-                )
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (isSelected || isToday || hasEntries) FontWeight.SemiBold else FontWeight.Normal,
+                color = content,
+            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.height(8.dp),
+            ) {
+                jobColors.take(3).forEach { color ->
+                    JobColorDot(
+                        color = color,
+                        size = 6.dp,
+                        modifier = if (isSelected) Modifier.border(1.dp, colors.onPrimary, CircleShape) else Modifier,
+                    )
+                }
+                if (hasBonus) {
+                    Icon(Icons.Filled.Redeem, contentDescription = null, modifier = Modifier.size(8.dp), tint = content)
+                }
             }
         }
     }
 }
 
+/**
+ * Bento panel with the selected day: its total, shift/bonus cards (each expands into its editor)
+ * and the add actions. Lives in the screen itself (not a bottom sheet window), so tapping through
+ * days is instant and the cards can fly into the editors with a shared-element transition.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun MonthStatsCard(minutes: Long, earnings: Long, shifts: Int, modifier: Modifier = Modifier) {
-    val locale = currentLocale()
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        ),
-        shape = MaterialTheme.shapes.large,
-    ) {
-        Row(Modifier.fillMaxWidth().padding(20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            StatBlock(
-                label = stringResource(R.string.earned),
-                value = Formatters.money(earnings, locale),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.weight(1.4f),
-            )
-            StatBlock(
-                label = stringResource(R.string.hours),
-                value = Formatters.decimalHours(minutes, locale),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.weight(1f),
-            )
-            StatBlock(
-                label = stringResource(R.string.shifts),
-                value = shifts.toString(),
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.weight(0.8f),
-            )
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DayBottomSheet(
+private fun DayPanel(
     date: LocalDate,
-    shifts: List<ShiftWithJob>,
-    bonuses: List<BonusWithJob>,
-    canAdd: Boolean,
-    onDismiss: () -> Unit,
+    shiftsByDate: Map<LocalDate, List<ShiftWithJob>>,
+    bonusesByDate: Map<LocalDate, List<BonusWithJob>>,
     onAddShift: () -> Unit,
     onEditShift: (Long) -> Unit,
     onAddBonus: () -> Unit,
     onEditBonus: (Long) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val locale = currentLocale()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = shifts.size + bonuses.size < 4)
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 16.dp)) {
-            Text(
-                text = Formatters.fullDate(date, locale),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
-            if (shifts.isNotEmpty() || bonuses.isNotEmpty()) {
-                val minutes = shifts.sumOf { it.shift.paidMinutes }
-                val earnings = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze }
-                Text(
-                    text = "${hoursLabel(minutes)} · ${Formatters.money(earnings, locale)}",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                )
-            }
-            Spacer(Modifier.height(8.dp))
-            if (shifts.isEmpty() && bonuses.isEmpty()) {
-                Text(
-                    text = stringResource(R.string.no_shifts_this_day),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                )
-            } else {
-                shifts.forEachIndexed { index, item ->
-                    if (index > 0) HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    ShiftListItem(
-                        item = item,
-                        modifier = Modifier.clickable { onEditShift(item.shift.id) },
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    val shifts = shiftsByDate[date].orEmpty()
+    val bonuses = bonusesByDate[date].orEmpty()
+    val total = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze }
+    val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    // The old day disappears at once and the new one springs in, so two days never overlap;
+    // SizeTransform springs the panel height between them.
+    val enterFade = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Column(Modifier.weight(1f)) {
+                    AnimatedContent(
+                        targetState = date,
+                        transitionSpec = {
+                            val forward = targetState > initialState
+                            (slideInHorizontally(spatialOffset) { w -> if (forward) w / 4 else -w / 4 } + fadeIn(enterFade)) togetherWith
+                                ExitTransition.None using SizeTransform(clip = false) { _, _ -> spatialSize }
+                        },
+                        label = "dayTitle",
+                    ) { d ->
+                        val dayShifts = shiftsByDate[d].orEmpty()
+                        Column {
+                            Text(Formatters.fullDate(d, locale), style = MaterialTheme.typography.titleLarge)
+                            Text(
+                                text = if (dayShifts.isEmpty()) {
+                                    stringResource(R.string.no_shifts_this_day)
+                                } else {
+                                    "${hoursLabel(dayShifts.sumOf { it.shift.paidMinutes })} · ${shiftsCountLabel(dayShifts.size)}"
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (total > 0) {
+                    RollingMoney(
+                        grosze = total,
+                        style = MaterialTheme.typography.titleLargeEmphasized,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
-                bonuses.forEach { item ->
-                    HorizontalDivider(Modifier.padding(horizontal = 16.dp))
-                    BonusListItem(
-                        item = item,
-                        modifier = Modifier.clickable { onEditBonus(item.bonus.id) },
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    )
+            }
+
+            // The entries of the selected day; switching days cross-fades and springs the height.
+            AnimatedContent(
+                targetState = date,
+                transitionSpec = {
+                    val forward = targetState > initialState
+                    (slideInHorizontally(spatialOffset) { w -> if (forward) w / 6 else -w / 6 } + fadeIn(enterFade)) togetherWith
+                        ExitTransition.None using SizeTransform(clip = false) { _, _ -> spatialSize }
+                },
+                label = "dayEntries",
+            ) { d ->
+                val dayShifts = shiftsByDate[d].orEmpty()
+                val dayBonuses = bonusesByDate[d].orEmpty()
+                if (dayShifts.isEmpty() && dayBonuses.isEmpty()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(
+                            Icons.Filled.EventAvailable,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.outline,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.day_free),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.outline,
+                        )
+                    }
+                } else {
+                    Column(
+                        Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        dayShifts.forEach { item ->
+                            ShiftCard(item = item, onClick = { onEditShift(item.shift.id) })
+                        }
+                        dayBonuses.forEach { item ->
+                            BonusCard(item = item, onClick = { onEditBonus(item.bonus.id) })
+                        }
+                    }
                 }
             }
-            if (canAdd) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = onAddShift,
+                    modifier = Modifier
+                        .weight(1f)
+                        .heightIn(min = 52.dp)
+                        .sharedContainer(SharedKeys.NEW_SHIFT, ButtonDefaults.shape),
                 ) {
-                    Button(onClick = onAddShift, modifier = Modifier.weight(1f).height(52.dp)) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.add_shift))
-                    }
-                    FilledTonalButton(onClick = onAddBonus, modifier = Modifier.height(52.dp)) {
-                        Icon(Icons.Filled.Redeem, contentDescription = null, modifier = Modifier.size(20.dp))
-                        Spacer(Modifier.size(8.dp))
-                        Text(stringResource(R.string.bonus))
-                    }
+                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.add_shift))
+                }
+                FilledTonalButton(
+                    onClick = onAddBonus,
+                    modifier = Modifier
+                        .heightIn(min = 52.dp)
+                        .sharedContainer(SharedKeys.NEW_BONUS, ButtonDefaults.shape),
+                ) {
+                    Icon(Icons.Filled.Redeem, contentDescription = null, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.bonus))
                 }
             }
         }
+    }
+}
+
+/** Bento tiles for the month: a big earnings tile (rolling counter) next to hours and shifts. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
+    val locale = currentLocale()
+    val colors = MaterialTheme.colorScheme
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Tile(
+            container = colors.primaryContainer,
+            modifier = Modifier.weight(1.55f).heightIn(min = 148.dp),
+        ) {
+            Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
+            Spacer(Modifier.weight(1f))
+            RollingMoney(
+                grosze = summary.totalEarningsGrosze,
+                style = MaterialTheme.typography.headlineMediumEmphasized,
+                color = colors.onPrimaryContainer,
+            )
+            if (summary.bonusGrosze > 0) {
+                Text(
+                    stringResource(R.string.including_bonuses, Formatters.money(summary.bonusGrosze, locale)),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.onPrimaryContainer.copy(alpha = 0.8f),
+                )
+            }
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Tile(container = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
+                Text(stringResource(R.string.hours), style = MaterialTheme.typography.labelMedium, color = colors.onSecondaryContainer)
+                RollingText(
+                    text = Formatters.decimalHours(summary.totalPaidMinutes, locale),
+                    value = summary.totalPaidMinutes,
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = colors.onSecondaryContainer,
+                )
+            }
+            Tile(container = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
+                Text(stringResource(R.string.shifts), style = MaterialTheme.typography.labelMedium, color = colors.onTertiaryContainer)
+                RollingText(
+                    text = summary.shiftCount.toString(),
+                    value = summary.shiftCount.toLong(),
+                    style = MaterialTheme.typography.titleLargeEmphasized,
+                    color = colors.onTertiaryContainer,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun Tile(container: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Surface(modifier = modifier, shape = MaterialTheme.shapes.extraLarge, color = container) {
+        Column(Modifier.padding(16.dp)) { content() }
     }
 }

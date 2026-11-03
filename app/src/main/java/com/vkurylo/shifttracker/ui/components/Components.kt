@@ -14,12 +14,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.NightsStay
-import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,12 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
-import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
-import com.vkurylo.shifttracker.domain.model.ShiftWithJob
-import com.vkurylo.shifttracker.ui.util.Formatters
-import com.vkurylo.shifttracker.ui.util.currentLocale
-import com.vkurylo.shifttracker.ui.util.hoursLabel
 
 fun Job.composeColor(): Color = Color(color)
 
@@ -67,97 +58,6 @@ fun JobAvatar(job: Job, modifier: Modifier = Modifier, size: Dp = 40.dp) {
             style = MaterialTheme.typography.titleMedium,
         )
     }
-}
-
-@Composable
-fun ShiftListItem(
-    item: ShiftWithJob,
-    modifier: Modifier = Modifier,
-    showDate: Boolean = false,
-    containerColor: Color = ListItemDefaults.colors().containerColor,
-) {
-    val locale = currentLocale()
-    val shift = item.shift
-    val timeRange = "${Formatters.time(shift.start)}–${Formatters.time(shift.end)}"
-    val details = buildList {
-        if (showDate) add(Formatters.shortDate(shift.date, locale))
-        add(timeRange)
-        if (shift.unpaidBreakMinutes > 0) add(stringResource(R.string.break_short, shift.unpaidBreakMinutes))
-    }.joinToString(" · ")
-
-    ListItem(
-        modifier = modifier,
-        colors = ListItemDefaults.colors(containerColor = containerColor),
-        leadingContent = { JobAvatar(item.job) },
-        headlineContent = { Text(item.job.name, maxLines = 1) },
-        supportingContent = {
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(details)
-                    if (shift.isOvernight) {
-                        Spacer(Modifier.size(6.dp))
-                        Icon(
-                            Icons.Filled.NightsStay,
-                            contentDescription = stringResource(R.string.overnight_shift),
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.tertiary,
-                        )
-                    }
-                }
-                if (!shift.note.isNullOrBlank()) {
-                    Text(shift.note, maxLines = 1, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        },
-        trailingContent = {
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    Formatters.money(shift.earningsGrosze, locale),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(hoursLabel(shift.paidMinutes), style = MaterialTheme.typography.bodySmall)
-            }
-        },
-    )
-}
-
-@Composable
-fun BonusListItem(
-    item: BonusWithJob,
-    modifier: Modifier = Modifier,
-    showDate: Boolean = false,
-    containerColor: Color = ListItemDefaults.colors().containerColor,
-) {
-    val locale = currentLocale()
-    val bonus = item.bonus
-    val supporting = listOfNotNull(
-        if (showDate) Formatters.shortDate(bonus.date, locale) else null,
-        bonus.note,
-    ).joinToString(" · ")
-    ListItem(
-        modifier = modifier,
-        colors = ListItemDefaults.colors(containerColor = containerColor),
-        leadingContent = {
-            Box(
-                modifier = Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.tertiaryContainer),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Filled.Redeem, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer)
-            }
-        },
-        headlineContent = { Text(stringResource(R.string.bonus_for_job, item.job.name), maxLines = 1) },
-        supportingContent = if (supporting.isNotEmpty()) {
-            { Text(supporting, maxLines = 2) }
-        } else null,
-        trailingContent = {
-            Text(
-                "+" + Formatters.money(bonus.amountGrosze, locale),
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.tertiary,
-            )
-        },
-    )
 }
 
 @Composable

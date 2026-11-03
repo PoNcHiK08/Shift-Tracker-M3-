@@ -64,6 +64,7 @@ import java.time.ZoneOffset
 fun EditBonusScreen(
     onClose: () -> Unit,
     onManageJobs: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: EditBonusViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,6 +88,7 @@ fun EditBonusScreen(
     }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(if (state.isNew) R.string.new_bonus else R.string.edit_bonus)) },

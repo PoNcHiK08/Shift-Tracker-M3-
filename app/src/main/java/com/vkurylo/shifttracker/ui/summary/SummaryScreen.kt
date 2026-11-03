@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -41,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
@@ -58,8 +57,9 @@ import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
+import com.vkurylo.shifttracker.ui.components.RollingMoney
+import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.SectionHeader
-import com.vkurylo.shifttracker.ui.components.StatBlock
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
@@ -111,22 +111,8 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                 )
             }
             item(key = "hero") {
-                AnimatedContent(
-                    targetState = state,
-                    contentKey = { it.range },
-                    transitionSpec = {
-                        if (targetState.range.period != initialState.range.period) {
-                            fadeIn() togetherWith fadeOut()
-                        } else {
-                            val forward = targetState.range.from > initialState.range.from
-                            (slideInHorizontally { if (forward) it / 6 else -it / 6 } + fadeIn()) togetherWith
-                                (slideOutHorizontally { if (forward) -it / 6 else it / 6 } + fadeOut())
-                        }
-                    },
-                    label = "summaryHero",
-                ) { target ->
-                    TotalsCard(target.range.period, target.summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                }
+                // One card that stays put: switching week/month/year or paging rolls its numbers.
+                TotalsCard(range.period, state.summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
             if (!state.loading && state.summary.isEmpty) {
                 item(key = "empty") {
@@ -211,9 +197,11 @@ private fun periodLabel(range: PeriodRange): String {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: Modifier = Modifier) {
     val locale = currentLocale()
+    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val onColor = MaterialTheme.colorScheme.onPrimaryContainer
     val average = summary.averageRateGrosze
     val title = when (period) {
@@ -227,10 +215,16 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = onColor),
     ) {
         Column(Modifier.padding(24.dp)) {
-            Text(stringResource(title), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
-            Text(
-                Formatters.money(summary.totalEarningsGrosze, locale),
-                style = MaterialTheme.typography.displaySmall,
+            AnimatedContent(
+                targetState = title,
+                transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
+                label = "totalsTitle",
+            ) { res ->
+                Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+            }
+            RollingMoney(
+                grosze = summary.totalEarningsGrosze,
+                style = MaterialTheme.typography.displaySmallEmphasized,
                 color = onColor,
             )
             if (summary.bonusGrosze > 0) {
@@ -242,9 +236,27 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
             }
             Spacer(Modifier.height(20.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                StatBlock(stringResource(R.string.hours), Formatters.decimalHours(summary.totalPaidMinutes, locale), color = onColor, modifier = Modifier.weight(1f))
-                StatBlock(stringResource(R.string.shifts), summary.shiftCount.toString(), color = onColor, modifier = Modifier.weight(1f))
-                StatBlock(stringResource(R.string.average_rate), Formatters.money(average, locale), color = onColor, modifier = Modifier.weight(1.3f))
+                RollingStat(
+                    label = stringResource(R.string.hours),
+                    text = Formatters.decimalHours(summary.totalPaidMinutes, locale),
+                    value = summary.totalPaidMinutes,
+                    color = onColor,
+                    modifier = Modifier.weight(1f),
+                )
+                RollingStat(
+                    label = stringResource(R.string.shifts),
+                    text = summary.shiftCount.toString(),
+                    value = summary.shiftCount.toLong(),
+                    color = onColor,
+                    modifier = Modifier.weight(1f),
+                )
+                RollingStat(
+                    label = stringResource(R.string.average_rate),
+                    text = Formatters.money(average, locale),
+                    value = average,
+                    color = onColor,
+                    modifier = Modifier.weight(1.3f),
+                )
             }
         }
     }
@@ -354,5 +366,14 @@ private fun BreakdownCard(period: SummaryPeriod, entries: List<BreakdownEntry>, 
                 }
             }
         }
+    }
+}
+
+/** Label + value whose digits roll when the value changes. */
+@Composable
+private fun RollingStat(label: String, text: String, value: Long, color: Color, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = color.copy(alpha = 0.75f))
+        RollingText(text = text, value = value, style = MaterialTheme.typography.titleLarge, color = color)
     }
 }

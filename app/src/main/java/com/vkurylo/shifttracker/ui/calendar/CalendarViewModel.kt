@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.ui.calendar
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
@@ -17,8 +18,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
@@ -29,23 +30,23 @@ data class CalendarUiState(
     val shiftsByDate: Map<LocalDate, List<ShiftWithJob>> = emptyMap(),
     val bonusesByDate: Map<LocalDate, List<BonusWithJob>> = emptyMap(),
     val monthSummary: MonthSummary = MonthSummary.EMPTY,
-    val monthShifts: List<ShiftWithJob> = emptyList(),
-    val monthBonuses: List<BonusWithJob> = emptyList(),
     val jobs: List<Job> = emptyList(),
-    val selectedDate: LocalDate? = null,
+    /** The day shown in the panel under the grid; always inside [month]. */
+    val selectedDate: LocalDate = LocalDate.now(),
     val loading: Boolean = true,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     shiftRepository: ShiftRepository,
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(YearMonth.now())
-    private val selectedDate = MutableStateFlow<LocalDate?>(null)
+    private val selectedDate = savedStateHandle.getStateFlow(KEY_SELECTED, LocalDate.now().toEpochDay())
 
     private data class Window(val month: YearMonth, val shifts: List<ShiftWithJob>, val bonuses: List<BonusWithJob>)
 
@@ -61,7 +62,7 @@ class CalendarViewModel @Inject constructor(
     val uiState: StateFlow<CalendarUiState> = combine(
         around,
         jobRepository.observeJobs(),
-        selectedDate,
+        selectedDate.map(LocalDate::ofEpochDay),
     ) { window, jobs, selected ->
         val m = window.month
         val monthShifts = window.shifts.filter { YearMonth.from(it.shift.date) == m }
@@ -71,15 +72,33 @@ class CalendarViewModel @Inject constructor(
             shiftsByDate = window.shifts.groupBy { it.shift.date },
             bonusesByDate = window.bonuses.groupBy { it.bonus.date },
             monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses),
-            monthShifts = monthShifts,
-            monthBonuses = monthBonuses,
             jobs = jobs,
             selectedDate = selected,
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CalendarUiState())
 
-    fun showMonth(value: YearMonth) = month.update { value }
-    fun selectDate(date: LocalDate) = selectedDate.update { date }
-    fun dismissDay() = selectedDate.update { null }
+    /** Called when the pager settles on a month; keeps the selected day inside it. */
+    fun showMonth(value: YearMonth) {
+        month.value = value
+        val selected = LocalDate.ofEpochDay(selectedDate.value)
+        if (YearMonth.from(selected) != value) {
+            val today = LocalDate.now()
+            val newSelection = if (YearMonth.from(today) == value) {
+                today
+            } else {
+                // Same day of the month, like most calendar apps (31 Jan -> 28 Feb).
+                value.atDay(selected.dayOfMonth.coerceAtMost(value.lengthOfMonth()))
+            }
+            savedStateHandle[KEY_SELECTED] = newSelection.toEpochDay()
+        }
+    }
+
+    fun selectDate(date: LocalDate) {
+        savedStateHandle[KEY_SELECTED] = date.toEpochDay()
+    }
+
+    private companion object {
+        const val KEY_SELECTED = "selectedDate"
+    }
 }

@@ -1,8 +1,6 @@
 package com.vkurylo.shifttracker.ui.shift
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -33,6 +30,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -42,16 +40,12 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TimePicker
-import androidx.compose.material3.TimePickerDialog
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,15 +62,14 @@ import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.PickerField
+import com.vkurylo.shifttracker.ui.components.RollingMoney
+import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.TimeDialog
-import com.vkurylo.shifttracker.ui.components.StatBlock
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.jobs.jobRatesLabel
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
 import java.time.ZoneOffset
 
 private val BreakPresets = listOf(0, 15, 30, 45, 60)
@@ -86,6 +79,7 @@ private val BreakPresets = listOf(0, 15, 30, 45, 60)
 fun EditShiftScreen(
     onClose: () -> Unit,
     onManageJobs: () -> Unit,
+    modifier: Modifier = Modifier,
     viewModel: EditShiftViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +106,7 @@ fun EditShiftScreen(
     var showEndPicker by rememberSaveable { mutableStateOf(false) }
 
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(if (state.isNew) R.string.new_shift else R.string.edit_shift)) },
@@ -294,6 +289,7 @@ private fun FieldLabel(text: String) {
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
     val locale = currentLocale()
@@ -305,18 +301,25 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer, contentColor = onColor),
     ) {
         Column(Modifier.padding(20.dp)) {
+            // Live "drum" counters: change a time or the break and the numbers roll.
             Row(verticalAlignment = Alignment.Bottom) {
-                StatBlock(
-                    label = stringResource(R.string.earnings),
-                    value = Formatters.money(pay.earningsGrosze, locale),
-                    color = onColor,
-                    modifier = Modifier.weight(1f),
-                )
-                StatBlock(
-                    label = stringResource(R.string.paid_hours),
-                    value = Formatters.hoursMinutes(pay.paidMinutes),
-                    color = onColor,
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                    RollingMoney(
+                        grosze = pay.earningsGrosze,
+                        style = MaterialTheme.typography.headlineMediumEmphasized,
+                        color = onColor,
+                    )
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(stringResource(R.string.paid_hours), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                    RollingText(
+                        text = Formatters.hoursMinutes(pay.paidMinutes),
+                        value = pay.paidMinutes,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = onColor,
+                    )
+                }
             }
             Spacer(Modifier.height(12.dp))
             val second = state.secondRate

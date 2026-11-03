@@ -33,6 +33,7 @@
     <string name="add_shift">Додати зміну</string>
     <string name="no_shifts_title">Цього місяця змін немає</string>
     <string name="no_shifts_message">Натисни на день у календарі або «Додати зміну», щоб записати першу.</string>
+    <string name="day_free">Вихідний — змін немає</string>
     <string name="no_shifts_this_day">Цього дня змін немає.</string>
     <string name="no_jobs_title">Спершу додай роботу</string>
     <string name="no_jobs_message">Вкажи назву роботи й погодинну ставку, і можна буде записувати зміни.</string>

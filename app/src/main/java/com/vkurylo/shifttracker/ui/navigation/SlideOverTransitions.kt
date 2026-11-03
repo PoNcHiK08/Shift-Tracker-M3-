@@ -6,9 +6,8 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
@@ -17,27 +16,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.IntOffset
 import androidx.navigation.NavBackStackEntry
+import com.vkurylo.shifttracker.ui.theme.AppMotion
 
 /*
  * "Slide over" screen transition modelled on Samsung One UI Settings, measured frame by frame
  * from a 120 fps screen recording:
- *  - the new screen slides in from the right edge over ~420 ms;
+ *  - the new screen slides in from the right edge (90 % in ~195 ms, settled by ~360 ms);
  *  - the screen underneath moves ~31 % of the width to the left (parallax) in sync;
  *  - the screen underneath is dimmed with up to ~16 % black, linearly with progress;
- *  - the motion fits cubic-bezier(0.22, 0.25, 0, 1): fast start, long gentle settle.
+ *  - the motion is a slightly over-damped spring (damping 1.15, stiffness 580) fitted to the
+ *    recording — no overshoot, and it keeps its velocity if interrupted.
  * Going back plays the same motion in reverse, and the predictive back gesture scrubs it with
  * the finger (Navigation Compose seeks these transitions while the gesture is in progress).
  */
 
-/** One UI's deceleration curve, matched to the recording (RMSE ≈ 1 % of the screen width). */
-val OneUiEasing = CubicBezierEasing(0.22f, 0.25f, 0f, 1f)
-
-const val SLIDE_OVER_DURATION_MS = 420
 private const val PARALLAX_FRACTION = 0.31f
 private const val MAX_DIM = 0.16f
 
-private fun <T> slideSpec() = tween<T>(SLIDE_OVER_DURATION_MS, easing = OneUiEasing)
+private fun slideSpec() = AppMotion.screenSlide<IntOffset>(IntOffset.VisibilityThreshold)
 
 fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOverEnter(): EnterTransition =
     slideInHorizontally(slideSpec()) { fullWidth -> fullWidth }
@@ -61,7 +59,7 @@ fun AnimatedContentTransitionScope<NavBackStackEntry>.slideOverPopExit(): ExitTr
 @Composable
 fun Modifier.slideOverScrim(scope: AnimatedVisibilityScope): Modifier {
     val visibility by scope.transition.animateFloat(
-        transitionSpec = { slideSpec() },
+        transitionSpec = { AppMotion.screenSlide(0.001f) },
         label = "slideOverScrim",
     ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
     return drawWithContent {
