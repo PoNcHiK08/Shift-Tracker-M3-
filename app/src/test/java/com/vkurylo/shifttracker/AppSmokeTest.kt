@@ -3,6 +3,7 @@ package com.vkurylo.shifttracker
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -45,7 +46,8 @@ class AppSmokeTest {
 
     /** Waits until a clickable node with this text (or content description) exists, then clicks it. */
     private fun clickOn(label: String) {
-        val matcher = (hasText(label) or hasContentDescription(label)) and hasClickAction()
+        // Enabled too: e.g. an editor's Delete only becomes enabled once the entry has loaded.
+        val matcher = (hasText(label) or hasContentDescription(label)) and hasClickAction() and isEnabled()
         composeRule.waitUntilExactlyOneExists(matcher, timeoutMillis = 10_000)
         composeRule.onNode(matcher).performClick()
         composeRule.waitForIdle()

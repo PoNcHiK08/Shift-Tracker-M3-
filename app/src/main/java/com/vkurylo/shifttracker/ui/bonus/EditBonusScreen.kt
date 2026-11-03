@@ -97,7 +97,9 @@ fun EditBonusScreen(
                 },
                 actions = {
                     if (!state.isNew) {
-                        IconButton(onClick = viewModel::requestDelete) {
+                        // Like Save: only once the entry is loaded. A tap during loading used to set the
+                        // "confirm delete" flag on a state the loader then replaced, so it did nothing.
+                        IconButton(onClick = viewModel::requestDelete, enabled = !state.loading) {
                             Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_bonus))
                         }
                     }

@@ -124,7 +124,8 @@ class EditBonusViewModel @Inject constructor(
         }
     }
 
-    fun requestDelete() = _uiState.update { it.copy(confirmDelete = true) }
+    /** Ignored until the entry is loaded: the loader replaces the whole state and would drop the request. */
+    fun requestDelete() = _uiState.update { if (it.loading) it else it.copy(confirmDelete = true) }
     fun cancelDelete() = _uiState.update { it.copy(confirmDelete = false) }
 
     fun delete() {
