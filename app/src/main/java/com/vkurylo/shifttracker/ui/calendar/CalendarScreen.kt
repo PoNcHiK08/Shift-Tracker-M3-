@@ -13,6 +13,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -60,10 +61,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -123,7 +127,9 @@ fun CalendarScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val locale = currentLocale()
     val scope = rememberCoroutineScope()
-    val baseMonth = remember { YearMonth.now() }
+    // Saved with the pager's page: if the activity is recreated in another month (e.g. just after
+    // midnight on the 1st), the restored page still means the same month.
+    val baseMonth = rememberSaveable { YearMonth.now() }
     val pagerState = rememberPagerState(initialPage = INITIAL_PAGE) { PAGE_COUNT }
     val visibleMonth by remember { derivedStateOf { baseMonth.plusMonths((pagerState.currentPage - INITIAL_PAGE).toLong()) } }
 
@@ -195,6 +201,13 @@ fun CalendarScreen(
                         bonusDates = state.bonusesByDate.keys,
                         selectedDate = state.selectedDate,
                         onDayClick = viewModel::selectDate,
+                        // Only the month on screen takes focus. Its neighbours are composed off-screen for
+                        // smooth swiping; when the activity is recreated without touch mode (keyboard, DeX,
+                        // tests) the system hands initial focus to the first day it finds, and focusing a
+                        // neighbour's day scrolled the calendar away from the month the user was on.
+                        modifier = Modifier
+                            .focusProperties { onEnter = { if (page != pagerState.currentPage) cancelFocusChange() } }
+                            .focusGroup(),
                     )
                 }
             }
@@ -254,11 +267,12 @@ private fun MonthGrid(
     bonusDates: Set<LocalDate>,
     selectedDate: LocalDate,
     onDayClick: (LocalDate) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val leadingBlanks = month.atDay(1).dayOfWeek.value - 1 // Monday = 1
     val today = LocalDate.now()
 
-    Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
         // Always 6 rows so the pager height never jumps.
         for (row in 0 until 6) {
             Row(Modifier.fillMaxWidth()) {
@@ -432,7 +446,8 @@ private fun DayPanel(
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(1f)) {
+                // Clipped, so the next day's title slides in under the amount instead of over it.
+                Column(Modifier.weight(1f).clipToBounds()) {
                     AnimatedContent(
                         targetState = date,
                         transitionSpec = {
@@ -458,6 +473,7 @@ private fun DayPanel(
                     }
                 }
                 if (total > 0) {
+                    Spacer(Modifier.width(12.dp))
                     RollingMoney(
                         grosze = total,
                         style = MaterialTheme.typography.titleLargeEmphasized,

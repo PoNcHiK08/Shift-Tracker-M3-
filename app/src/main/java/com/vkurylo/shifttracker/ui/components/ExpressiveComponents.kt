@@ -10,8 +10,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.TextAutoSize
@@ -20,6 +22,8 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -45,6 +49,8 @@ import com.vkurylo.shifttracker.ui.theme.pressScale
  *    and squeezes it slightly on the bouncy spatial spring; releasing springs it back.
  *  - ChoiceButtonGroup: single-choice M3 Expressive connected button group (ToggleButtons that morph
  *    their shape on press and on selection), the same component as Week / Month / Year.
+ *  - ExpressiveFilterPill: a free-standing choice (e.g. a job) as a ToggleButton that morphs from a
+ *    squircle into a pill when selected, like the bottom bar indicator.
  *
  * Every radius derived from a spring is clamped at zero: a bouncy spring can overshoot below its
  * target, and a negative corner radius makes the shape throw while drawing.
@@ -189,5 +195,48 @@ fun <T> ChoiceButtonGroup(
                 )
             }
         }
+    }
+}
+
+/**
+ * A free-standing choice, e.g. one job of several: a squircle (14 dp) that squeezes its corners on
+ * press and morphs into a pill when [selected]. Replaces Material's FilterChip, which doesn't morph.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun ExpressiveFilterPill(
+    selected: Boolean,
+    onClick: () -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null,
+) {
+    val shapes = remember {
+        ToggleButtonShapes(
+            shape = RoundedCornerShape(14.dp),
+            pressedShape = RoundedCornerShape(8.dp),
+            checkedShape = RoundedCornerShape(50),
+        )
+    }
+    val colors = ToggleButtonDefaults.colors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        checkedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+        checkedContentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    )
+    ToggleButton(
+        checked = selected,
+        onCheckedChange = { onClick() },
+        shapes = shapes,
+        colors = colors,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        // One job of several: announced as a radio button, like the other single choices.
+        modifier = modifier.semantics { role = Role.RadioButton },
+    ) {
+        if (leadingIcon != null) {
+            leadingIcon()
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(text = label, style = MaterialTheme.typography.labelLarge)
     }
 }

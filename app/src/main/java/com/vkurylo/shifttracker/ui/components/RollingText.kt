@@ -1,10 +1,8 @@
 package com.vkurylo.shifttracker.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ContentTransform
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -84,7 +82,11 @@ fun RollingText(
                                 (slideOutVertically(spatial) { h -> -direction * h } + fadeOut(effects)) using
                                 SizeTransform(clip = true) { _, _ -> sizeSpec }
                         } else {
-                            ContentTransform(EnterTransition.None, ExitTransition.None, sizeTransform = SizeTransform(clip = true))
+                            // A slot switching between a digit and a separator (e.g. hours "88,5" -> "35,25"):
+                            // the old glyph goes at once and the new one fades in. Without a fade both glyphs
+                            // showed on top of each other for a few frames; a plain cross-fade still blended them.
+                            fadeIn(effects) togetherWith fadeOut(snap()) using
+                                SizeTransform(clip = true) { _, _ -> sizeSpec }
                         }
                     },
                     label = "rollingDigit",

@@ -25,7 +25,8 @@ UI in **Ukrainian** by default with **English** as an alternative.
 - **Settings** — jobs & rates, theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
-  Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups.
+  Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;
+  picking a job (shift/bonus editors, schedule import) uses toggle buttons that morph from a squircle into a pill.
 - **Schedule import** — pick an `.ics` file, choose the job, preview the events (duplicates are detected and unchecked), confirm.
   Handles folded lines, `TZID` / UTC / floating times, `DURATION`, Outlook time-zone names, and skips all-day/cancelled events.
 
