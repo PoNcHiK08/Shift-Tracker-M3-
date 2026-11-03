@@ -11,6 +11,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
 - **Jobs** — name, hourly rate (PLN) and a color from a palette, plus an optional **second rate for a time window**
   (e.g. 33 zł/h base and 37 zł/h from 23:00 to 06:00). Deleting a job asks first and shows how many shifts go with it.
 - **Shifts** — job, date, start/end time (overnight shifts supported), unpaid break, note.
+  The time dial gives a light haptic tick for each hour or minute your finger selects (at most one per frame) and a
+  confirm click on OK; opening the dial or changing the time from code stays silent. The phone's touch-feedback /
+  vibration settings apply.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
   earnings (the editor offers "use current rate" when they differ).
@@ -23,12 +26,20 @@ UI in **Ukrainian** by default with **English** as an alternative.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year. Paging slides the period label in the direction of travel.
 - **Settings** — jobs & rates, theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
+  An import checks the whole file before touching anything (format versions 1–3; a file from a newer app version
+  gets its own message; unique job IDs, amounts within what the editors accept, a break shorter than the shift, a
+  second-rate window that isn't empty, bonuses above zero) and replaces the data in one transaction, so a bad or
+  half-written file leaves the existing data exactly as it was.
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
   Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;
   picking a job (shift/bonus editors, schedule import) uses toggle buttons that morph from a squircle into a pill.
 - **Schedule import** — pick an `.ics` file, choose the job, preview the events (duplicates are detected and unchecked), confirm.
   Handles folded lines, `TZID` / UTC / floating times, `DURATION`, Outlook time-zone names, and skips all-day/cancelled events.
+  A broken event (an impossible date or duration) is skipped and counted instead of failing the whole file.
+  Time zones are matched by name only: IANA IDs, Windows/Outlook names, path-style IDs (`/mozilla.org/…/Europe/Warsaw`)
+  and the `X-LIC-LOCATION` of a `VTIMEZONE` block. The rules inside a custom `VTIMEZONE` are *not* interpreted, so an
+  ID that matches none of these is listed in the preview with a warning that its times were read as local time.
 
 ## Download the APK
 
@@ -42,9 +53,17 @@ All builds are signed with the same development key (`app/signing/dev.keystore`)
 as an update over the old one and keeps your data. Android will ask to allow installs from your browser /
 file manager the first time.
 
-> Before publishing to Google Play, generate your own key and pass it through the
-> `SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS` and `SIGNING_KEY_PASSWORD`
-> environment variables (e.g. from GitHub Secrets). The dev key in this repo is public and only meant for testing.
+### Signing
+
+| Release build has… | Result |
+| --- | --- |
+| `SIGNING_KEYSTORE_PATH`, `SIGNING_STORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` | Signed with that key (a missing variable stops the build and names it) |
+| `ALLOW_DEV_RELEASE_SIGNING=true` (env) or `-PallowDevReleaseSigning=true` | Signed with the public dev key, with a warning banner in the build log |
+| neither | The build stops before signing and explains both options |
+
+Debug builds always use the dev key. The GitHub workflow opts in explicitly for its builds. The dev key's
+password is in this repo, so anyone can sign an APK with it: fine for test builds, **not** for Google Play —
+generate your own key and pass it through the `SIGNING_*` variables (e.g. from GitHub Secrets).
 
 ## Crash reports
 
@@ -58,7 +77,8 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 
 ```bash
 ./gradlew testDebugUnitTest   # unit tests + Robolectric UI smoke test
-./gradlew assembleRelease     # app/build/outputs/apk/release/app-release.apk
+ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
+                              # app/build/outputs/apk/release/app-release.apk, signed with the dev key
 ./gradlew installDebug        # install a debug build on a connected phone
 ```
 
@@ -69,11 +89,19 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 | UI | Jetpack Compose, Material 3 Expressive (material3 1.5.0-beta02 on Compose BOM 2026.09), dynamic color, edge-to-edge |
 | Motion | Springs (MotionScheme.expressive): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press feedback that squeezes and morphs shapes (segmented list items round their inner corners, day cells become squircles, button groups and icon buttons morph); circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
-| Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back (the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts with the finger). Icon-only bottom bar built from M3 Expressive toggle buttons |
+| Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back: while you drag, the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts towards the swiping edge; when you let go it keeps going from that exact point (shrinks to 85 % and fades out within at most ~300 ms) instead of pausing first, and a cancelled swipe returns it to its place. An editor opened from a card follows the finger back towards that card (linear bounds while seeking, so it covers about as much of the way as your finger has) and lands in it on release. Normal open/close keeps the springs. Icon-only bottom bar built from M3 Expressive toggle buttons |
 | Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
 | Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English) |
+
+## Known questions
+
+- **Pay on the nights the clocks change.** A shift's length is wall-clock time. A 22:00–06:00 shift on the night
+  the clocks go back (24→25 October 2026) really lasts 9 hours but is paid as 8; on the night they go forward
+  (last Sunday of March) it lasts 7 and is paid as 8. Whether to pay real elapsed time is an open product decision,
+  so the calculator deliberately stays as it is for now. (Schedule import already converts UTC and `TZID`
+  times correctly across these nights; this is only about how a shift's hours are counted.)
 
 ## Project layout
 
@@ -84,6 +112,7 @@ app/src/main/java/com/vkurylo/shifttracker/
 ├── di/            Hilt modules
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
-app/src/test/      calculator (incl. second rate), money parser, .ics parser, import planner,
-                   DB migration from v1, JSON backup round trip, and an end-to-end UI smoke test
+app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
+                   import planner, DB migration from v1, JSON backup (validation, versions, rollback),
+                   time-dial haptics, predictive back frame by frame, and an end-to-end UI smoke test
 ```
