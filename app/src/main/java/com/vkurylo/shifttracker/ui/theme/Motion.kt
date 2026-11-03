@@ -20,20 +20,12 @@ import androidx.compose.ui.semantics.Role
  * Motion for the app. Everything is spring-based (M3 Expressive): springs keep their velocity when
  * an animation is interrupted, so a tap during a transition never makes things jump.
  *
- * Component motion comes from MaterialTheme.motionScheme (MotionScheme.expressive(), set in Theme.kt):
+ * Motion comes from MaterialTheme.motionScheme (MotionScheme.expressive(), set in Theme.kt):
  *  - spatial specs (position, size, shape) are slightly bouncy,
  *  - effects specs (colour, alpha) never overshoot, so colours don't flicker.
- * The only hand-tuned spring is the screen slide, fitted to a One UI screen recording.
+ * Screen transitions follow the M3 transition patterns (ui/navigation/M3Transitions.kt).
  */
 object AppMotion {
-    /**
-     * One UI "slide over" screen transition as a spring, fitted to the 120 fps recording of Samsung
-     * Settings (RMSE 1.6 % of the screen width; reaches 90 % in ~195 ms and settles by ~360 ms).
-     * Slightly over-damped, so it never overshoots — exactly like the system transition.
-     */
-    fun <T> screenSlide(visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
-        spring(dampingRatio = 1.15f, stiffness = 580f, visibilityThreshold = visibilityThreshold)
-
     /** Container transform (card -> full screen editor): bouncy enough to feel physical, no wobble. */
     fun <T> containerTransform(visibilityThreshold: T? = null): FiniteAnimationSpec<T> =
         spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = visibilityThreshold)

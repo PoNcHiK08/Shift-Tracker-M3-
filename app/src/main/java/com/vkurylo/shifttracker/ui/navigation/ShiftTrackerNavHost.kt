@@ -4,9 +4,6 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -51,10 +48,12 @@ import kotlinx.serialization.Serializable
 data object MainRoute
 
 /**
- * Two levels of navigation inside one SharedTransitionLayout:
+ * Two levels of navigation inside one SharedTransitionLayout, all on Material 3 Expressive motion
+ * (see M3Transitions.kt):
  *  - the root stack holds the tabbed home screen and every detail screen. Editors opened from a
- *    card/button grow out of it (container transform); everything else uses the One UI slide-over;
- *  - the tabs live in their own nested NavHost and switch with a spring fade-through.
+ *    card/button grow out of it (container transform); other screens use the shared axis X, and
+ *    the predictive back gesture shrinks the closing screen away;
+ *  - the tabs live in their own nested NavHost and switch with a fade through.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -65,6 +64,7 @@ fun ShiftTrackerNavHost() {
     val snackbarController = remember(snackbarHostState, scope) { SnackbarController(snackbarHostState, scope) }
     val rootEntry by rootNav.currentBackStackEntryAsState()
     val onHome = rootEntry?.destination?.hasRoute(MainRoute::class) != false
+    val transitions = rememberM3Transitions()
 
     CompositionLocalProvider(LocalSnackbarController provides snackbarController) {
         Box(Modifier.fillMaxSize()) {
@@ -75,28 +75,36 @@ fun ShiftTrackerNavHost() {
                         startDestination = MainRoute,
                         modifier = Modifier.fillMaxSize(),
                         // Container transform: the editor itself is the shared element, the screen below
-                        // stays put until the card has finished growing.
+                        // stays put until the card has finished growing (or shrinking back).
                         enterTransition = {
-                            if (targetState.containerKey() != null) EnterTransition.None else slideOverEnter()
+                            if (targetState.containerKey() != null) EnterTransition.None else transitions.forwardEnter()
                         },
                         exitTransition = {
-                            if (targetState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else slideOverExit()
+                            if (targetState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.forwardExit()
                         },
                         popEnterTransition = {
-                            if (initialState.containerKey() != null) EnterTransition.None else slideOverPopEnter()
+                            if (initialState.containerKey() != null) EnterTransition.None else transitions.backwardEnter()
                         },
                         popExitTransition = {
-                            if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else slideOverPopExit()
+                            if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.backwardExit()
+                        },
+                        predictivePopEnterTransition = { transitions.predictiveBackEnter() },
+                        predictivePopExitTransition = { swipeEdge ->
+                            if (initialState.containerKey() != null) {
+                                ExitTransition.KeepUntilTransitionsFinished // the editor shrinks back into its card
+                            } else {
+                                transitions.predictiveBackExit(swipeEdge)
+                            }
                         },
                     ) {
                         composable<MainRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.slideOverScrim(this@composable)) { HomeScreen(rootNav) }
+                                HomeScreen(rootNav, transitions)
                             }
                         }
                         composable<JobsRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.slideOverScrim(this@composable)) {
+                                Box(Modifier.closingScreenShape(this@composable)) {
                                     JobsScreen(onBack = { rootNav.navigateUp() })
                                 }
                             }
@@ -104,7 +112,7 @@ fun ShiftTrackerNavHost() {
                         composable<EditShiftRoute> { entry ->
                             val key = entry.toRoute<EditShiftRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.slideOverScrim(this@composable)) {
+                                Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
                                         Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
                                             EditShiftScreen(
@@ -120,7 +128,7 @@ fun ShiftTrackerNavHost() {
                         composable<EditBonusRoute> { entry ->
                             val key = entry.toRoute<EditBonusRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.slideOverScrim(this@composable)) {
+                                Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
                                         Box(Modifier.sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
                                             EditBonusScreen(
@@ -135,7 +143,7 @@ fun ShiftTrackerNavHost() {
                         }
                         composable<ImportIcsRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.slideOverScrim(this@composable)) {
+                                Box(Modifier.closingScreenShape(this@composable)) {
                                     ImportIcsScreen(
                                         onClose = { rootNav.navigateUp() },
                                         onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -159,15 +167,10 @@ fun ShiftTrackerNavHost() {
 }
 
 @Composable
-private fun HomeScreen(rootNav: NavHostController) {
+private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
     val tabNav = rememberNavController()
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
-
-    // Fade-through between tabs, on M3 Expressive springs.
-    val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fastEffects = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -191,10 +194,13 @@ private fun HomeScreen(rootNav: NavHostController) {
             modifier = Modifier
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding),
-            enterTransition = { fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f) },
-            exitTransition = { fadeOut(fastEffects) },
-            popEnterTransition = { fadeIn(effects) + scaleIn(spatial, initialScale = 0.96f) },
-            popExitTransition = { fadeOut(fastEffects) },
+            // Top-level destinations: fade through (also when going back to the first tab).
+            enterTransition = { transitions.fadeThroughEnter() },
+            exitTransition = { transitions.fadeThroughExit() },
+            popEnterTransition = { transitions.fadeThroughEnter() },
+            popExitTransition = { transitions.fadeThroughExit() },
+            predictivePopEnterTransition = { transitions.fadeThroughEnter() },
+            predictivePopExitTransition = { transitions.fadeThroughExit() },
         ) {
             composable<CalendarRoute> {
                 CalendarScreen(
