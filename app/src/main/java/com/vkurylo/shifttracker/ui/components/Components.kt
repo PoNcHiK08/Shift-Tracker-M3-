@@ -1,5 +1,11 @@
 package com.vkurylo.shifttracker.ui.components
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,14 +20,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,9 +39,11 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.Job
+import kotlin.math.sign
 
 fun Job.composeColor(): Color = Color(color)
 
@@ -60,28 +71,57 @@ fun JobAvatar(job: Job, modifier: Modifier = Modifier, size: Dp = 40.dp) {
     }
 }
 
+/**
+ * "‹ label ›" switcher for a period. When [period] changes, the label slides in from the side of
+ * travel ([direction] > 0: forward, < 0: backward) or cross-fades ([direction] == 0, e.g. when the
+ * kind of period changes). The arrows are M3 Expressive icon buttons that morph their shape on press.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PeriodSwitcher(
-    label: String,
+fun <T> PeriodSwitcher(
+    period: T,
+    label: @Composable (T) -> String,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
     modifier: Modifier = Modifier,
+    direction: (from: T, to: T) -> Int = { _, _ -> 0 },
 ) {
+    val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        FilledTonalIconButton(onClick = onPrevious) {
+        FilledTonalIconButton(onClick = onPrevious, shapes = IconButtonDefaults.shapes()) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.previous_period))
         }
-        Text(
-            text = label,
-            style = MaterialTheme.typography.titleLarge,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        FilledTonalIconButton(onClick = onNext) {
+        AnimatedContent(
+            targetState = period,
+            transitionSpec = {
+                val d = direction(initialState, targetState).sign
+                if (d == 0) {
+                    fadeIn(fadeInSpec) togetherWith fadeOut(fadeOutSpec)
+                } else {
+                    (slideInHorizontally(spatial) { w -> d * w / 3 } + fadeIn(fadeInSpec)) togetherWith
+                        (slideOutHorizontally(spatial) { w -> -d * w / 3 } + fadeOut(fadeOutSpec))
+                }
+            },
+            contentAlignment = Alignment.Center,
+            // The label slides under the arrows, not over them.
+            modifier = Modifier.weight(1f).clipToBounds(),
+            label = "periodLabel",
+        ) { p ->
+            Text(
+                text = label(p),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth().semantics { heading() },
+            )
+        }
+        FilledTonalIconButton(onClick = onNext, shapes = IconButtonDefaults.shapes()) {
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.next_period))
         }
     }

@@ -16,14 +16,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Today
-import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
@@ -33,7 +31,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,23 +40,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
 import com.vkurylo.shifttracker.ui.components.RollingMoney
 import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.SectionHeader
+import com.vkurylo.shifttracker.ui.components.SegmentedItem
+import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
@@ -104,9 +101,12 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
             }
             item(key = "switcher") {
                 PeriodSwitcher(
-                    label = periodLabel(range),
+                    period = range,
+                    label = { periodLabel(it) },
                     onPrevious = viewModel::previous,
                     onNext = viewModel::next,
+                    // Paging slides the label in the direction of travel; switching week/month/year fades.
+                    direction = { from, to -> if (from.period != to.period) 0 else to.from.compareTo(from.from) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
@@ -125,11 +125,14 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
             } else {
                 if (state.summary.perJob.isNotEmpty()) {
                     item(key = "by-job-header") { SectionHeader(stringResource(R.string.by_job)) }
-                    items(state.summary.perJob, key = { "job-${it.job.id}" }) { jobSummary ->
-                        JobSummaryCard(
+                    val jobs = state.summary.perJob
+                    itemsIndexed(jobs, key = { _, it -> "job-${it.job.id}" }) { index, jobSummary ->
+                        JobSummaryItem(
                             summary = jobSummary,
                             totalEarnings = state.summary.totalEarningsGrosze,
-                            modifier = Modifier.animateItem().padding(horizontal = 16.dp, vertical = 6.dp),
+                            index = index,
+                            count = jobs.size,
+                            modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
                         )
                     }
                 }
@@ -137,11 +140,18 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                     item(key = "breakdown-header") {
                         SectionHeader(stringResource(if (range.period == SummaryPeriod.WEEK) R.string.by_day else R.string.by_month))
                     }
-                    item(key = "breakdown") {
-                        BreakdownCard(
+                    val entries = state.breakdown
+                    val max = entries.maxOf { it.earningsGrosze }.coerceAtLeast(1)
+                    // Keyed by position: paging keeps the rows in place (only values and bars change),
+                    // so old and new rows never fade over each other.
+                    itemsIndexed(entries, key = { index, _ -> "breakdown-$index" }) { index, entry ->
+                        BreakdownItem(
                             period = range.period,
-                            entries = state.breakdown,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                            entry = entry,
+                            max = max,
+                            index = index,
+                            count = entries.size,
+                            modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
                         )
                     }
                 }
@@ -151,40 +161,27 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
 }
 
 /** M3 Expressive connected button group: Week | Month | Year. */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun PeriodSelector(
     selected: SummaryPeriod,
     onSelect: (SummaryPeriod) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val options = listOf(
-        SummaryPeriod.WEEK to R.string.period_week,
-        SummaryPeriod.MONTH to R.string.period_month,
-        SummaryPeriod.YEAR to R.string.period_year,
-    )
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-    ) {
-        options.forEachIndexed { index, (period, label) ->
-            ToggleButton(
-                checked = period == selected,
-                onCheckedChange = { onSelect(period) },
-                shapes = when (index) {
-                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                    options.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+    ChoiceButtonGroup(
+        options = SummaryPeriod.entries,
+        selected = selected,
+        onSelect = onSelect,
+        label = { period ->
+            stringResource(
+                when (period) {
+                    SummaryPeriod.WEEK -> R.string.period_week
+                    SummaryPeriod.MONTH -> R.string.period_month
+                    SummaryPeriod.YEAR -> R.string.period_year
                 },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .semantics { role = Role.RadioButton },
-            ) {
-                Text(stringResource(label), maxLines = 1)
-            }
-        }
-    }
+            )
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -262,12 +259,13 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
     }
 }
 
+/** One job of the "By job" group: earnings, hours/shifts/bonuses and its share of the total. */
 @Composable
-private fun JobSummaryCard(summary: JobSummary, totalEarnings: Long, modifier: Modifier = Modifier) {
+private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int, count: Int, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val share = if (totalEarnings > 0) summary.earningsGrosze.toFloat() / totalEarnings else 0f
-    val animatedShare by animateFloatAsState(share, label = "share")
-    ElevatedCard(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+    val animatedShare by animateFloatAsState(share, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "share")
+    SegmentedItem(index = index, count = count, modifier = modifier) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 JobAvatar(summary.job)
@@ -295,7 +293,8 @@ private fun JobSummaryCard(summary: JobSummary, totalEarnings: Long, modifier: M
             val percent = (share * 100).toInt()
             val shareDescription = stringResource(R.string.share_of_earnings, percent)
             LinearProgressIndicator(
-                progress = { animatedShare },
+                // The spatial spring may overshoot a little; the bar itself must stay within 0..1.
+                progress = { animatedShare.coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth().height(8.dp).clearAndSetSemantics { contentDescription = shareDescription },
                 color = summary.job.composeColor(),
                 trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
@@ -305,65 +304,72 @@ private fun JobSummaryCard(summary: JobSummary, totalEarnings: Long, modifier: M
     }
 }
 
-/** Per-day (week) or per-month (year) earnings, each with a bar relative to the best entry. */
+/** One day (week) or month (year) of the breakdown group, with a bar relative to the best entry. */
 @Composable
-private fun BreakdownCard(period: SummaryPeriod, entries: List<BreakdownEntry>, modifier: Modifier = Modifier) {
+private fun BreakdownItem(
+    period: SummaryPeriod,
+    entry: BreakdownEntry,
+    max: Long,
+    index: Int,
+    count: Int,
+    modifier: Modifier = Modifier,
+) {
     val locale = currentLocale()
-    val max = entries.maxOf { it.earningsGrosze }.coerceAtLeast(1)
     val today = LocalDate.now()
-    ElevatedCard(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-        Column(Modifier.padding(vertical = 8.dp)) {
-            entries.forEach { entry ->
-                val isCurrent = when (period) {
-                    SummaryPeriod.WEEK -> entry.date == today
-                    else -> YearMonth.from(entry.date) == YearMonth.from(today)
+    val isCurrent = when (period) {
+        SummaryPeriod.WEEK -> entry.date == today
+        else -> YearMonth.from(entry.date) == YearMonth.from(today)
+    }
+    val label = when (period) {
+        SummaryPeriod.WEEK -> Formatters.shortDate(entry.date, locale)
+        else -> Formatters.monthName(YearMonth.from(entry.date), locale)
+    }
+    val empty = entry.isEmpty
+    val valueText = Formatters.money(entry.earningsGrosze, locale)
+    val hoursText = hoursLabel(entry.paidMinutes)
+    SegmentedItem(
+        index = index,
+        count = count,
+        // Today / this month: a slightly lifted segment and a primary label.
+        color = if (isCurrent) MaterialTheme.colorScheme.surfaceContainerHighest else MaterialTheme.colorScheme.surfaceContainer,
+        modifier = modifier.clearAndSetSemantics { contentDescription = "$label: $valueText, $hoursText" },
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    label,
+                    style = if (isCurrent) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
+                    color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                if (entry.shiftCount > 0) {
+                    Text(
+                        hoursText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(12.dp))
                 }
-                val label = when (period) {
-                    SummaryPeriod.WEEK -> Formatters.shortDate(entry.date, locale)
-                    else -> Formatters.monthName(YearMonth.from(entry.date), locale)
-                }
-                val empty = entry.isEmpty
-                val valueText = Formatters.money(entry.earningsGrosze, locale)
-                val hoursText = hoursLabel(entry.paidMinutes)
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                        .clearAndSetSemantics { contentDescription = "$label: $valueText, $hoursText" },
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            label,
-                            style = if (isCurrent) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
-                            color = if (isCurrent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        if (entry.shiftCount > 0) {
-                            Text(
-                                hoursText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(12.dp))
-                        }
-                        Text(
-                            if (empty) "—" else valueText,
-                            style = MaterialTheme.typography.titleSmall,
-                            color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                        )
-                    }
-                    if (!empty) {
-                        Spacer(Modifier.height(6.dp))
-                        val progress by animateFloatAsState(entry.earningsGrosze.toFloat() / max, label = "breakdown")
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier.fillMaxWidth().height(6.dp),
-                            color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            strokeCap = StrokeCap.Round,
-                        )
-                    }
-                }
+                Text(
+                    if (empty) "—" else valueText,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            if (!empty) {
+                Spacer(Modifier.height(8.dp))
+                val progress by animateFloatAsState(
+                    targetValue = entry.earningsGrosze.toFloat() / max,
+                    animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    label = "breakdown",
+                )
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    strokeCap = StrokeCap.Round,
+                )
             }
         }
     }

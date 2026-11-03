@@ -1,6 +1,10 @@
 package com.vkurylo.shifttracker.ui.components
 
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.NightsStay
 import androidx.compose.material.icons.filled.Redeem
@@ -19,31 +22,74 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
-import com.vkurylo.shifttracker.ui.navigation.ContainerCornerRadius
 import com.vkurylo.shifttracker.ui.navigation.SharedKeys
 import com.vkurylo.shifttracker.ui.navigation.sharedContainer
-import com.vkurylo.shifttracker.ui.theme.expressiveClickable
+import com.vkurylo.shifttracker.ui.theme.pressScale
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
 
-private val CardShape = RoundedCornerShape(ContainerCornerRadius)
+/**
+ * The card surface: one segment of the day's group (several entries of a day sit 2 dp apart, like an
+ * Android 16 list) and one end of a container transform. Pressing rounds its inner corners and
+ * squeezes it; the ripple stays inside the shape.
+ */
+@Composable
+private fun EntryContainer(
+    key: String,
+    index: Int,
+    count: Int,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    content: @Composable () -> Unit,
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val shape = animateSegmentShape(index, count, pressed)
+    Box(
+        modifier
+            .fillMaxWidth()
+            .sharedContainer(key, shape)
+            .pressScale(interactionSource, pressedScale = 0.97f)
+            .clip(shape)
+            .background(color)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+    ) {
+        content()
+    }
+}
 
 /**
  * A shift as a card. It is one end of a container transform: tapping it grows the card into the
  * full-screen editor (and the editor shrinks back into it on close / predictive back).
  */
 @Composable
-fun ShiftCard(item: ShiftWithJob, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ShiftCard(
+    item: ShiftWithJob,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    index: Int = 0,
+    count: Int = 1,
+) {
     val locale = currentLocale()
     val shift = item.shift
     val details = buildList {
@@ -51,13 +97,13 @@ fun ShiftCard(item: ShiftWithJob, onClick: () -> Unit, modifier: Modifier = Modi
         if (shift.unpaidBreakMinutes > 0) add(stringResource(R.string.break_short, shift.unpaidBreakMinutes))
     }.joinToString(" · ")
 
-    Box(
-        modifier
-            .fillMaxWidth()
-            .sharedContainer(SharedKeys.shift(shift.id), CardShape)
-            .expressiveClickable(onClick = onClick, pressedScale = 0.97f)
-            .clip(CardShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+    EntryContainer(
+        key = SharedKeys.shift(shift.id),
+        index = index,
+        count = count,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        onClick = onClick,
+        modifier = modifier,
     ) {
     Row(
         modifier = Modifier
@@ -106,16 +152,22 @@ fun ShiftCard(item: ShiftWithJob, onClick: () -> Unit, modifier: Modifier = Modi
 
 /** A bonus as a card; like [ShiftCard] it expands into its editor. */
 @Composable
-fun BonusCard(item: BonusWithJob, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun BonusCard(
+    item: BonusWithJob,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    index: Int = 0,
+    count: Int = 1,
+) {
     val locale = currentLocale()
     val bonus = item.bonus
-    Box(
-        modifier
-            .fillMaxWidth()
-            .sharedContainer(SharedKeys.bonus(bonus.id), CardShape)
-            .expressiveClickable(onClick = onClick, pressedScale = 0.97f)
-            .clip(CardShape)
-            .background(MaterialTheme.colorScheme.tertiaryContainer),
+    EntryContainer(
+        key = SharedKeys.bonus(bonus.id),
+        index = index,
+        count = count,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        onClick = onClick,
+        modifier = modifier,
     ) {
     Row(
         modifier = Modifier

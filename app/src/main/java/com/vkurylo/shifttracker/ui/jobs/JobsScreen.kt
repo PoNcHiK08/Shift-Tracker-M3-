@@ -3,7 +3,6 @@ package com.vkurylo.shifttracker.ui.jobs
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.selection.selectable
@@ -86,6 +85,8 @@ import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.PickerField
 import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.onColor
+import com.vkurylo.shifttracker.ui.components.SegmentedItem
+import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.LocalTime
@@ -137,20 +138,29 @@ fun JobsScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 96.dp),
+                contentPadding = PaddingValues(top = padding.calculateTopPadding() + 8.dp, bottom = padding.calculateBottomPadding() + 96.dp),
             ) {
-                items(state.jobs, key = { it.id }) { job ->
-                    ListItem(
-                        modifier = Modifier.animateItem().clickable { viewModel.startEdit(job) },
-                        leadingContent = { JobAvatar(job) },
-                        headlineContent = { Text(job.name) },
-                        supportingContent = { Text(jobRatesLabel(job)) },
-                        trailingContent = {
-                            IconButton(onClick = { viewModel.requestDelete(job) }) {
-                                Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_job_named, job.name))
-                            }
-                        },
-                    )
+                // One segmented group (Android 16 style); tapping a job opens its editor.
+                itemsIndexed(state.jobs, key = { _, job -> job.id }) { index, job ->
+                    SegmentedItem(
+                        index = index,
+                        count = state.jobs.size,
+                        onClick = { viewModel.startEdit(job) },
+                        modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
+                    ) {
+                        ListItem(
+                            modifier = it,
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            leadingContent = { JobAvatar(job) },
+                            headlineContent = { Text(job.name) },
+                            supportingContent = { Text(jobRatesLabel(job)) },
+                            trailingContent = {
+                                IconButton(onClick = { viewModel.requestDelete(job) }) {
+                                    Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_job_named, job.name))
+                                }
+                            },
+                        )
+                    }
                 }
             }
         }

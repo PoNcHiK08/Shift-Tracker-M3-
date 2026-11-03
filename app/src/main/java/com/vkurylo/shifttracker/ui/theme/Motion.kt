@@ -4,8 +4,10 @@ import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Indication
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.MaterialTheme
@@ -32,8 +34,30 @@ object AppMotion {
 }
 
 /**
+ * Squeezes the element while [interactionSource] reports a press and springs it back on release
+ * (M3 Expressive press feedback). Put it before any clip/background so the whole surface scales.
+ */
+@Composable
+fun Modifier.pressScale(
+    interactionSource: InteractionSource,
+    pressedScale: Float = 0.95f,
+    enabled: Boolean = true,
+): Modifier {
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed && enabled) pressedScale else 1f,
+        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+        label = "pressScale",
+    )
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+/**
  * Clickable that physically squeezes under the finger and springs back on release
- * (M3 Expressive press feedback), keeping the standard ripple and semantics.
+ * (M3 Expressive press feedback), keeping the standard ripple (or the given [indication]) and semantics.
  */
 @Composable
 fun Modifier.expressiveClickable(
@@ -42,22 +66,15 @@ fun Modifier.expressiveClickable(
     onClickLabel: String? = null,
     role: Role? = Role.Button,
     pressedScale: Float = 0.95f,
+    interactionSource: MutableInteractionSource? = null,
+    indication: Indication? = LocalIndication.current,
 ): Modifier {
-    val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
-        targetValue = if (pressed && enabled) pressedScale else 1f,
-        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-        label = "pressScale",
-    )
+    val source = interactionSource ?: remember { MutableInteractionSource() }
     return this
-        .graphicsLayer {
-            scaleX = scale
-            scaleY = scale
-        }
+        .pressScale(source, pressedScale, enabled)
         .clickable(
-            interactionSource = interactionSource,
-            indication = LocalIndication.current,
+            interactionSource = source,
+            indication = indication,
             enabled = enabled,
             onClickLabel = onClickLabel,
             role = role,

@@ -19,10 +19,13 @@ UI in **Ukrainian** by default with **English** as an alternative.
 - **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
   M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
   "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. Below it, Bento tiles
-  for the month's earnings, hours and shifts.
+  for the month's earnings, hours and shifts. Under the finger every day morphs into the squircle too.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
-  plus per-day bars for a week and per-month bars for a year.
+  plus per-day bars for a week and per-month bars for a year. Paging slides the period label in the direction of travel.
 - **Settings** — jobs & rates, theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
+- **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
+  segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
+  Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups.
 - **Schedule import** — pick an `.ics` file, choose the job, preview the events (duplicates are detected and unchecked), confirm.
   Handles folded lines, `TZID` / UTC / floating times, `DURATION`, Outlook time-zone names, and skips all-day/cancelled events.
 
@@ -63,7 +66,7 @@ Requirements: JDK 17+ and the Android SDK (Android Studio installs both).
 | Area | Choice |
 | --- | --- |
 | UI | Jetpack Compose, Material 3 Expressive (material3 1.5.0-beta02 on Compose BOM 2026.09), dynamic color, edge-to-edge |
-| Motion | Springs (MotionScheme.expressive): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press-to-squeeze feedback on cards and cells; circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
+| Motion | Springs (MotionScheme.expressive): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press feedback that squeezes and morphs shapes (segmented list items round their inner corners, day cells become squircles, button groups and icon buttons morph); circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
 | Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back (the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts with the finger). Icon-only bottom bar built from M3 Expressive toggle buttons |
 | Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored in grosze (`Long`) |

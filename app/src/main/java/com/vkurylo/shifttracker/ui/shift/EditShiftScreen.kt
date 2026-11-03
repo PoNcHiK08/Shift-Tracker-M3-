@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -62,6 +63,7 @@ import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.PickerField
+import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.RollingMoney
 import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.TimeDialog
@@ -191,15 +193,19 @@ fun EditShiftScreen(
 
             Spacer(Modifier.height(16.dp))
             FieldLabel(stringResource(R.string.unpaid_break))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BreakPresets.forEach { minutes ->
-                    FilterChip(
-                        selected = state.breakValue == minutes,
-                        onClick = { viewModel.setBreak(minutes.toString()) },
-                        label = { Text(if (minutes == 0) stringResource(R.string.no_break) else stringResource(R.string.minutes_short, minutes)) },
-                    )
-                }
-            }
+            // One connected button group (like Week / Month / Year): the chosen break becomes a pill.
+            // A break typed below that isn't a preset leaves none selected.
+            ChoiceButtonGroup(
+                options = BreakPresets,
+                selected = state.breakValue?.takeIf { it in BreakPresets },
+                onSelect = { minutes -> viewModel.setBreak(minutes.toString()) },
+                label = { minutes ->
+                    if (minutes == 0) stringResource(R.string.no_break) else stringResource(R.string.minutes_short, minutes)
+                },
+                weight = { minutes -> if (minutes == 0) 1.6f else 1f },
+                contentPadding = PaddingValues(horizontal = 6.dp),
+                modifier = Modifier.padding(top = 4.dp),
+            )
             OutlinedTextField(
                 value = state.breakMinutes,
                 onValueChange = viewModel::setBreak,

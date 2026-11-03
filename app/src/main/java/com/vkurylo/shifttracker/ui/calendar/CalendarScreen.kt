@@ -13,6 +13,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,6 +90,7 @@ import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.MorphShape
 import com.vkurylo.shifttracker.ui.components.RollingMoney
 import com.vkurylo.shifttracker.ui.components.RollingText
+import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.ShiftCard
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.navigation.SharedKeys
@@ -298,11 +301,16 @@ private fun DayCell(
     val colors = MaterialTheme.colorScheme
     val motion = MaterialTheme.motionScheme
     val hasEntries = shifts.isNotEmpty() || hasBonus
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
 
-    val morph by animateFloatAsState(if (isSelected) 1f else 0f, motion.fastSpatialSpec(), label = "cellMorph")
+    // Under the finger every day turns into the squircle (M3 Expressive shape morph on press),
+    // so the press feedback has the cell's own shape instead of a square ripple.
+    val morph by animateFloatAsState(if (isSelected || pressed) 1f else 0f, motion.fastSpatialSpec(), label = "cellMorph")
     val scale by animateFloatAsState(
         targetValue = when {
             isSelected -> 1f
+            pressed -> 0.92f
             hasEntries || isToday -> 0.86f
             else -> 0.6f
         },
@@ -313,7 +321,7 @@ private fun DayCell(
         targetValue = when {
             isSelected -> colors.primary
             isToday -> colors.primaryContainer
-            hasEntries -> colors.surfaceContainerHighest
+            hasEntries || pressed -> colors.surfaceContainerHighest
             else -> Color.Transparent
         },
         animationSpec = motion.defaultEffectsSpec(),
@@ -340,7 +348,12 @@ private fun DayCell(
         modifier = Modifier
             .padding(3.dp)
             .fillMaxSize()
-            .expressiveClickable(onClick = onClick, pressedScale = 0.88f)
+            .expressiveClickable(
+                onClick = onClick,
+                pressedScale = 0.9f,
+                interactionSource = interactionSource,
+                indication = null, // the morphing background is the press feedback
+            )
             .semantics {
                 contentDescription = description
                 selected = isSelected
@@ -484,15 +497,22 @@ private fun DayPanel(
                         )
                     }
                 } else {
+                    // The day's entries form one segmented group (Android 16 list style).
+                    val count = dayShifts.size + dayBonuses.size
                     Column(
                         Modifier.fillMaxWidth().padding(top = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(SegmentedListDefaults.Gap),
                     ) {
-                        dayShifts.forEach { item ->
-                            ShiftCard(item = item, onClick = { onEditShift(item.shift.id) })
+                        dayShifts.forEachIndexed { index, item ->
+                            ShiftCard(item = item, onClick = { onEditShift(item.shift.id) }, index = index, count = count)
                         }
-                        dayBonuses.forEach { item ->
-                            BonusCard(item = item, onClick = { onEditBonus(item.bonus.id) })
+                        dayBonuses.forEachIndexed { index, item ->
+                            BonusCard(
+                                item = item,
+                                onClick = { onEditBonus(item.bonus.id) },
+                                index = dayShifts.size + index,
+                                count = count,
+                            )
                         }
                     }
                 }
