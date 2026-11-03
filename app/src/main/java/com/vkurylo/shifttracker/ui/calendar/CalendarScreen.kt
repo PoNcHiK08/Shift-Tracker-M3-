@@ -19,10 +19,13 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -71,6 +74,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -562,16 +566,24 @@ private fun DayPanel(
     }
 }
 
-/** Bento tiles for the month: a big earnings tile (rolling counter) next to hours and shifts. */
+internal const val MONTH_TILE_EARNINGS = "month-tile-earnings"
+internal const val MONTH_TILE_HOURS = "month-tile-hours"
+internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
+
+/**
+ * Bento tiles for the month: a big earnings tile (rolling counter) next to hours and shifts.
+ * The big tile and the column of two equal small ones share one height (whichever needs more, e.g.
+ * with a large font), so their tops and bottoms always line up.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
+internal fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val colors = MaterialTheme.colorScheme
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Tile(
             container = colors.primaryContainer,
-            modifier = Modifier.weight(1.55f).heightIn(min = 148.dp),
+            modifier = Modifier.weight(1.55f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
         ) {
             Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
             Spacer(Modifier.weight(1f))
@@ -588,8 +600,8 @@ private fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
                 )
             }
         }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(container = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
+        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Tile(container = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().weight(1f).testTag(MONTH_TILE_HOURS)) {
                 Text(stringResource(R.string.hours), style = MaterialTheme.typography.labelMedium, color = colors.onSecondaryContainer)
                 RollingText(
                     text = Formatters.decimalHours(summary.totalPaidMinutes, locale),
@@ -598,7 +610,7 @@ private fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
                     color = colors.onSecondaryContainer,
                 )
             }
-            Tile(container = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().heightIn(min = 70.dp)) {
+            Tile(container = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().weight(1f).testTag(MONTH_TILE_SHIFTS)) {
                 Text(stringResource(R.string.shifts), style = MaterialTheme.typography.labelMedium, color = colors.onTertiaryContainer)
                 RollingText(
                     text = summary.shiftCount.toString(),
@@ -612,8 +624,8 @@ private fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun Tile(container: Color, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+private fun Tile(container: Color, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Surface(modifier = modifier, shape = MaterialTheme.shapes.extraLarge, color = container) {
-        Column(Modifier.padding(16.dp)) { content() }
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { content() }
     }
 }
