@@ -1,7 +1,6 @@
 package com.vkurylo.shifttracker.ui.theme
 
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -35,10 +34,15 @@ object AppMotion {
      */
     const val TRANSITION_STIFFNESS_FACTOR = 1.38f
 
-    /** Container transform (card -> full screen editor): bouncy enough to feel physical, no wobble. */
+    /**
+     * Container transform (card -> full screen editor and back), also the editor's corner and scrim.
+     * Damping 0.9 overshoots by ~0.15 % (about 2 px over a full-screen move; 0.86 did ~0.5 %, a few
+     * pixels past the card when closing), so it lands solid. The stiffness keeps the settle time of
+     * the quicker 0.86 spring (~195 ms to 99 %), as more damping alone would make it slower.
+     */
     fun <T> containerTransform(visibilityThreshold: T? = null): FiniteAnimationSpec<T> = spring(
-        dampingRatio = 0.86f,
-        stiffness = Spring.StiffnessMediumLow * TRANSITION_STIFFNESS_FACTOR,
+        dampingRatio = 0.9f,
+        stiffness = 690f,
         visibilityThreshold = visibilityThreshold,
     )
 

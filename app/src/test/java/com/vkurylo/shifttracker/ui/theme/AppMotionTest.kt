@@ -37,10 +37,21 @@ class AppMotionTest {
         }
     }
 
+    /** When a full-screen move (1500 px) really ends: within half a pixel of its target. */
+    private fun fullScreenMoveMs(spec: FiniteAnimationSpec<Float>): Double =
+        spec.vectorize(Float.VectorConverter)
+            .getDurationNanos(AnimationVector1D(0f), AnimationVector1D(1500f), AnimationVector1D(0f)) / 1e6
+
     @Test
-    fun `the container transform is about 15 percent quicker than before`() {
-        val before = spring<Float>(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow)
-        assertAboutFifteenPercentQuicker(before, AppMotion.containerTransform())
+    fun `the container transform lands without visible overshoot and is not slower than in 1_0_12`() {
+        val spec = AppMotion.containerTransform<Float>(0.5f) as SpringSpec<Float>
+        assertTrue("damping ${spec.dampingRatio}", spec.dampingRatio >= 0.9f)
+        // 1.0.11: 0.86 / StiffnessMediumLow. 1.0.12: the same with stiffness x 1.38.
+        val v1011 = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = 0.5f)
+        val v1012 = spring(0.86f, Spring.StiffnessMediumLow * AppMotion.TRANSITION_STIFFNESS_FACTOR, 0.5f)
+        val now = fullScreenMoveMs(spec)
+        assertTrue("$now ms vs 1.0.12 ${fullScreenMoveMs(v1012)} ms", now <= fullScreenMoveMs(v1012))
+        assertTrue("$now ms vs 1.0.11 ${fullScreenMoveMs(v1011)} ms", now <= 0.85 * fullScreenMoveMs(v1011))
     }
 
     @Test
