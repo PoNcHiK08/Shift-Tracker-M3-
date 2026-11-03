@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.domain.ics
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -220,5 +221,138 @@ class IcsParserTest {
     fun `garbage input yields no events`() {
         val result = parser.parse("hello\nworld")
         assertEquals(0, result.events.size)
+    }
+
+    private fun event(start: String, end: String, extra: String = "") = """
+        BEGIN:VEVENT
+        $extra
+        DTSTART$start
+        DTEND$end
+        END:VEVENT
+    """.lines().filter { it.isNotBlank() }.joinToString("\n")
+
+    private val utc = IcsParser(ZoneId.of("UTC"))
+
+    // --- Time zones the parser can't resolve -----------------------------------------------------
+
+    @Test
+    fun `unknown TZID keeps the clock time and is reported`() {
+        val result = parser.parse(ics(event(";TZID=Some/Unknown_Zone:20261102T080000", ";TZID=Some/Unknown_Zone:20261102T160000")))
+        assertEquals(setOf("Some/Unknown_Zone"), result.unknownZones)
+        val e = result.events.single()
+        assertEquals(LocalDateTime.of(2026, 11, 2, 8, 0), e.start)
+        assertEquals(LocalDateTime.of(2026, 11, 2, 16, 0), e.end)
+    }
+
+    @Test
+    fun `known zones are not reported`() {
+        val result = parser.parse(ics(event(";TZID=Europe/Warsaw:20261102T080000", ";TZID=Europe/Warsaw:20261102T160000")))
+        assertTrue(result.unknownZones.isEmpty())
+    }
+
+    @Test
+    fun `path-style TZID resolves to its IANA zone`() {
+        // Old Thunderbird/Lightning exports. 08:00 in Warsaw in November (UTC+1) is 07:00 UTC.
+        val result = utc.parse(
+            ics(event(";TZID=/mozilla.org/20050126_1/Europe/Warsaw:20261102T080000", ";TZID=/mozilla.org/20050126_1/Europe/Warsaw:20261102T160000")),
+        )
+        assertTrue(result.unknownZones.isEmpty())
+        assertEquals(LocalDateTime.of(2026, 11, 2, 7, 0), result.events.single().start)
+    }
+
+    @Test
+    fun `VTIMEZONE with X-LIC-LOCATION resolves a custom TZID, without it the zone is reported`() {
+        val zones = """
+            BEGIN:VTIMEZONE
+            TZID:Firma Time
+            X-LIC-LOCATION:Europe/Warsaw
+            BEGIN:STANDARD
+            DTSTART:19701025T030000
+            TZOFFSETFROM:+0200
+            TZOFFSETTO:+0100
+            END:STANDARD
+            END:VTIMEZONE
+            BEGIN:VTIMEZONE
+            TZID:Custom Rules Only
+            BEGIN:STANDARD
+            DTSTART:19701025T030000
+            TZOFFSETFROM:+0200
+            TZOFFSETTO:+0100
+            END:STANDARD
+            END:VTIMEZONE
+        """.trimIndent()
+        val result = utc.parse(
+            ics(
+                zones,
+                event(";TZID=\"Firma Time\":20261102T080000", ";TZID=\"Firma Time\":20261102T160000"),
+                event(";TZID=Custom Rules Only:20261103T080000", ";TZID=Custom Rules Only:20261103T160000"),
+            ),
+        )
+        assertEquals(LocalDateTime.of(2026, 11, 2, 7, 0), result.events[0].start) // resolved via X-LIC-LOCATION
+        assertEquals(LocalDateTime.of(2026, 11, 3, 8, 0), result.events[1].start) // custom rules: not interpreted
+        assertEquals(setOf("Custom Rules Only"), result.unknownZones)
+    }
+
+    // --- Broken events don't fail the file ------------------------------------------------------
+
+    @Test
+    fun `an absurd DURATION skips that event only`() {
+        val result = parser.parse(
+            ics(
+                "BEGIN:VEVENT\nDTSTART:20261102T080000\nDURATION:P9999999999999999D\nEND:VEVENT",
+                event(":20261103T080000", ":20261103T160000"),
+            ),
+        )
+        assertEquals(1, result.skippedCount)
+        assertEquals(LocalDateTime.of(2026, 11, 3, 8, 0), result.events.single().start)
+    }
+
+    // --- Daylight saving time in Warsaw (parsing/conversion only; pay is a separate question) ----
+
+    @Test
+    fun `UTC times convert correctly across the spring DST change`() {
+        // 29 Mar 2026: 02:00 CET -> 03:00 CEST.
+        val result = parser.parse(ics(event(":20260329T003000Z", ":20260329T013000Z")))
+        val e = result.events.single()
+        assertEquals(LocalDateTime.of(2026, 3, 29, 1, 30), e.start) // UTC+1
+        assertEquals(LocalDateTime.of(2026, 3, 29, 3, 30), e.end) // UTC+2: one real hour, two on the clock
+    }
+
+    @Test
+    fun `UTC times convert correctly across the autumn DST change`() {
+        // 25 Oct 2026: 03:00 CEST -> 02:00 CET, so 02:00-03:00 happens twice.
+        val result = parser.parse(ics(event(":20261024T223000Z", ":20261025T013000Z")))
+        val e = result.events.single()
+        assertEquals(LocalDateTime.of(2026, 10, 25, 0, 30), e.start) // UTC+2
+        assertEquals(LocalDateTime.of(2026, 10, 25, 2, 30), e.end) // UTC+1 (the second 02:30)
+    }
+
+    @Test
+    fun `Europe-Warsaw times convert to another zone on both sides of DST`() {
+        val spring = utc.parse(ics(event(";TZID=Europe/Warsaw:20260329T013000", ";TZID=Europe/Warsaw:20260329T033000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 3, 29, 0, 30), spring.start) // CET  (+1)
+        assertEquals(LocalDateTime.of(2026, 3, 29, 1, 30), spring.end) // CEST (+2)
+        val autumn = utc.parse(ics(event(";TZID=Europe/Warsaw:20261025T013000", ";TZID=Europe/Warsaw:20261025T033000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 10, 24, 23, 30), autumn.start) // CEST (+2)
+        assertEquals(LocalDateTime.of(2026, 10, 25, 2, 30), autumn.end) // CET  (+1)
+    }
+
+    @Test
+    fun `zoned non-existent and repeated Warsaw times follow java-time rules`() {
+        // 02:30 doesn't exist on 29 Mar: java.time moves it forward by the gap (03:30 CEST = 01:30 UTC).
+        val gap = utc.parse(ics(event(";TZID=Europe/Warsaw:20260329T023000", ";TZID=Europe/Warsaw:20260329T050000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 3, 29, 1, 30), gap.start)
+        // 02:30 happens twice on 25 Oct: java.time takes the earlier offset (CEST, +2 -> 00:30 UTC).
+        val overlap = utc.parse(ics(event(";TZID=Europe/Warsaw:20261025T023000", ";TZID=Europe/Warsaw:20261025T050000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 10, 25, 0, 30), overlap.start)
+    }
+
+    @Test
+    fun `floating non-existent and repeated local times are kept as written`() {
+        // Floating times have no zone, so there is nothing to resolve: the clock time is kept.
+        val gap = parser.parse(ics(event(":20260329T023000", ":20260329T060000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 3, 29, 2, 30), gap.start)
+        val overlap = parser.parse(ics(event(":20261025T023000", ":20261025T060000"))).events.single()
+        assertEquals(LocalDateTime.of(2026, 10, 25, 2, 30), overlap.start)
     }
 }

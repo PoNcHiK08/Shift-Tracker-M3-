@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.domain.ics
 
+import java.time.DateTimeException
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -19,8 +20,13 @@ data class IcsEvent(
 
 data class IcsParseResult(
     val events: List<IcsEvent>,
-    /** Events that can't become shifts: all-day, missing times, longer than 24 h, etc. */
+    /** Events that can't become shifts: all-day, missing times, longer than 24 h, broken values, etc. */
     val skippedCount: Int,
+    /**
+     * TZIDs the parser could not resolve. Events using them keep their clock times as written, i.e.
+     * they are taken as local time; the import preview tells the user so they can check them.
+     */
+    val unknownZones: Set<String> = emptySet(),
 )
 
 /**
@@ -28,10 +34,16 @@ data class IcsParseResult(
  * folded lines, property parameters (TZID, VALUE=DATE), UTC/floating/zoned times,
  * DURATION instead of DTEND, escaped text and nested components such as VALARM.
  * Recurring rules (RRULE) are not expanded; only the first occurrence is imported.
+ *
+ * Time zones: IANA ids, path-style ids ("/mozilla.org/20050126_1/Europe/Warsaw"), common Outlook
+ * (Windows) names, and VTIMEZONE blocks that name their IANA zone in X-LIC-LOCATION. Custom VTIMEZONE
+ * rules (STANDARD/DAYLIGHT offsets) are not interpreted; such zones are reported as unknown.
  */
 class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
 
     fun parse(text: String): IcsParseResult {
+        val lines = unfold(text).mapNotNull(::parseLine)
+        val zones = ZoneResolver(vtimezoneAliases(lines))
         val events = mutableListOf<IcsEvent>()
         var skipped = 0
 
@@ -39,8 +51,7 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
         var nestedDepth = 0
         var props = mutableMapOf<String, IcsProperty>()
 
-        for (line in unfold(text)) {
-            val prop = parseLine(line) ?: continue
+        for (prop in lines) {
             when {
                 prop.name == "BEGIN" && prop.value.equals("VEVENT", ignoreCase = true) && !inEvent -> {
                     inEvent = true
@@ -48,7 +59,15 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
                     props = mutableMapOf()
                 }
                 prop.name == "END" && prop.value.equals("VEVENT", ignoreCase = true) && inEvent && nestedDepth == 0 -> {
-                    val event = buildEvent(props)
+                    // One broken event (an absurd DURATION, a date out of range...) is skipped and
+                    // counted; it must not fail the whole file. Only those expected errors are caught.
+                    val event = try {
+                        buildEvent(props, zones)
+                    } catch (_: DateTimeException) {
+                        null
+                    } catch (_: ArithmeticException) {
+                        null
+                    }
                     if (event != null) events += event else skipped++
                     inEvent = false
                 }
@@ -57,16 +76,40 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
                 inEvent && nestedDepth == 0 -> props.putIfAbsent(prop.name, prop)
             }
         }
-        return IcsParseResult(events.sortedBy { it.start }, skipped)
+        return IcsParseResult(events.sortedBy { it.start }, skipped, zones.unknown.toSet())
     }
 
-    private fun buildEvent(props: Map<String, IcsProperty>): IcsEvent? {
+    /** TZID -> IANA zone from VTIMEZONE blocks that carry X-LIC-LOCATION (Thunderbird, Google). */
+    private fun vtimezoneAliases(lines: List<IcsProperty>): Map<String, String> {
+        val aliases = mutableMapOf<String, String>()
+        var inZone = false
+        var tzid: String? = null
+        var location: String? = null
+        for (prop in lines) {
+            when {
+                prop.name == "BEGIN" && prop.value.equals("VTIMEZONE", ignoreCase = true) -> {
+                    inZone = true; tzid = null; location = null
+                }
+                prop.name == "END" && prop.value.equals("VTIMEZONE", ignoreCase = true) -> {
+                    val id = tzid
+                    val loc = location
+                    if (inZone && id != null && loc != null) aliases[cleanTzid(id)] = loc.trim()
+                    inZone = false
+                }
+                inZone && prop.name == "TZID" -> tzid = prop.value
+                inZone && prop.name == "X-LIC-LOCATION" -> location = prop.value
+            }
+        }
+        return aliases
+    }
+
+    private fun buildEvent(props: Map<String, IcsProperty>, zones: ZoneResolver): IcsEvent? {
         val startProp = props["DTSTART"] ?: return null
         if (props["STATUS"]?.value.equals("CANCELLED", ignoreCase = true)) return null
         if (isDateOnly(startProp)) return null
 
-        val start = parseDateTime(startProp) ?: return null
-        val end = props["DTEND"]?.let { if (isDateOnly(it)) null else parseDateTime(it) }
+        val start = parseDateTime(startProp, zones) ?: return null
+        val end = props["DTEND"]?.let { if (isDateOnly(it)) null else parseDateTime(it, zones) }
             ?: props["DURATION"]?.let { parseDuration(it.value) }?.let { start.plus(it) }
             ?: return null
 
@@ -85,7 +128,7 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
     private fun isDateOnly(prop: IcsProperty): Boolean =
         prop.params["VALUE"].equals("DATE", ignoreCase = true) || prop.value.trim().length == 8
 
-    private fun parseDateTime(prop: IcsProperty): LocalDateTime? {
+    private fun parseDateTime(prop: IcsProperty, zones: ZoneResolver): LocalDateTime? {
         val raw = prop.value.trim()
         return try {
             when {
@@ -94,10 +137,11 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
                     local.atOffset(ZoneOffset.UTC).atZoneSameInstant(targetZone).toLocalDateTime()
                 }
                 prop.params["TZID"] != null -> {
-                    val zone = resolveZone(prop.params.getValue("TZID"))
                     val local = LocalDateTime.parse(raw, dateTimeFormat(raw.length))
-                    if (zone == null) local
-                    else local.atZone(zone).withZoneSameInstant(targetZone).toLocalDateTime()
+                    // An unknown zone keeps the clock time as written (taken as local time) and is
+                    // reported, so the preview can warn instead of silently shifting nothing or everything.
+                    val zone = zones.resolve(prop.params.getValue("TZID")) ?: return local
+                    local.atZone(zone).withZoneSameInstant(targetZone).toLocalDateTime()
                 }
                 else -> LocalDateTime.parse(raw, dateTimeFormat(raw.length)) // floating time
             }
@@ -109,13 +153,40 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
     private fun dateTimeFormat(length: Int): DateTimeFormatter =
         if (length == 13) FORMAT_NO_SECONDS else FORMAT
 
-    private fun resolveZone(tzid: String): ZoneId? {
-        val cleaned = tzid.trim().trim('"').removePrefix("/")
-        return runCatching { ZoneId.of(cleaned) }.getOrNull()
-            ?: WINDOWS_ZONES[cleaned]?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+    /** Resolves TZIDs for one file and remembers the ones it could not. */
+    private class ZoneResolver(private val aliases: Map<String, String>) {
+        val unknown = linkedSetOf<String>()
+        private val cache = mutableMapOf<String, ZoneId?>()
+
+        fun resolve(tzid: String): ZoneId? = cache.getOrPut(tzid) {
+            val cleaned = cleanTzid(tzid)
+            (
+                zoneOrNull(cleaned)
+                    ?: aliases[cleaned]?.let(::zoneOrNull)
+                    ?: WINDOWS_ZONES[cleaned]?.let(::zoneOrNull)
+                    ?: pathStyleZone(cleaned)
+                ).also { if (it == null) unknown += cleaned }
+        }
+
+        /** "mozilla.org/20050126_1/Europe/Warsaw" -> Europe/Warsaw (also 3-part ids like America/Argentina/Salta). */
+        private fun pathStyleZone(id: String): ZoneId? {
+            val parts = id.split('/').filter { it.isNotBlank() }
+            for (take in 3 downTo 2) {
+                if (parts.size > take) zoneOrNull(parts.takeLast(take).joinToString("/"))?.let { return it }
+            }
+            return null
+        }
+
+        private fun zoneOrNull(id: String): ZoneId? = try {
+            ZoneId.of(id)
+        } catch (_: DateTimeException) { // ZoneRulesException and invalid ids
+            null
+        }
     }
 
     companion object {
+        private fun cleanTzid(tzid: String): String = tzid.trim().trim('"').removePrefix("/")
+
         private val FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
         private val FORMAT_NO_SECONDS = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmm")
 

@@ -151,6 +151,25 @@ fun ImportIcsScreen(
                         }
                     }
                 }
+                if (state.unknownZones.isNotEmpty()) {
+                    item(key = "unknown-zones") {
+                        // Explicit, not silent: these times were taken as local time and may be off.
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            ),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
+                            Text(
+                                stringResource(R.string.import_unknown_zones, state.unknownZones.joinToString(", ")),
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.padding(16.dp),
+                            )
+                        }
+                    }
+                }
                 item(key = "job-header") { SectionHeader(stringResource(R.string.import_assign_job)) }
                 item(key = "jobs") {
                     FlowRow(

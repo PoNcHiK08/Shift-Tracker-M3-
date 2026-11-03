@@ -223,11 +223,12 @@
         <item quantity="many">%1$d вже є в застосунку — не позначені</item>
         <item quantity="other">%1$d вже є в застосунку — не позначені</item>
     </plurals>
+    <string name="import_unknown_zones">Невідомий часовий пояс у файлі: %1$s. Час цих подій прочитано як місцевий (як на телефоні) — перевірте його перед імпортом.</string>
     <plurals name="import_skipped">
-        <item quantity="one">%1$d пропущено (на весь день або без часу)</item>
-        <item quantity="few">%1$d пропущено (на весь день або без часу)</item>
-        <item quantity="many">%1$d пропущено (на весь день або без часу)</item>
-        <item quantity="other">%1$d пропущено (на весь день або без часу)</item>
+        <item quantity="one">%1$d пропущено (на весь день, без часу або з помилкою)</item>
+        <item quantity="few">%1$d пропущено (на весь день, без часу або з помилкою)</item>
+        <item quantity="many">%1$d пропущено (на весь день, без часу або з помилкою)</item>
+        <item quantity="other">%1$d пропущено (на весь день, без часу або з помилкою)</item>
     </plurals>
     <plurals name="import_n_shifts">
         <item quantity="one">Імпортувати %1$d зміну</item>

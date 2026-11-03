@@ -210,9 +210,10 @@
         <item quantity="one">%1$d already exists — unchecked</item>
         <item quantity="other">%1$d already exist — unchecked</item>
     </plurals>
+    <string name="import_unknown_zones">Unknown time zone in the file: %1$s. These events\' times were read as local time (as on this phone) — check them before importing.</string>
     <plurals name="import_skipped">
-        <item quantity="one">%1$d skipped (all-day or no time)</item>
-        <item quantity="other">%1$d skipped (all-day or no time)</item>
+        <item quantity="one">%1$d skipped (all-day, no time or broken)</item>
+        <item quantity="other">%1$d skipped (all-day, no time or broken)</item>
     </plurals>
     <plurals name="import_n_shifts">
         <item quantity="one">Import %1$d shift</item>

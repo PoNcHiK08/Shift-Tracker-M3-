@@ -33,6 +33,8 @@ data class ImportUiState(
     /** Indexes of [candidates] the user wants to import. */
     val selected: Set<Int> = emptySet(),
     val skippedCount: Int = 0,
+    /** Time zones the file uses that couldn't be resolved; their events were read as local time. */
+    val unknownZones: List<String> = emptyList(),
     val jobs: List<Job> = emptyList(),
     val jobId: Long? = null,
     val importing: Boolean = false,
@@ -70,6 +72,7 @@ class ImportIcsViewModel @Inject constructor(
                         candidates = candidates,
                         selected = candidates.indices.filterNot { i -> candidates[i].isDuplicate }.toSet(),
                         skippedCount = result.skippedCount,
+                        unknownZones = result.unknownZones.sorted(),
                     )
                 }
             } catch (e: Exception) {
