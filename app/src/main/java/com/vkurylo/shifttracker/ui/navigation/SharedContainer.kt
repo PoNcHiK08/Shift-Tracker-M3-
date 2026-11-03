@@ -7,9 +7,12 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -20,6 +23,8 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -31,6 +36,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.toRoute
@@ -68,6 +74,12 @@ fun NavBackStackEntry.containerKey(): String? = when {
  *
  * Like Material's container transform the morphing container is never see-through: the card end
  * ([isEditor] = false) stays fully opaque underneath, and the editor end fades in/out on top of it.
+ *
+ * Opening and closing use the container-transform spring. When a back gesture closes the editor,
+ * the transition is seeked by the finger: a spring (fast start) would collapse the editor into the
+ * card while the finger has barely moved, so the bounds then follow a linear timeline - the editor
+ * shrinks in step with the finger, stops when the finger stops, and after release carries on into
+ * the card. Its content stays readable through the first part of the drag.
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -76,20 +88,34 @@ fun Modifier.sharedContainer(key: String?, shape: Shape, isEditor: Boolean = fal
     val visibilityScope = LocalRootAnimatedVisibilityScope.current ?: return this
     if (key == null) return this
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val gesture = PredictiveBackGesture.closingEntryId != null
     return with(sharedScope) {
         this@sharedContainer.sharedBounds(
             sharedContentState = rememberSharedContentState(key),
             animatedVisibilityScope = visibilityScope,
             enter = if (isEditor) fadeIn(effects) else EnterTransition.None,
-            exit = if (isEditor) fadeOut(effects) else ExitTransition.None,
+            exit = if (!isEditor) ExitTransition.None else if (gesture) fadeOut(GestureEditorFade) else fadeOut(effects),
             zIndexInOverlay = if (isEditor) 1f else 0f,
-            boundsTransform = BoundsTransform { _, _ -> AppMotion.containerTransform(Rect.VisibilityThreshold) },
+            boundsTransform = BoundsTransform { _, _ ->
+                if (PredictiveBackGesture.closingEntryId != null) {
+                    tween(PREDICTIVE_BACK_MS, easing = LinearEasing)
+                } else {
+                    AppMotion.containerTransform(Rect.VisibilityThreshold)
+                }
+            },
             // The container itself follows the animated bounds, so its background always fills the
             // morphing shape; the editor inside keeps its full-screen layout (see ContainerTransformHost).
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
             clipInOverlayDuringTransition = OverlayClip(shape),
         )
     }
+}
+
+/** The editor's content, closed by a back gesture: visible through the early drag, gone before the card. */
+private val GestureEditorFade = keyframes<Float> {
+    durationMillis = PREDICTIVE_BACK_MS
+    1f at (PREDICTIVE_BACK_MS * 0.3f).toInt()
+    0f at (PREDICTIVE_BACK_MS * 0.8f).toInt()
 }
 
 /**
@@ -111,13 +137,25 @@ fun ContainerTransformHost(
         return
     }
     val spatial = AppMotion.containerTransform<Dp>(Dp.VisibilityThreshold)
-    val corner by scope.transition.animateDp(transitionSpec = { spatial }, label = "editorCorner") { state ->
+    val entryId = (LocalLifecycleOwner.current as? NavBackStackEntry)?.id
+    // Closed by a back gesture: on the gesture's own linear timeline (same length as the screen's
+    // predictive back), so the scrim lifts in step with the finger. Springs otherwise.
+    val corner by scope.transition.animateDp(
+        transitionSpec = { if (PredictiveBackGesture.isClosing(entryId)) tween(PREDICTIVE_BACK_MS, easing = LinearEasing) else spatial },
+        label = "editorCorner",
+    ) { state ->
         if (state == EnterExitState.Visible) 0.dp else ContainerCornerRadius
     }
     val scrim by scope.transition.animateFloat(
-        transitionSpec = { AppMotion.containerTransform(0.001f) },
+        transitionSpec = {
+            if (PredictiveBackGesture.isClosing(entryId)) tween(PREDICTIVE_BACK_MS, easing = LinearEasing) else AppMotion.containerTransform(0.001f)
+        },
         label = "editorScrim",
     ) { state -> if (state == EnterExitState.Visible) 0.32f else 0f }
+    // Forget the gesture mark when it was cancelled or the editor is gone.
+    val exiting = scope.transition.targetState == EnterExitState.PostExit
+    SideEffect { if (!exiting) PredictiveBackGesture.clear(entryId) }
+    DisposableEffect(entryId) { onDispose { PredictiveBackGesture.clear(entryId) } }
     // The destination fills the (edge-to-edge) window, so the editor's final size is the window size.
     // Read it directly instead of BoxWithConstraints: no subcomposition inside the shared transition.
     val windowSize = LocalWindowInfo.current.containerDpSize

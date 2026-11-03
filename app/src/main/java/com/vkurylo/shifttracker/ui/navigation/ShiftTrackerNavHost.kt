@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -44,6 +45,9 @@ import com.vkurylo.shifttracker.ui.settings.SettingsScreen
 import com.vkurylo.shifttracker.ui.shift.EditShiftScreen
 import com.vkurylo.shifttracker.ui.summary.SummaryScreen
 import kotlinx.serialization.Serializable
+
+/** Test tag of the morphing editor container (its size follows the container transform). */
+const val EDITOR_CONTAINER_TAG = "editor-container"
 
 /** The tabbed home screen (calendar / summary / settings with the bottom bar). */
 @Serializable
@@ -81,10 +85,15 @@ fun ShiftTrackerNavHost() {
                         modifier = Modifier.fillMaxSize(),
                         // Container transform: the editor itself is the shared element, the screen below
                         // stays put until the card has finished growing (or shrinking back).
+                        // Forward navigation is never a back gesture: drop a leftover mark of these entries.
+                        // (Only theirs: a NavHost composing its first screen runs this too, e.g. the tab
+                        // host re-created under an editor that a gesture is closing.)
                         enterTransition = {
+                            PredictiveBackGesture.clear(initialState.id, targetState.id)
                             if (targetState.containerKey() != null) EnterTransition.None else transitions.forwardEnter()
                         },
                         exitTransition = {
+                            PredictiveBackGesture.clear(initialState.id, targetState.id)
                             if (targetState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.forwardExit()
                         },
                         popEnterTransition = {
@@ -94,12 +103,11 @@ fun ShiftTrackerNavHost() {
                             if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.backwardExit()
                         },
                         predictivePopEnterTransition = { transitions.predictiveBackEnter() },
+                        // Only called for a back gesture. An editor then shrinks back into its card
+                        // (container transform); any other screen is drawn by predictiveBackSurface.
                         predictivePopExitTransition = { swipeEdge ->
-                            if (initialState.containerKey() != null) {
-                                ExitTransition.KeepUntilTransitionsFinished // the editor shrinks back into its card
-                            } else {
-                                transitions.predictiveBackExit(swipeEdge)
-                            }
+                            PredictiveBackGesture.mark(initialState.id, swipeEdge)
+                            ExitTransition.KeepUntilTransitionsFinished
                         },
                     ) {
                         composable<MainRoute> {
@@ -109,7 +117,7 @@ fun ShiftTrackerNavHost() {
                         }
                         composable<JobsRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.closingScreenShape(this@composable)) {
+                                Box(Modifier.predictiveBackSurface(this@composable)) {
                                     JobsScreen(onBack = { rootNav.navigateUp() })
                                 }
                             }
@@ -117,9 +125,9 @@ fun ShiftTrackerNavHost() {
                         composable<EditShiftRoute> { entry ->
                             val key = entry.toRoute<EditShiftRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
+                                Box(if (key == null) Modifier.predictiveBackSurface(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface).testTag(EDITOR_CONTAINER_TAG)) {
                                             EditShiftScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -133,9 +141,9 @@ fun ShiftTrackerNavHost() {
                         composable<EditBonusRoute> { entry ->
                             val key = entry.toRoute<EditBonusRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(if (key == null) Modifier.closingScreenShape(this@composable) else Modifier) {
+                                Box(if (key == null) Modifier.predictiveBackSurface(this@composable) else Modifier) {
                                     ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface)) {
+                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface).testTag(EDITOR_CONTAINER_TAG)) {
                                             EditBonusScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -148,7 +156,7 @@ fun ShiftTrackerNavHost() {
                         }
                         composable<ImportIcsRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                Box(Modifier.closingScreenShape(this@composable)) {
+                                Box(Modifier.predictiveBackSurface(this@composable)) {
                                     ImportIcsScreen(
                                         onClose = { rootNav.navigateUp() },
                                         onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -200,14 +208,23 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                 .padding(innerPadding)
                 .consumeWindowInsets(innerPadding),
             // Top-level destinations: fade through (also when going back to the first tab).
-            enterTransition = { transitions.fadeThroughEnter() },
-            exitTransition = { transitions.fadeThroughExit() },
+            enterTransition = {
+                PredictiveBackGesture.clear(initialState.id, targetState.id)
+                transitions.fadeThroughEnter()
+            },
+            exitTransition = {
+                PredictiveBackGesture.clear(initialState.id, targetState.id)
+                transitions.fadeThroughExit()
+            },
             popEnterTransition = { transitions.fadeThroughEnter() },
             popExitTransition = { transitions.fadeThroughExit() },
             // Back gesture from Summary/Settings: the tab shrinks away over the calendar (M3 predictive
             // back) instead of two half-transparent screens cross-fading under the finger.
             predictivePopEnterTransition = { transitions.predictiveBackEnter() },
-            predictivePopExitTransition = { swipeEdge -> transitions.predictiveBackExit(swipeEdge) },
+            predictivePopExitTransition = { swipeEdge ->
+                PredictiveBackGesture.mark(initialState.id, swipeEdge)
+                ExitTransition.KeepUntilTransitionsFinished
+            },
         ) {
             composable<CalendarRoute> {
                 CalendarScreen(
@@ -223,10 +240,10 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                 )
             }
             composable<SummaryRoute> {
-                Box(Modifier.closingScreenShape(this)) { SummaryScreen() }
+                Box(Modifier.predictiveBackSurface(this)) { SummaryScreen() }
             }
             composable<SettingsRoute> {
-                Box(Modifier.closingScreenShape(this)) {
+                Box(Modifier.predictiveBackSurface(this)) {
                     SettingsScreen(
                         onManageJobs = { rootNav.navigate(JobsRoute) },
                         onImportIcs = { uri -> rootNav.navigate(ImportIcsRoute(uri.toString())) },

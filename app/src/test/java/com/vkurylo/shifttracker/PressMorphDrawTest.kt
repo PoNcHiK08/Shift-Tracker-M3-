@@ -1,6 +1,7 @@
 package com.vkurylo.shifttracker
 
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
@@ -64,7 +65,7 @@ class PressMorphDrawTest {
         var t = 0L
         while (t < millis) {
             composeRule.mainClock.advanceTimeBy(16)
-            composeRule.onRoot().captureToImage()
+            composeRule.onRoot().captureToImage().asAndroidBitmap().recycle() // native memory: free each frame
             t += 16
         }
     }
