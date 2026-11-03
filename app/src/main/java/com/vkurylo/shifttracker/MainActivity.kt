@@ -60,7 +60,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun finish() {
         // Leaving the app is only expected from the home screen; anything else is a bug worth reporting.
-        if (CrashReporter.currentScreen != "home") CrashReporter.recordUnexpectedFinish(this)
+        // A recreation for a configuration change is not a close (defensive: it normally doesn't call finish()).
+        if (!isChangingConfigurations && CrashReporter.currentScreen != "home") CrashReporter.recordUnexpectedFinish(this)
         super.finish()
     }
 
