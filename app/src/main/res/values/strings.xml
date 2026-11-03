@@ -175,6 +175,8 @@
     <string name="replace_data">Замінити</string>
     <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
     <string name="error_file_operation">Не вдалося обробити файл</string>
+    <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
+    <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Оновіть Shift Tracker і спробуйте ще раз. Поточні дані не змінено.</string>
     <string name="version">Версія %1$s</string>
 
     <!-- .ics import -->

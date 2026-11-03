@@ -57,8 +57,29 @@ interface LanguageRepository {
 /** JSON export/import of all jobs, shifts and bonuses. */
 interface BackupRepository {
     suspend fun exportJson(): String
-    /** Replaces all data with the backup. */
+
+    /**
+     * Replaces all data with the backup. The whole file is validated first; if anything is wrong
+     * (or writing fails half-way) nothing in the database changes.
+     *
+     * @throws InvalidBackupException when the file is not a usable backup.
+     */
     suspend fun importJson(json: String): BackupCounts
+}
+
+/** The backup was rejected; the database is unchanged. */
+class InvalidBackupException(
+    message: String,
+    cause: Throwable? = null,
+    val reason: Reason = Reason.INVALID,
+) : Exception(message, cause) {
+    enum class Reason {
+        /** Not a Shift Tracker backup, or it contains values the app can't accept. */
+        INVALID,
+
+        /** Written by a newer version of the app, in a format this version doesn't know. */
+        NEWER_VERSION,
+    }
 }
 
 data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int)

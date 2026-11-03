@@ -27,4 +27,10 @@ class MoneyParserTest {
         assertEquals("30", MoneyParser.toInput(3000))
         assertEquals("0,05", MoneyParser.toInput(5))
     }
+
+    @Test
+    fun `MAX_GROSZE is the largest amount the parser accepts`() {
+        assertEquals(MoneyParser.MAX_GROSZE, MoneyParser.parseGrosze("9999999,99"))
+        assertEquals(null, MoneyParser.parseGrosze("10000000"))
+    }
 }

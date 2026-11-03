@@ -172,6 +172,8 @@
     <string name="replace_data">Replace</string>
     <string name="import_backup_done">Restored %1$d jobs, %2$d shifts and %3$d bonuses</string>
     <string name="error_file_operation">Couldn\'t process the file</string>
+    <string name="error_backup_invalid">This isn\'t a valid Shift Tracker backup. Your current data is unchanged.</string>
+    <string name="error_backup_newer_version">This backup was made by a newer version of the app. Update Shift Tracker and try again. Your current data is unchanged.</string>
     <string name="version">Version %1$s</string>
 
     <!-- .ics import -->

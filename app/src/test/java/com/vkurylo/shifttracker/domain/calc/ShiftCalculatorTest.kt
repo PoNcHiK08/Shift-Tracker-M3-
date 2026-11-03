@@ -5,6 +5,7 @@ import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.TimedRate
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -146,5 +147,15 @@ class ShiftCalculatorTest {
         assertEquals(false, summary.isEmpty)
         assertEquals(7500L, summary.totalEarningsGrosze)
         assertEquals(0L, summary.averageRateGrosze)
+    }
+
+    @Test
+    fun `largest allowed rate over a full day is exact (no Long overflow)`() {
+        val max = MoneyParser.MAX_GROSZE
+        val base = ShiftCalculator.pay(t(0), t(0), 0, max, null)
+        assertEquals(1440L, base.paidMinutes)
+        assertEquals(24 * max, base.earningsGrosze)
+        val night = TimedRate(max, t(22), t(6))
+        assertEquals(24 * max, ShiftCalculator.pay(t(0), t(0), 0, max, night).earningsGrosze)
     }
 }

@@ -5,6 +5,14 @@ import java.math.RoundingMode
 
 object MoneyParser {
     /**
+     * The largest amount the parser accepts (9 999 999,99 zł): at most 7 whole-złoty digits and 2
+     * decimals. Every rate and bonus in the app comes from this parser (or is copied from a job), and
+     * backups are checked against it. It also keeps pay calculations far from Long overflow: a full
+     * 24 h shift at this rate needs ~2.1e18 in the intermediate product, below Long.MAX_VALUE (9.2e18).
+     */
+    const val MAX_GROSZE: Long = 999_999_999L
+
+    /**
      * Parses user input such as "27,70", "27.7" or "30" into grosze.
      * Returns null for empty, negative or malformed input.
      */

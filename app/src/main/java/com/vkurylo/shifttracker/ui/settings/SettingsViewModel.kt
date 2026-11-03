@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.domain.model.UserPreferences
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
+import com.vkurylo.shifttracker.domain.repository.InvalidBackupException
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.LanguageRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
@@ -93,7 +94,15 @@ class SettingsViewModel @Inject constructor(
             busy.update { true }
             try {
                 block()
+            } catch (e: InvalidBackupException) {
+                // The file was rejected before anything was written; say why, and that data is intact.
+                val message = when (e.reason) {
+                    InvalidBackupException.Reason.NEWER_VERSION -> R.string.error_backup_newer_version
+                    InvalidBackupException.Reason.INVALID -> R.string.error_backup_invalid
+                }
+                _messages.send(UiMessage(message))
             } catch (e: Exception) {
+                // Reading/writing the document failed (or the import transaction was rolled back).
                 _messages.send(UiMessage(R.string.error_file_operation))
             } finally {
                 busy.update { false }
