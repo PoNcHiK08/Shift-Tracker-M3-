@@ -19,6 +19,11 @@ data class Job(
     val secondRate: TimedRate? = null,
     /** ISO 4217 code, see [Currencies]. Fixed once the job has shifts or bonuses. */
     val currency: String = Currencies.DEFAULT,
+    /** Pay type and salary by month, oldest first; empty means hourly throughout. See [payFor]. */
+    val payHistory: List<PaySettings> = emptyList(),
+    /** Dates of the job's first and last shift or bonus (null without any): bounds a monthly salary. */
+    val firstEntry: java.time.LocalDate? = null,
+    val lastEntry: java.time.LocalDate? = null,
 )
 
 /**

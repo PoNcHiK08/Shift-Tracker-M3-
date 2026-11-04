@@ -74,7 +74,7 @@ class CalendarViewModel @Inject constructor(
             month = m,
             shiftsByDate = window.shifts.groupBy { it.shift.date },
             bonusesByDate = window.bonuses.groupBy { it.bonus.date },
-            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses),
+            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m)),
             jobs = jobs,
             defaultCurrency = Currencies.defaultFor(jobs),
             selectedDate = selected,

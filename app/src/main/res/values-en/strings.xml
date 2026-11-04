@@ -227,4 +227,15 @@
     <string name="currency_pick_title">Job currency</string>
     <string name="currency_search">Search: code or name</string>
     <string name="currency_locked">The currency can\'t change once the job has shifts or bonuses. Create a new job for another currency.</string>
+    <string name="pay_type">Pay</string>
+    <string name="pay_type_hourly">Hourly</string>
+    <string name="pay_type_fixed_monthly">Monthly salary</string>
+    <string name="monthly_amount">Monthly salary</string>
+    <string name="pay_applies_from">Applies from</string>
+    <string name="pay_applies_from_hint">Earlier months keep their pay.</string>
+    <string name="fixed_salary">Salary</string>
+    <string name="fixed_salary_per_month">Salary %1$s/month</string>
+    <string name="salary_value">salary %1$s</string>
+    <string name="fixed_salary_shift_hint">This shift counts for hours: the job is paid a monthly salary.</string>
+    <string name="week_fixed_pay_note">Salaried jobs count their pay per month, so this week shows only their hours.</string>
 </resources>

@@ -4,6 +4,7 @@ import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
@@ -16,6 +17,13 @@ interface JobRepository {
     fun observeJobs(): Flow<List<Job>>
     suspend fun getJob(id: Long): Job?
     suspend fun upsert(job: Job): Long
+
+    /**
+     * Saves [job] and its [pay] settings in one transaction. With `pay.from == null` the settings apply
+     * from the beginning and replace the whole history (a job without entries); otherwise they replace
+     * only the entry of that month, so other months keep theirs.
+     */
+    suspend fun save(job: Job, pay: PaySettings): Long
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
 

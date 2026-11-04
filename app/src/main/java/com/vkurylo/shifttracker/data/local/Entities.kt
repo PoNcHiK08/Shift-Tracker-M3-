@@ -9,11 +9,14 @@ import androidx.room.PrimaryKey
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 
 @Entity(tableName = "jobs")
 data class JobEntity(
@@ -162,3 +165,52 @@ fun Bonus.toEntity() = BonusEntity(
 )
 
 fun BonusWithJobRow.toDomain() = BonusWithJob(bonus = bonus.toDomain(), job = job.toDomain())
+
+/**
+ * One entry of a job's pay settings history (see [PaySettings]). Added in DB version 5.
+ * [fromMonth] is yyyymm (202611), or 0 for "from the very beginning".
+ */
+@Entity(
+    tableName = "job_pay_settings",
+    foreignKeys = [
+        ForeignKey(
+            entity = JobEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["job_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["job_id", "from_month"], unique = true)],
+)
+data class JobPaySettingsEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    @ColumnInfo(name = "from_month") val fromMonth: Int,
+    @ColumnInfo(name = "pay_type") val payType: String,
+    /** Minor units of the job's currency. */
+    @ColumnInfo(name = "monthly_amount_minor") val monthlyAmountMinor: Long,
+)
+
+/** First and last date (epoch day) with any shift or bonus of a job. */
+data class JobActivityRow(
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    @ColumnInfo(name = "first_day") val firstDay: Long,
+    @ColumnInfo(name = "last_day") val lastDay: Long,
+)
+
+fun YearMonth?.toMonthKey(): Int = this?.let { it.year * 100 + it.monthValue } ?: 0
+internal fun monthKeyToYearMonth(key: Int): YearMonth? = if (key == 0) null else YearMonth.of(key / 100, key % 100)
+
+fun JobPaySettingsEntity.toDomain() = PaySettings(
+    from = monthKeyToYearMonth(fromMonth),
+    // An unknown type (written by a newer app version) reads as hourly rather than crashing.
+    payType = PayType.entries.firstOrNull { it.name == payType } ?: PayType.HOURLY,
+    monthlyAmountMinor = monthlyAmountMinor,
+)
+
+fun PaySettings.toEntity(jobId: Long) = JobPaySettingsEntity(
+    jobId = jobId,
+    fromMonth = from.toMonthKey(),
+    payType = payType.name,
+    monthlyAmountMinor = monthlyAmountMinor,
+)

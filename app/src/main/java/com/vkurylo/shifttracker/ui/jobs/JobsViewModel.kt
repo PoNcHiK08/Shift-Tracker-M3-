@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,10 @@ data class JobsUiState(
     val loading: Boolean = true,
     /** Job being edited in the sheet; id = 0 means a new job. */
     val editing: Job? = null,
-    /** The edited job has shifts or bonuses, so its currency can't change any more. */
+    /**
+     * The edited job has shifts or bonuses: its currency can't change any more, and pay changes apply
+     * from a chosen month on instead of to the whole history.
+     */
     val currencyLocked: Boolean = false,
     val pendingDelete: PendingJobDelete? = null,
 )
@@ -63,9 +67,10 @@ class JobsViewModel @Inject constructor(
     }
     fun dismissEditor() = editing.update { null }
 
-    fun save(job: Job) {
+    /** Saves the job with its [pay] settings (see [JobRepository.save] for how they enter its history). */
+    fun save(job: Job, pay: PaySettings) {
         viewModelScope.launch {
-            jobRepository.upsert(job.copy(name = job.name.trim()))
+            jobRepository.save(job.copy(name = job.name.trim()), pay)
             editing.update { null }
         }
     }

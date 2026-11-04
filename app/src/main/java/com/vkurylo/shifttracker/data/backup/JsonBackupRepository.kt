@@ -3,11 +3,16 @@ package com.vkurylo.shifttracker.data.backup
 import androidx.room.withTransaction
 import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
+import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
+import com.vkurylo.shifttracker.data.local.monthKeyToYearMonth
+import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
 import com.vkurylo.shifttracker.domain.repository.InvalidBackupException
@@ -32,8 +37,8 @@ data class BackupFile(
 
         /**
          * Every exporter so far wrote its version explicitly: 1 (jobs + shifts), 2 (+ second rates),
-         * 3 (+ bonuses), 4 (+ a currency per job). All of them decode into these classes (newer fields
-         * have defaults: an older file's jobs are PLN).
+         * 3 (+ bonuses), 4 (+ a currency and pay settings history per job). All of them decode into
+         * these classes (newer fields have defaults: an older file's jobs are PLN and hourly).
          */
         const val MIN_VERSION = 1
         const val CURRENT_VERSION = 4
@@ -52,6 +57,16 @@ data class BackupJob(
      * `*_grosze` names are kept from version 1). Added in backup version 4.
      */
     val currency: String = "PLN",
+    /** Pay settings by month, oldest first; empty = hourly throughout. Added in backup version 4. */
+    @SerialName("pay_history") val payHistory: List<BackupPaySettings> = emptyList(),
+)
+
+/** One entry of a job's pay history: from month [from] ("2026-11"; null = from the beginning). */
+@Serializable
+data class BackupPaySettings(
+    val from: String? = null,
+    @SerialName("pay_type") val payType: String = "HOURLY",
+    @SerialName("monthly_amount_minor") val monthlyAmountMinor: Long = 0,
 )
 
 /** Optional second rate between [from] and [to] (HH:mm). Added in backup version 2. */
@@ -98,10 +113,12 @@ class JsonBackupRepository @Inject constructor(
     }
 
     override suspend fun exportJson(): String {
-        // One read transaction, so the three lists are a consistent snapshot.
-        val (jobs, shifts, bonuses) = db.withTransaction {
-            Triple(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll())
+        // One read transaction, so the lists are a consistent snapshot.
+        val snapshot = db.withTransaction {
+            Snapshot(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll(), db.paySettingsDao().getAll())
         }
+        val (jobs, shifts, bonuses) = snapshot
+        val history = snapshot.payHistory.groupBy { it.jobId }
         val file = BackupFile(
             exportedAt = java.time.OffsetDateTime.now().toString(),
             jobs = jobs.map {
@@ -112,6 +129,13 @@ class JsonBackupRepository @Inject constructor(
                     color = it.color,
                     secondRate = backupRate(it.secondRateGrosze, it.secondRateFromMinute, it.secondRateToMinute),
                     currency = it.currency,
+                    payHistory = history[it.id].orEmpty().map { entry ->
+                        BackupPaySettings(
+                            from = monthKeyToYearMonth(entry.fromMonth)?.toString(),
+                            payType = entry.payType,
+                            monthlyAmountMinor = entry.monthlyAmountMinor,
+                        )
+                    },
                 )
             },
             shifts = shifts.map {
@@ -157,6 +181,7 @@ class JsonBackupRepository @Inject constructor(
         // Everything is validated and converted before the database is touched. The rules are the
         // ones the editors enforce, so any backup this app exported passes.
         val jobs = convert("jobs") { toJobs(file.jobs) }
+        val payHistory = convert("pay settings") { file.jobs.flatMap(::toPayHistory) }
         // Job id -> decimals of its currency: shift rates and bonuses are checked against them.
         val digitsByJob = jobs.associate { it.id to Currencies.fractionDigits(it.currency) }
         val shifts = convert("shifts") { file.shifts.map { toShift(it, digitsByJob) } }
@@ -166,8 +191,10 @@ class JsonBackupRepository @Inject constructor(
         db.withTransaction {
             db.bonusDao().deleteAll()
             db.shiftDao().deleteAll()
+            db.paySettingsDao().deleteAll()
             db.jobDao().deleteAll()
             db.jobDao().insertAll(jobs)
+            db.paySettingsDao().insertAll(payHistory)
             db.shiftDao().insertAll(shifts)
             db.bonusDao().insertAll(bonuses)
         }
@@ -203,6 +230,23 @@ class JsonBackupRepository @Inject constructor(
                 currency = it.currency,
             )
         }
+    }
+
+    /** A job's pay history: known types, months unique, salaries within the editor's limits. */
+    private fun toPayHistory(job: BackupJob): List<JobPaySettingsEntity> {
+        val digits = Currencies.fractionDigits(job.currency)
+        val entries = job.payHistory.map { entry ->
+            val type = PayType.entries.firstOrNull { it.name == entry.payType }
+            requireNotNull(type) { "job ${job.id} has an unknown pay type '${entry.payType}'" }
+            val month = entry.from?.let { java.time.YearMonth.parse(it) }
+            require(entry.monthlyAmountMinor in 0..MoneyParser.maxMinor(digits, MoneyParser.AMOUNT_WHOLE_DIGITS)) {
+                "monthly amount of job ${job.id} out of range: ${entry.monthlyAmountMinor}"
+            }
+            PaySettings(month, type, entry.monthlyAmountMinor).toEntity(job.id)
+        }
+        val duplicates = entries.groupingBy { it.fromMonth }.eachCount().filterValues { it > 1 }.keys
+        require(duplicates.isEmpty()) { "job ${job.id} has two pay settings for the same month" }
+        return entries
     }
 
     private fun toShift(shift: BackupShift, digitsByJob: Map<Long, Int>): ShiftEntity {
@@ -242,6 +286,13 @@ class JsonBackupRepository @Inject constructor(
     }
 
     private class Window(val rate: Long, val from: Int, val to: Int)
+
+    private data class Snapshot(
+        val jobs: List<JobEntity>,
+        val shifts: List<ShiftEntity>,
+        val bonuses: List<BonusEntity>,
+        val payHistory: List<JobPaySettingsEntity>,
+    )
 
     /** A second rate: amount in range and a non-empty window (the job editor rejects from == to). */
     private fun toWindow(rate: BackupTimedRate, digits: Int): Window {

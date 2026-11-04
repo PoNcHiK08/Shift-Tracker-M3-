@@ -309,13 +309,19 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             // Live "drum" counters: change a time or the break and the numbers roll.
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
-                    RollingMoney(
-                        grosze = pay.earningsGrosze,
-                        currency = state.currency,
-                        style = MaterialTheme.typography.headlineMediumEmphasized,
-                        color = onColor,
-                    )
+                    if (state.fixedPay) {
+                        // A salaried job: no per-shift earnings, rate or "use current rate".
+                        Text(stringResource(R.string.pay_type), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                        Text(stringResource(R.string.fixed_salary), style = MaterialTheme.typography.headlineMediumEmphasized, color = onColor)
+                    } else {
+                        Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                        RollingMoney(
+                            grosze = pay.earningsGrosze,
+                            currency = state.currency,
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
+                            color = onColor,
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(stringResource(R.string.paid_hours), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
@@ -329,7 +335,9 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             val second = state.secondRate
-            if (second == null) {
+            if (state.fixedPay) {
+                Text(stringResource(R.string.fixed_salary_shift_hint), style = MaterialTheme.typography.bodyMedium)
+            } else if (second == null) {
                 Text(
                     stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, state.currency, locale)),
                     style = MaterialTheme.typography.bodyMedium,

@@ -95,6 +95,8 @@ class DatabaseMigrationTest {
 
             // v4: jobs made before currencies are PLN.
             assertEquals("PLN", jobs.single().currency)
+            // v5: no pay history, which means hourly as before.
+            assertEquals(0, db.paySettingsDao().getAll().size)
         } finally {
             db.close()
         }

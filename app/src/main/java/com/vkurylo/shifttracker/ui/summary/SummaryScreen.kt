@@ -115,6 +115,16 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                 // One card that stays put: switching week/month/year or paging rolls its numbers.
                 TotalsCard(range.period, state.summary, state.defaultCurrency, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
+            if (range.period == SummaryPeriod.WEEK && state.summary.fixedPayShiftCount > 0) {
+                item(key = "fixed-pay-note") {
+                    Text(
+                        stringResource(R.string.week_fixed_pay_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    )
+                }
+            }
             if (!state.loading && state.summary.isEmpty) {
                 item(key = "empty") {
                     EmptyState(
@@ -286,6 +296,9 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                         if (summary.shiftCount > 0) {
                             add(hoursLabel(summary.paidMinutes))
                             add(shiftsCountLabel(summary.shiftCount))
+                        }
+                        if (summary.salaryMinor > 0) {
+                            add(stringResource(R.string.salary_value, Formatters.money(summary.salaryMinor, summary.currency, locale)))
                         }
                         if (summary.bonusGrosze > 0) {
                             add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, summary.currency, locale)))

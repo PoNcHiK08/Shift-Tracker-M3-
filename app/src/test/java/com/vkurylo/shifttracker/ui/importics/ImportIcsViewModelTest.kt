@@ -9,6 +9,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.data.DocumentIo
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
+import com.vkurylo.shifttracker.data.repository.JobDetailsSource
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import org.junit.After
@@ -36,8 +37,8 @@ class ImportIcsViewModelTest {
         return ImportIcsViewModel(
             SavedStateHandle(mapOf("uri" to Uri.fromFile(file).toString())),
             DocumentIo(context),
-            RoomShiftRepository(db.shiftDao()),
-            RoomJobRepository(db.jobDao()),
+            RoomShiftRepository(db.shiftDao(), JobDetailsSource(db.paySettingsDao())),
+            RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), JobDetailsSource(db.paySettingsDao())),
         )
     }
 

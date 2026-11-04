@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import androidx.room.Room
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.local.BonusDao
+import com.vkurylo.shifttracker.data.local.PaySettingsDao
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
@@ -47,6 +48,9 @@ object DataModule {
 
     @Provides
     fun provideBonusDao(db: ShiftDatabase): BonusDao = db.bonusDao()
+
+    @Provides
+    fun providePaySettingsDao(db: ShiftDatabase): PaySettingsDao = db.paySettingsDao()
 
     @Provides
     @Singleton

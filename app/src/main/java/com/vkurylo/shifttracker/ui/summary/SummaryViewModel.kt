@@ -7,6 +7,7 @@ import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
@@ -54,8 +55,10 @@ data class BreakdownEntry(
     val earnings: Amounts,
     val shiftCount: Int,
     val bonusCount: Int,
+    /** A monthly salary is counted in this month (year view). */
+    val hasSalary: Boolean = false,
 ) {
-    val isEmpty: Boolean get() = shiftCount == 0 && bonusCount == 0
+    val isEmpty: Boolean get() = shiftCount == 0 && bonusCount == 0 && !hasSalary
 }
 
 data class SummaryUiState(
@@ -91,8 +94,8 @@ class SummaryViewModel @Inject constructor(
             ) { shifts, bonuses, jobs ->
                 SummaryUiState(
                     range = range,
-                    summary = ShiftCalculator.summarize(shifts, bonuses),
-                    breakdown = breakdown(range, shifts, bonuses),
+                    summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to)),
+                    breakdown = breakdown(range, shifts, bonuses, jobs),
                     defaultCurrency = Currencies.defaultFor(jobs),
                     loading = false,
                 )
@@ -125,6 +128,7 @@ class SummaryViewModel @Inject constructor(
         range: PeriodRange,
         shifts: List<ShiftWithJob>,
         bonuses: List<BonusWithJob>,
+        jobs: List<Job>,
     ): List<BreakdownEntry> = when (range.period) {
         SummaryPeriod.WEEK -> (0L..6L).map { offset ->
             val day = range.from.plusDays(offset)
@@ -136,15 +140,25 @@ class SummaryViewModel @Inject constructor(
                 first,
                 shifts.filter { it.shift.date.monthValue == month },
                 bonuses.filter { it.bonus.date.monthValue == month },
+                // Each month of the year carries its fixed salaries.
+                salaries = jobs.fold(Amounts.EMPTY) { acc, job ->
+                    ShiftCalculator.salary(job, YearMonth.from(first)).let { if (it > 0) acc.plus(job.currency, it) else acc }
+                },
             )
         }
         SummaryPeriod.MONTH -> emptyList()
     }
 
-    private fun entry(date: LocalDate, shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob>) = BreakdownEntry(
+    private fun entry(
+        date: LocalDate,
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob>,
+        salaries: Amounts = Amounts.EMPTY,
+    ) = BreakdownEntry(
         date = date,
         paidMinutes = shifts.sumOf { it.shift.paidMinutes },
-        earnings = ShiftCalculator.earnings(shifts, bonuses),
+        earnings = ShiftCalculator.earnings(shifts, bonuses) + salaries,
+        hasSalary = !salaries.isEmpty,
         shiftCount = shifts.size,
         bonusCount = bonuses.size,
     )

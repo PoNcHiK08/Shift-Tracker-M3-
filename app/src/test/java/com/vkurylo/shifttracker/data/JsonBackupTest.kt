@@ -11,6 +11,8 @@ import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.TimedRate
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
@@ -148,6 +150,17 @@ class JsonBackupTest {
             "currency without decimals rules (gold)" to backup(version = 4, jobs = job(1, currency = "XAU")),
             // 10 000 000 yen is 8 whole digits: over the rate limit, although fine as zł grosze.
             "JPY rate above max" to backup(version = 4, jobs = job(1, rate = 10_000_000, currency = "JPY")),
+            "unknown pay type" to backup(version = 4, jobs = job(1, pay = """[{"pay_type":"PER_TASK"}]""")),
+            "bad pay month" to backup(version = 4, jobs = job(1, pay = """[{"from":"2026-13","pay_type":"FIXED_MONTHLY","monthly_amount_minor":100}]""")),
+            "two pay settings for one month" to backup(
+                version = 4,
+                jobs = job(1, pay = """[{"from":"2026-11","pay_type":"HOURLY"},{"from":"2026-11","pay_type":"FIXED_MONTHLY"}]"""),
+            ),
+            "negative salary" to backup(version = 4, jobs = job(1, pay = """[{"pay_type":"FIXED_MONTHLY","monthly_amount_minor":-1}]""")),
+            "salary above max" to backup(
+                version = 4,
+                jobs = job(1, pay = """[{"pay_type":"FIXED_MONTHLY","monthly_amount_minor":${MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS) + 1}}]"""),
+            ),
             "JPY shift rate above max" to backup(version = 4, jobs = job(1, currency = "JPY"), shifts = shift(rate = 10_000_000)),
         )
         val db = seededDb()
@@ -169,7 +182,34 @@ class JsonBackupTest {
         assertEquals(BackupCounts(2, 2, 1), JsonBackupRepository(newDb()).importJson(json))
     }
 
-    // --- Currencies (version 4) -----------------------------------------------------------------
+    // --- Currencies and pay settings (version 4) -------------------------------------------------
+
+    @Test
+    fun payHistoryRoundTripsAndOlderVersionsAreHourly() = runBlocking {
+        val json = backup(
+            version = 4,
+            jobs = job(
+                1,
+                pay = """[{"pay_type":"HOURLY"},{"from":"2026-07","pay_type":"FIXED_MONTHLY","monthly_amount_minor":300000}]""",
+            ),
+        )
+        val db = newDb()
+        JsonBackupRepository(db).importJson(json)
+        val history = db.paySettingsDao().getAll().map { it.toDomain() }
+        assertEquals(
+            listOf(PaySettings(null, PayType.HOURLY, 0), PaySettings(java.time.YearMonth.of(2026, 7), PayType.FIXED_MONTHLY, 300_000)),
+            history,
+        )
+        val again = newDb()
+        JsonBackupRepository(again).importJson(JsonBackupRepository(db).exportJson())
+        assertEquals(history, again.paySettingsDao().getAll().map { it.toDomain() })
+
+        for (version in 1..3) {
+            val old = newDb()
+            JsonBackupRepository(old).importJson(backup(version = version, bonuses = if (version < 3) "" else bonus()))
+            assertEquals("v$version", 0, old.paySettingsDao().getAll().size)
+        }
+    }
 
     @Test
     fun olderVersionsImportAsPln() = runBlocking {
@@ -247,9 +287,15 @@ class JsonBackupTest {
         bonuses: String = bonus(),
     ) = """{"format":"shift-tracker-backup","version":$version,"exported_at":"x","jobs":[$jobs],"shifts":[$shifts],"bonuses":[$bonuses]}"""
 
-    private fun job(id: Long, name: String = "Job $id", rate: Long = 3300, second: String? = null, currency: String? = null) =
-        """{"id":$id,"name":"$name","hourly_rate_grosze":$rate,"color":1${second?.let { ",\"second_rate\":$it" } ?: ""}""" +
-            (currency?.let { ",\"currency\":\"$it\"" } ?: "") + "}"
+    private fun job(
+        id: Long,
+        name: String = "Job $id",
+        rate: Long = 3300,
+        second: String? = null,
+        currency: String? = null,
+        pay: String? = null,
+    ) = """{"id":$id,"name":"$name","hourly_rate_grosze":$rate,"color":1${second?.let { ",\"second_rate\":$it" } ?: ""}""" +
+        (currency?.let { ",\"currency\":\"$it\"" } ?: "") + (pay?.let { ",\"pay_history\":$it" } ?: "") + "}"
 
     private fun shift(
         jobId: Long = 1,

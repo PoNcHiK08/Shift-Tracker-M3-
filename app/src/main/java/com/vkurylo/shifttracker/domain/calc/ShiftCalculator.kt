@@ -2,12 +2,18 @@ package com.vkurylo.shifttracker.domain.calc
 
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.isActiveIn
+import com.vkurylo.shifttracker.domain.model.payFor
+import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
 import java.time.LocalTime
+import java.time.YearMonth
 
 object ShiftCalculator {
 
@@ -83,27 +89,57 @@ object ShiftCalculator {
     private fun LocalTime.toMinuteOfDay(): Int = hour * 60 + minute
 
     /**
-     * Totals plus a per-job breakdown (shifts and bonuses). Money is totalled per currency; jobs are
-     * sorted by currency (the biggest total first), then by earnings (highest first).
+     * What a shift earns: its hourly pay, or 0 when its job is paid a fixed monthly salary that month
+     * (the shift still counts for hours).
      */
-    fun summarize(shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob> = emptyList()): MonthSummary {
-        if (shifts.isEmpty() && bonuses.isEmpty()) return MonthSummary.EMPTY
+    fun shiftEarnings(item: ShiftWithJob): Long =
+        if (item.job.paysHourly(item.shift.date)) item.shift.earningsGrosze else 0
+
+    /**
+     * The monthly salary [job] earns in [month]: its amount when that month's settings are
+     * [PayType.FIXED_MONTHLY] and the month lies between the job's first and last entry; 0 otherwise.
+     */
+    fun salary(job: Job, month: YearMonth): Long {
+        val pay = job.payFor(month)
+        return if (pay.payType == PayType.FIXED_MONTHLY && job.isActiveIn(month)) pay.monthlyAmountMinor else 0
+    }
+
+    /**
+     * Totals plus a per-job breakdown (shifts, bonuses and monthly salaries). Money is totalled per
+     * currency; jobs are sorted by currency (the biggest total first), then by earnings (highest first).
+     *
+     * [salaryMonths] are the whole months the period covers (none for a week): each job of [jobs] paid a
+     * fixed salary in such a month adds it once, even in a month without entries of its own (leave).
+     */
+    fun summarize(
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob> = emptyList(),
+        jobs: List<Job> = emptyList(),
+        salaryMonths: List<YearMonth> = emptyList(),
+    ): MonthSummary {
+        val salaries = jobs.associate { job -> job.id to salaryMonths.sumOf { salary(job, it) } }.filterValues { it > 0 }
+        if (shifts.isEmpty() && bonuses.isEmpty() && salaries.isEmpty()) return MonthSummary.EMPTY
         val shiftsByJob = shifts.groupBy { it.job.id }
         val bonusesByJob = bonuses.groupBy { it.job.id }
-        val unsorted = (shiftsByJob.keys + bonusesByJob.keys).map { jobId ->
+        val jobsById = jobs.associateBy { it.id }
+        val unsorted = (shiftsByJob.keys + bonusesByJob.keys + salaries.keys).map { jobId ->
             val jobShifts = shiftsByJob[jobId].orEmpty()
             val jobBonuses = bonusesByJob[jobId].orEmpty()
+            val hourly = jobShifts.filter { it.job.paysHourly(it.shift.date) }
             JobSummary(
-                job = jobShifts.firstOrNull()?.job ?: jobBonuses.first().job,
+                job = jobsById[jobId] ?: jobShifts.firstOrNull()?.job ?: jobBonuses.first().job,
                 paidMinutes = jobShifts.sumOf { it.shift.paidMinutes },
-                shiftEarningsGrosze = jobShifts.sumOf { it.shift.earningsGrosze },
+                shiftEarningsGrosze = hourly.sumOf { it.shift.earningsGrosze },
                 bonusGrosze = jobBonuses.sumOf { it.bonus.amountGrosze },
                 shiftCount = jobShifts.size,
+                salaryMinor = salaries[jobId] ?: 0,
+                hourlyPaidMinutes = hourly.sumOf { it.shift.paidMinutes },
             )
         }
         val shiftEarnings = Amounts.sum(unsorted, { it.currency }, { it.shiftEarningsGrosze })
         val bonusTotals = Amounts.sum(unsorted, { it.currency }, { it.bonusGrosze })
-        val currencyOrder = (shiftEarnings + bonusTotals).sortedByValue().map { it.first }
+        val salaryTotals = Amounts.sum(unsorted.filter { it.salaryMinor > 0 }, { it.currency }, { it.salaryMinor })
+        val currencyOrder = (shiftEarnings + bonusTotals + salaryTotals).sortedByValue().map { it.first }
         val perJob = unsorted.sortedWith(
             compareBy<JobSummary> { currencyOrder.indexOf(it.currency) }
                 .thenByDescending { it.earningsGrosze }
@@ -116,11 +152,24 @@ object ShiftCalculator {
             shiftCount = shifts.size,
             bonusCount = bonuses.size,
             perJob = perJob,
+            salaries = salaryTotals,
+            fixedPayShiftCount = shifts.count { !it.job.paysHourly(it.shift.date) },
         )
     }
 
-    /** Earnings of a set of shifts and bonuses (e.g. one day), per currency. */
+    /** Earnings of a set of shifts and bonuses (e.g. one day), per currency; no monthly salaries. */
     fun earnings(shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob>): Amounts =
-        Amounts.sum(shifts, { it.job.currency }, { it.shift.earningsGrosze }) +
+        Amounts.sum(shifts, { it.job.currency }, { shiftEarnings(it) }) +
             Amounts.sum(bonuses, { it.job.currency }, { it.bonus.amountGrosze })
+
+    /** The whole months between [from] and [to] (inclusive): where monthly salaries are counted. */
+    fun wholeMonths(from: java.time.LocalDate, to: java.time.LocalDate): List<YearMonth> {
+        val months = mutableListOf<YearMonth>()
+        var month = YearMonth.from(from)
+        while (!month.isAfter(YearMonth.from(to))) {
+            if (!month.atDay(1).isBefore(from) && !month.atEndOfMonth().isAfter(to)) months += month
+            month = month.plusMonths(1)
+        }
+        return months
+    }
 }

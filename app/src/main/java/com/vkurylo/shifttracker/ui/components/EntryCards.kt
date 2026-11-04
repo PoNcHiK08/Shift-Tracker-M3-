@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.ui.navigation.SharedKeys
@@ -139,7 +140,12 @@ fun ShiftCard(
         }
         Spacer(Modifier.width(12.dp))
         Column(horizontalAlignment = Alignment.End) {
-            Text(Formatters.money(shift.earningsGrosze, item.job.currency, locale), style = MaterialTheme.typography.titleMedium)
+            // A salaried job's shift counts for hours only; its pay is the monthly salary.
+            Text(
+                if (item.job.paysHourly(shift.date)) Formatters.money(shift.earningsGrosze, item.job.currency, locale)
+                else stringResource(R.string.fixed_salary),
+                style = MaterialTheme.typography.titleMedium,
+            )
             Text(
                 hoursLabel(shift.paidMinutes),
                 style = MaterialTheme.typography.bodySmall,

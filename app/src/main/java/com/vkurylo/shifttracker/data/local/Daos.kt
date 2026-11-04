@@ -112,3 +112,53 @@ interface BonusDao {
     @Query("DELETE FROM bonuses")
     suspend fun deleteAll()
 }
+
+@Dao
+interface PaySettingsDao {
+    @Query("SELECT * FROM job_pay_settings ORDER BY job_id, from_month")
+    fun observeAll(): Flow<List<JobPaySettingsEntity>>
+
+    @Query("SELECT * FROM job_pay_settings ORDER BY job_id, from_month")
+    suspend fun getAll(): List<JobPaySettingsEntity>
+
+    @Query("SELECT * FROM job_pay_settings WHERE job_id = :jobId ORDER BY from_month")
+    suspend fun forJob(jobId: Long): List<JobPaySettingsEntity>
+
+    @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId")
+    suspend fun deleteForJob(jobId: Long)
+
+    @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId AND from_month = :fromMonth")
+    suspend fun deleteEntry(jobId: Long, fromMonth: Int)
+
+    @Insert
+    suspend fun insert(entry: JobPaySettingsEntity)
+
+    @Insert
+    suspend fun insertAll(entries: List<JobPaySettingsEntity>)
+
+    @Query("DELETE FROM job_pay_settings")
+    suspend fun deleteAll()
+
+    /** Each job's first and last day with a shift or bonus. */
+    @Query(
+        """
+        SELECT job_id, MIN(day) AS first_day, MAX(day) AS last_day FROM (
+            SELECT job_id, date_epoch_day AS day FROM shifts
+            UNION ALL
+            SELECT job_id, date_epoch_day AS day FROM bonuses
+        ) GROUP BY job_id
+        """,
+    )
+    fun observeActivity(): Flow<List<JobActivityRow>>
+
+    @Query(
+        """
+        SELECT job_id, MIN(day) AS first_day, MAX(day) AS last_day FROM (
+            SELECT job_id, date_epoch_day AS day FROM shifts
+            UNION ALL
+            SELECT job_id, date_epoch_day AS day FROM bonuses
+        ) GROUP BY job_id
+        """,
+    )
+    suspend fun getActivity(): List<JobActivityRow>
+}

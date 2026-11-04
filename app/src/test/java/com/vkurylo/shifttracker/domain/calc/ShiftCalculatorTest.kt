@@ -3,6 +3,8 @@ package com.vkurylo.shifttracker.domain.calc
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
@@ -187,5 +189,79 @@ class ShiftCalculatorTest {
         assertEquals(listOf("Warsaw", "Berlin", "Tokyo"), summary.perJob.map { it.job.name })
         // A day's total.
         assertEquals(mapOf("PLN" to 24000L, "EUR" to 11000L, "JPY" to 1200L), ShiftCalculator.earnings(shifts, bonuses).byCurrency)
+    }
+    // --- Pay types --------------------------------------------------------------------------------
+
+    private val nov = java.time.YearMonth.of(2026, 11)
+
+    private fun salaried(history: List<PaySettings>, first: LocalDate?, last: LocalDate?) = Job(
+        id = 5, name = "Office", hourlyRateGrosze = 4000, color = 0, currency = "EUR",
+        payHistory = history, firstEntry = first, lastEntry = last,
+    )
+
+    @Test
+    fun `a fixed monthly salary counts once per month and its shifts only log hours`() {
+        val office = salaried(listOf(PaySettings(null, PayType.FIXED_MONTHLY, 300_000)), LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 20))
+        val shifts = listOf(
+            ShiftWithJob(Shift(id = 1, jobId = 5, date = LocalDate.of(2026, 11, 2), start = t(9), end = t(17), hourlyRateGrosze = 4000), office),
+            ShiftWithJob(Shift(id = 2, jobId = 5, date = LocalDate.of(2026, 11, 3), start = t(9), end = t(17), hourlyRateGrosze = 4000), office),
+        )
+        val bonuses = listOf(BonusWithJob(Bonus(jobId = 5, date = LocalDate.of(2026, 11, 3), amountGrosze = 10_000), office))
+
+        val month = ShiftCalculator.summarize(shifts, bonuses, listOf(office), listOf(nov))
+        assertEquals(300_000L, month.salaries["EUR"])
+        assertEquals(0L, month.shiftEarnings["EUR"])
+        assertEquals(310_000L, month.totalEarnings["EUR"]) // salary + bonus, no hourly pay
+        assertEquals(16 * 60L, month.totalPaidMinutes)
+        assertEquals(0L, month.averageRate("EUR")) // salaried time isn't hourly time
+        assertEquals(2, month.fixedPayShiftCount)
+        assertEquals(300_000L, month.perJob.single().salaryMinor)
+
+        // A week has no whole month: hours only, no salary, no money from the shifts.
+        val week = ShiftCalculator.summarize(shifts, emptyList(), listOf(office), emptyList())
+        assertEquals(0L, week.totalEarnings["EUR"])
+        assertEquals(16 * 60L, week.totalPaidMinutes)
+        assertEquals(0L, ShiftCalculator.shiftEarnings(shifts[0]))
+    }
+
+    @Test
+    fun `the salary counts from the first to the last month with entries, gaps included`() {
+        val office = salaried(listOf(PaySettings(null, PayType.FIXED_MONTHLY, 300_000)), LocalDate.of(2026, 3, 10), LocalDate.of(2026, 6, 1))
+        val year = (1..12).map { java.time.YearMonth.of(2026, it) }
+        val summary = ShiftCalculator.summarize(emptyList(), emptyList(), listOf(office), year)
+        // March, April (leave, no entries), May and June.
+        assertEquals(4 * 300_000L, summary.salaries["EUR"])
+        assertEquals(0L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 2)))
+        assertEquals(300_000L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 4)))
+        assertEquals(0L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 7)))
+        // A job that never had an entry earns no salary.
+        assertEquals(0L, ShiftCalculator.salary(salaried(office.payHistory, null, null), nov))
+    }
+
+    @Test
+    fun `changing pay from a month on leaves earlier months as they were`() {
+        // Hourly until June, a 3 000 € salary from July, raised to 3 500 € from October.
+        val history = listOf(
+            PaySettings(java.time.YearMonth.of(2026, 7), PayType.FIXED_MONTHLY, 300_000),
+            PaySettings(java.time.YearMonth.of(2026, 10), PayType.FIXED_MONTHLY, 350_000),
+        )
+        val office = salaried(history, LocalDate.of(2026, 1, 5), LocalDate.of(2026, 12, 1))
+        val june = ShiftWithJob(Shift(id = 1, jobId = 5, date = LocalDate.of(2026, 6, 8), start = t(9), end = t(17), hourlyRateGrosze = 4000), office)
+        val july = ShiftWithJob(Shift(id = 2, jobId = 5, date = LocalDate.of(2026, 7, 8), start = t(9), end = t(17), hourlyRateGrosze = 4000), office)
+
+        assertEquals(32_000L, ShiftCalculator.shiftEarnings(june)) // still hourly
+        assertEquals(0L, ShiftCalculator.shiftEarnings(july))
+        assertEquals(0L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 6)))
+        assertEquals(300_000L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 9)))
+        assertEquals(350_000L, ShiftCalculator.salary(office, java.time.YearMonth.of(2026, 10)))
+        val year = ShiftCalculator.summarize(listOf(june, july), emptyList(), listOf(office), (1..12).map { java.time.YearMonth.of(2026, it) })
+        assertEquals(32_000L + 3 * 300_000L + 3 * 350_000L, year.totalEarnings["EUR"])
+    }
+
+    @Test
+    fun `whole months of a period`() {
+        assertEquals(listOf(nov), ShiftCalculator.wholeMonths(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30)))
+        assertEquals(emptyList<java.time.YearMonth>(), ShiftCalculator.wholeMonths(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 8)))
+        assertEquals(12, ShiftCalculator.wholeMonths(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)).size)
     }
 }

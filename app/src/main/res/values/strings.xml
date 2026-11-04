@@ -246,4 +246,15 @@
     <string name="currency_pick_title">Валюта роботи</string>
     <string name="currency_search">Пошук: код або назва</string>
     <string name="currency_locked">Валюту не можна змінити, коли вже є зміни чи бонуси. Для іншої валюти створіть нову роботу.</string>
+    <string name="pay_type">Оплата</string>
+    <string name="pay_type_hourly">Погодинна</string>
+    <string name="pay_type_fixed_monthly">Оклад за місяць</string>
+    <string name="monthly_amount">Оклад за місяць</string>
+    <string name="pay_applies_from">Діє з</string>
+    <string name="pay_applies_from_hint">Попередні місяці лишаються як були.</string>
+    <string name="fixed_salary">Оклад</string>
+    <string name="fixed_salary_per_month">Оклад %1$s/міс.</string>
+    <string name="salary_value">оклад %1$s</string>
+    <string name="fixed_salary_shift_hint">Ця зміна рахується в години: роботі платять місячний оклад.</string>
+    <string name="week_fixed_pay_note">Роботи з окладом рахуються помісячно, тож за тиждень тут лише їхні години.</string>
 </resources>

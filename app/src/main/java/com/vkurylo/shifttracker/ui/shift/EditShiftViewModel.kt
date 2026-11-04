@@ -11,6 +11,7 @@ import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.TimedRate
+import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import com.vkurylo.shifttracker.ui.navigation.EditShiftRoute
@@ -48,6 +49,9 @@ data class EditShiftUiState(
 
     /** The shift's currency: its job's. */
     val currency: String get() = selectedJob?.currency ?: Currencies.DEFAULT
+
+    /** The job is paid a monthly salary in the shift's month: the shift only logs hours. */
+    val fixedPay: Boolean get() = selectedJob?.paysHourly(date) == false
     val breakValue: Int? get() = breakMinutes.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..1440 }
     val durationMinutes: Long get() = ShiftCalculator.durationMinutes(start, end)
     val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)
@@ -58,7 +62,7 @@ data class EditShiftUiState(
     val jobMissing: Boolean get() = selectedJob == null
     /** The job's current rate differs from the snapshot stored on an existing shift. */
     val rateOutdated: Boolean
-        get() = !isNew && selectedJob != null &&
+        get() = !isNew && selectedJob != null && !fixedPay &&
             (selectedJob!!.hourlyRateGrosze != rateGrosze || selectedJob!!.secondRate != secondRate)
     val canSave: Boolean get() = !jobMissing && breakValue != null && !breakTooLong
 }
