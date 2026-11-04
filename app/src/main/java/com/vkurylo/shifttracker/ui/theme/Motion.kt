@@ -47,10 +47,12 @@ object AppMotion {
     )
 
     /**
-     * Closing an editor after a released back gesture: 10 % quicker than a normal close (duration goes
-     * with 1/√stiffness, and 1/0.9² ≈ 1.235).
+     * Closing an editor after a released back gesture (only the flight into the card, see
+     * EditorFlightOverlay): a calmer, slightly longer spring so letting go doesn't feel like a jolt.
+     * Duration goes with 1/√stiffness: 1/√0.9 ≈ 1.054, so ~5 % longer than a normal close and
+     * √(1.235/0.9) ≈ 1.17, so ~17 % longer than in 1.0.14 (factor 1.235). Same damping, no overshoot.
      */
-    const val AFTER_GESTURE_STIFFNESS_FACTOR = 1.235f
+    const val AFTER_GESTURE_STIFFNESS_FACTOR = 0.9f
 
     /** A motion-scheme spring made quicker for screen transitions; any other spec is returned as is. */
     fun <T> quicker(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =

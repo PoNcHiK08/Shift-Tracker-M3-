@@ -55,12 +55,15 @@ class AppMotionTest {
     }
 
     @Test
-    fun `after a back gesture the editor closes 10 percent quicker`() {
+    fun `after a back gesture the editor flies into its card a little calmer`() {
         val normal = AppMotion.containerTransform<Float>(0.5f) as SpringSpec<Float>
-        val quick = AppMotion.containerTransform<Float>(0.5f, afterBackGesture = true) as SpringSpec<Float>
-        assertEquals("same bounce", normal.dampingRatio, quick.dampingRatio, 0f)
-        val ratio = fullScreenMoveMs(quick) / fullScreenMoveMs(normal)
-        assertEquals("duration ratio", 0.9, ratio, 0.02)
+        val calm = AppMotion.containerTransform<Float>(0.5f, afterBackGesture = true) as SpringSpec<Float>
+        assertEquals("same bounce", normal.dampingRatio, calm.dampingRatio, 0f)
+        // ~5 % longer than a normal close.
+        assertEquals("vs normal close", 1.054, fullScreenMoveMs(calm) / fullScreenMoveMs(normal), 0.02)
+        // ~17 % longer than 1.0.14 (stiffness 690 x 1.235).
+        val v1014 = spring(0.9f, 690f * 1.235f, 0.5f)
+        assertEquals("vs 1.0.14", 1.17, fullScreenMoveMs(calm) / fullScreenMoveMs(v1014), 0.03)
     }
 
     @Test
