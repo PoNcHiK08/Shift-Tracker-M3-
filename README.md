@@ -40,6 +40,15 @@ UI in **Ukrainian** by default with **English** as an alternative.
   Under the finger every day morphs into the squircle too.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year. Paging slides the period label in the direction of travel.
+- **Home-screen widget** (Jetpack Glance, Material 3) — this month's earnings (the same figure as the calendar:
+  bonuses, fixed salaries, Gross/Net, one line per currency, at most two then "+N", with the "Gross"/"Net" tag when
+  jobs have deductions), paid hours, the shift in progress ("Until 06:00", overnight shifts included) or the next one
+  within 60 days, and "+ Shift". Compact (~2×1: total and "+") and medium (~4×2) layouts, resizable. Taps open the
+  new-shift editor on today, that shift's editor, the Summary tab or Jobs; an open editor is never stacked on.
+  Dynamic colors on Android 12+, the app's palette before; texts, dates and amounts in the app's language.
+  It updates as soon as anything changes in the app, and on its own every 30 min and on clock / time zone / locale
+  changes (so a new day or a finished shift can take up to 30 min to show). "Hide amounts in widget" in Settings
+  shows ••• instead of money.
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
   An import checks the whole file before touching anything (format versions 1–4; files older than 4 import as PLN,

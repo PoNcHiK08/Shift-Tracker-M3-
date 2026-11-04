@@ -176,6 +176,9 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     implementation(libs.androidx.datastore.preferences)
+    // Home-screen widget.
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 
     testImplementation(libs.junit)
     // UI smoke test on the JVM (Robolectric) — exercises the real Room/Hilt/Compose stack.

@@ -4,6 +4,8 @@ data class UserPreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val useDynamicColor: Boolean = true,
     val earningsMode: EarningsMode = EarningsMode.GROSS,
+    /** The home-screen widget shows "•••" instead of money (it is visible on the home/lock screen). */
+    val hideWidgetAmounts: Boolean = false,
 )
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }

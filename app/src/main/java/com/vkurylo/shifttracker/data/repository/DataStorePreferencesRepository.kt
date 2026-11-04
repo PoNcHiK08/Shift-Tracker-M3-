@@ -28,6 +28,7 @@ class DataStorePreferencesRepository @Inject constructor(
             earningsMode = prefs[EARNINGS_MODE]
                 ?.let { name -> EarningsMode.entries.firstOrNull { it.name == name } }
                 ?: EarningsMode.GROSS,
+            hideWidgetAmounts = prefs[HIDE_WIDGET_AMOUNTS] ?: false,
         )
     }
 
@@ -43,7 +44,14 @@ class DataStorePreferencesRepository @Inject constructor(
         dataStore.edit { it[EARNINGS_MODE] = mode.name }
     }
 
+    override suspend fun setHideWidgetAmounts(hide: Boolean) {
+        dataStore.edit { it[HIDE_WIDGET_AMOUNTS] = hide }
+    }
+
     internal companion object {
+        val HIDE_WIDGET_AMOUNTS = booleanPreferencesKey("hide_widget_amounts")
+        /** The app language tag as last set from the app; read by the widget before Android 13. */
+        val APP_LANGUAGE = stringPreferencesKey("app_language")
         val EARNINGS_MODE = stringPreferencesKey("earnings_mode")
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")

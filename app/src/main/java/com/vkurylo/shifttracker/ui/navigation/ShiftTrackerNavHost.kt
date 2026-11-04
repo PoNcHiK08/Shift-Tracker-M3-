@@ -16,7 +16,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -45,7 +48,9 @@ import com.vkurylo.shifttracker.ui.jobs.JobsScreen
 import com.vkurylo.shifttracker.ui.settings.SettingsScreen
 import com.vkurylo.shifttracker.ui.shift.EditShiftScreen
 import com.vkurylo.shifttracker.ui.summary.SummaryScreen
+import com.vkurylo.shifttracker.widget.LaunchRequest
 import kotlinx.serialization.Serializable
+import java.time.LocalDate
 
 /** Test tag of the morphing editor container (its size follows the container transform). */
 const val EDITOR_CONTAINER_TAG = "editor-container"
@@ -64,8 +69,28 @@ data object MainRoute
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ShiftTrackerNavHost() {
+fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: () -> Unit = {}) {
     val rootNav = rememberNavController()
+    // Widget taps: incremented to make the home screen switch to the Summary tab.
+    var summaryTabRequests by remember { mutableIntStateOf(0) }
+    LaunchedEffect(launchRequest) {
+        val request = launchRequest ?: return@LaunchedEffect
+        onLaunchHandled()
+        val top = rootNav.currentBackStackEntry?.destination
+        // An open editor stays as it is: nothing is stacked on it and nothing typed is thrown away.
+        val editorOpen = top?.hasRoute(EditShiftRoute::class) == true || top?.hasRoute(EditBonusRoute::class) == true
+        if (editorOpen) return@LaunchedEffect
+        when (request) {
+            // No shared key: the card isn't on screen, so the editor slides in instead of growing out of it.
+            LaunchRequest.NewShift -> rootNav.navigate(EditShiftRoute(dateEpochDay = LocalDate.now().toEpochDay()))
+            is LaunchRequest.EditShift -> rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
+            LaunchRequest.Summary -> {
+                rootNav.popBackStack(MainRoute, inclusive = false)
+                summaryTabRequests++
+            }
+            LaunchRequest.Jobs -> if (top?.hasRoute(JobsRoute::class) != true) rootNav.navigate(JobsRoute)
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val snackbarController = remember(snackbarHostState, scope) { SnackbarController(snackbarHostState, scope) }
@@ -125,7 +150,7 @@ fun ShiftTrackerNavHost() {
                     ) {
                         composable<MainRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                HomeScreen(rootNav, transitions)
+                                HomeScreen(rootNav, transitions, summaryTabRequests)
                             }
                         }
                         composable<JobsRoute> {
@@ -217,8 +242,16 @@ fun ShiftTrackerNavHost() {
 }
 
 @Composable
-private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
+private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, summaryTabRequests: Int = 0) {
     val tabNav = rememberNavController()
+    LaunchedEffect(summaryTabRequests) {
+        if (summaryTabRequests == 0) return@LaunchedEffect
+        tabNav.navigate(SummaryRoute) {
+            popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
 

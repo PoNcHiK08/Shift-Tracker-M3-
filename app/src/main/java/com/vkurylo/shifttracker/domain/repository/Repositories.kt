@@ -60,6 +60,7 @@ interface PreferencesRepository {
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setEarningsMode(mode: EarningsMode)
+    suspend fun setHideWidgetAmounts(hide: Boolean)
 }
 
 /** Per-app UI language (stored by the platform / AppCompat, not by us). */
@@ -68,6 +69,17 @@ interface LanguageRepository {
     fun set(language: AppLanguage)
     /** Applies Ukrainian on the very first launch, as it is the app's default language. */
     suspend fun applyDefaultOnFirstLaunch()
+
+    /**
+     * The app language for places outside activities (the home-screen widget). On Android 13+ the
+     * platform's per-app locale (also changed from system Settings); before that, the tag this app
+     * stored when the language was set, as AppCompat only restores its locale when an activity starts.
+     * Null: follow the system.
+     */
+    suspend fun appLocale(): java.util.Locale?
+
+    /** Emits whenever the app language is set from the app (a trigger for the widget). */
+    val changes: kotlinx.coroutines.flow.Flow<String?>
 }
 
 /** JSON export/import of all jobs, shifts and bonuses. */

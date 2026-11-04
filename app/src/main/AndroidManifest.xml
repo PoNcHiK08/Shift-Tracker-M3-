@@ -2,6 +2,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        Glance renders widgets through WorkManager, whose manifest adds these permissions. The widget
+        needs none of them (no network constraints, no foreground work, nothing to reschedule after a
+        reboot), so they are dropped. WAKE_LOCK stays: WorkManager may hold one while it runs a session.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
+
     <application
         android:name=".ShiftTrackerApp"
         android:allowBackup="true"
@@ -18,12 +27,29 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Home-screen widget (Glance). Also redraws on clock / time zone / locale changes. -->
+        <receiver
+            android:name=".widget.ShiftTrackerWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/shift_tracker_widget_info" />
+        </receiver>
 
         <!-- Stores the per-app language on Android 12 and below (Android 13+ does it natively). -->
         <service

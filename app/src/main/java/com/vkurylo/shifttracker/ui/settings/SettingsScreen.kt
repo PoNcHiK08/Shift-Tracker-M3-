@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.WorkOutline
@@ -107,7 +108,7 @@ fun SettingsScreen(
             // Android 16 style: every section is one segmented group of rows.
             item { SectionHeader(stringResource(R.string.section_work)) }
             item {
-                SettingsRow(index = 0, count = 3, onClick = onManageJobs) {
+                SettingsRow(index = 0, count = 4, onClick = onManageJobs) {
                     ListItem(
                         modifier = it,
                         colors = TransparentListItem,
@@ -121,7 +122,7 @@ fun SettingsScreen(
             item {
                 SettingsRow(
                     index = 1,
-                    count = 3,
+                    count = 4,
                     onClick = {
                         pickIcs.launch(arrayOf("text/calendar", "text/x-vcalendar", "application/ics", "application/octet-stream", "text/plain"))
                     },
@@ -137,7 +138,7 @@ fun SettingsScreen(
             }
             item {
                 // Gross / Net for every earnings figure (calendar, day panel, summary).
-                SettingsRow(index = 2, count = 3) {
+                SettingsRow(index = 2, count = 4) {
                     ListItem(
                         modifier = it,
                         colors = TransparentListItem,
@@ -162,6 +163,20 @@ fun SettingsScreen(
                 }
             }
 
+            item {
+                // The widget sits on the home / lock screen: money can be hidden there.
+                val hide = state.preferences.hideWidgetAmounts
+                SettingsRow(index = 3, count = 4, onClick = { viewModel.setHideWidgetAmounts(!hide) }, checked = hide) {
+                    ListItem(
+                        modifier = it,
+                        colors = TransparentListItem,
+                        leadingContent = { Icon(Icons.Filled.VisibilityOff, contentDescription = null) },
+                        headlineContent = { Text(stringResource(R.string.hide_widget_amounts)) },
+                        supportingContent = { Text(stringResource(R.string.hide_widget_amounts_summary)) },
+                        trailingContent = { Switch(checked = hide, onCheckedChange = null) },
+                    )
+                }
+            }
             item { SectionHeader(stringResource(R.string.section_appearance)) }
             item {
                 SettingsRow(index = 0, count = 3) {

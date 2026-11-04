@@ -101,6 +101,7 @@ class EarningsModeSwitchTest {
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
         override suspend fun setDynamicColor(enabled: Boolean) = Unit
         override suspend fun setEarningsMode(mode: EarningsMode) { prefs.value = prefs.value.copy(earningsMode = mode) }
+        override suspend fun setHideWidgetAmounts(hide: Boolean) = Unit
     }
 
     private fun <T> StateFlow<T>.awaitValue(condition: (T) -> Boolean): T {
