@@ -59,4 +59,20 @@ class PredictiveBackVisualsTest {
             assertTrue("no fade right after release at $r", start.alpha - tenth.alpha > 0.01f)
         }
     }
+
+    @Test
+    fun `a held editor follows the finger at first, then stops at a limit`() {
+        assertEquals(0f, editorDragAmount(0f), 0f)
+        var last = 0f
+        for (i in 1..100) {
+            val v = editorDragAmount(i / 100f)
+            assertTrue("not increasing at ${i / 100f}", v > last)
+            assertTrue("past the limit", v < 1f)
+            last = v
+        }
+        // Most of the way in the first quarter of the finger's travel, little after half of it.
+        assertTrue(editorDragAmount(0.25f) > 0.6f)
+        assertTrue(editorDragAmount(1f) - editorDragAmount(0.5f) < 0.15f)
+        assertEquals(editorDragAmount(1f), editorDragAmount(3f), 0f) // clamped
+    }
 }

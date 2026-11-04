@@ -22,6 +22,7 @@ import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import com.vkurylo.shifttracker.ui.navigation.EDITOR_CONTAINER_TAG
+import com.vkurylo.shifttracker.ui.navigation.EditorFlights
 import com.vkurylo.shifttracker.ui.navigation.PREDICTIVE_BACK_MS
 import com.vkurylo.shifttracker.ui.navigation.PredictiveBackGesture
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -49,8 +50,9 @@ import kotlin.math.abs
  *
  * What this can prove: commit and cancel reach the right destination, nothing throws, the closing
  * screen keeps moving after release (no stall before it disappears) and is gone in time, the drift
- * follows the swipe edge, the editor follows the finger instead of collapsing at once, and normal
- * transitions afterwards are not affected. What it can't: how the gesture feels on a phone.
+ * follows the swipe edge, an editor is only held (up to a limit) by the finger and flies into its
+ * card after release, and normal transitions afterwards are not affected. What it can't: how the
+ * gesture feels on a phone.
  *
  * Geometry is read from the semantics bounds of a stable node on the closing screen; these include
  * the graphics-layer scale/translation. Checks use small tolerances and windows of a few frames, not
@@ -233,66 +235,95 @@ class PredictiveBackGestureTest {
         assertNull(PredictiveBackGesture.closingEntryId)
     }
 
+    private fun editorFrame(): Frame {
+        composeRule.mainClock.advanceTimeBy(FRAME_MS)
+        val image = composeRule.onRoot(useUnmergedTree = true).captureToImage().asAndroidBitmap()
+        val small = Bitmap.createScaledBitmap(image, image.width / 8, image.height / 8, true)
+        val pixels = IntArray(small.width * small.height).also { small.getPixels(it, 0, small.width, 0, 0, small.width, small.height) }
+        image.recycle()
+        small.recycle()
+        return Frame(container(), pixels)
+    }
+
+    private fun dragEditor(p: Float, edge: Int = BackEventCompat.EDGE_RIGHT) {
+        composeRule.runOnUiThread { dispatcher.dispatchOnBackProgressed(event(p, edge)) }
+    }
+
+    /** Drags the editor's back gesture from [from] to [to] in [steps] frames, then holds it for [hold] frames. */
+    private fun dragAndHold(from: Float, to: Float, edge: Int = BackEventCompat.EDGE_RIGHT, steps: Int = 12, hold: Int = 20): List<Frame> =
+        List(steps) { i -> dragEditor(from + (to - from) * (i + 1) / steps, edge); editorFrame() } + List(hold) { editorFrame() }
+
     /**
-     * Editor -> card while the finger drives it: the container shrinks in step with the gesture (and
-     * holds still when the finger does - a spring or any time-driven animation would keep moving),
-     * then carries on into its card after release. Afterwards the normal container transform works.
+     * An editor held by a back gesture only shrinks a little, up to a limit (rubber band), however far
+     * the finger goes: it never turns into its card under the finger. The calendar is there behind it.
+     * On release it flies into its card without a blank frame or a pause, and everything ends clean.
      */
     @Test
-    fun editorFollowsTheFingerThenFliesIntoItsCard() {
+    fun editorHeldByTheGestureStopsAtALimitThenFliesIntoItsCard() {
         click("Kawiarnia")
         val full = container()!!.height
-        val heights = mutableListOf<Float?>()
-        fun step() {
-            composeRule.mainClock.advanceTimeBy(FRAME_MS)
-            composeRule.onRoot(useUnmergedTree = true).captureToImage().asAndroidBitmap().recycle()
-            heights += container()?.height
-        }
-        fun dragTo(p: Float) {
-            composeRule.runOnUiThread { dispatcher.dispatchOnBackProgressed(event(p, BackEventCompat.EDGE_RIGHT)) }
-            step()
-        }
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnUiThread { dispatcher.dispatchOnBackStarted(event(0f, BackEventCompat.EDGE_RIGHT)) }
-        step()
-        for (i in 1..6) dragTo(0.15f * i / 6)
-        val atHalf = heights.size - 1
-        repeat(8) { step() } // finger held still
-        val afterHold = heights.size - 1
-        for (i in 1..6) dragTo(0.15f + 0.15f * i / 6)
-        repeat(3) { step() }
-        val atEnd = heights.size - 1
+        editorFrame()
+        val toHalf = dragAndHold(0f, 0.5f)
+        val half = toHalf.last().bounds!!.height
+        assertTrue("calendar not shown behind the held editor", composeRule.onAllNodesWithText(str(R.string.add_shift)).fetchSemanticsNodes().isNotEmpty())
+        val toEnd = dragAndHold(0.5f, 1f)
+        val end = toEnd.last().bounds!!.height
+        val held = (toHalf + toEnd).map { it.bounds!!.height }
+
+        assertTrue("didn't shrink under the finger: $half", full - half > full * 0.05f)
+        assertTrue("went past the limit: $end of $full", end >= full * 0.88f)
+        assertTrue("no rubber band: half=${full - half} end=${full - end}", full - half > 0.8f * (full - end))
+        held.zipWithNext().forEach { (a, b) -> assertTrue("grew while dragging further: $held", b <= a + 3f) }
+        assertNull("NavHost's own editor gesture state leaked", EditorFlights.current)
+
         composeRule.runOnUiThread { dispatcher.onBackPressed() }
-        val released = heights.size
-        repeat(40) { step() }
+        val after = List(40) { editorFrame() }
         composeRule.mainClock.autoAdvance = true
         composeRule.waitForIdle()
 
-        val half = full - heights[atHalf]!!
-        val end = full - heights[atEnd]!!
-        assertTrue("editor didn't shrink while dragging: ${heights.take(atEnd + 1)}", end > full * 0.1f)
-        assertEquals("editor moved while the finger was still", heights[atHalf]!!, heights[afterHold]!!, 3f)
-        assertTrue("shrink not in step with the finger: half=$half end=$end", half / end in 0.35f..0.65f)
-        // The way covered at progress 0.3 is about 0.3 of the way to the card. A spring, sampled on the
-        // seeked timeline, would be most of the way there (measured: ~0.8) before the finger has moved.
-        val card = heights.filterNotNull().min()
-        val covered = (full - heights[atEnd]!!) / (full - card)
-        assertTrue("editor ran ahead of the finger: covered $covered of the way at progress 0.3", covered in 0.15f..0.5f)
-        // After release: keeps shrinking towards the card until it arrives (< 20 % of the screen).
-        val after = heights.subList(released, heights.size)
-        val arrived = after.indexOfFirst { it == null || it < full * 0.2f }
-        assertTrue("editor never reached its card: $after", arrived in 1..((0.7f * PREDICTIVE_BACK_MS / FRAME_MS).toInt() + 6))
-        val moving = after.subList(3, arrived).map { it!! }
-        for (i in 0 until moving.size - 2) {
-            assertTrue("editor stalled after release: ${moving.drop(i).take(3)}", moving[i] - moving[i + 2] >= 1f)
+        // Something (the editor, then its flight) is on screen in every frame until it has moved on.
+        val home = after.last().pixels
+        for (i in 0..3) assertTrue("blank frame $i after release", diff(after[i].pixels, home) >= CLEARLY_VISIBLE)
+        // And it keeps moving/dissolving until it is gone (after NavHost's own latency).
+        val gone = after.indexOfFirst { diff(it.pixels, home) < VISIBLE }
+        assertTrue("flight never finished", gone > 0)
+        for (i in 3 until gone - 1) {
+            assertTrue("flight stalled at frame $i", diff(after[i].pixels, after[i + 1].pixels) >= MOVING)
         }
-        composeRule.waitUntil(5_000) { container() == null }
+        assertTrue("flight took $gone frames", gone <= 20)
+        assertNull(container())
+        assertNull(EditorFlights.current)
         assertNull(PredictiveBackGesture.closingEntryId)
 
         // The normal container transform afterwards: the card grows into the editor and back.
         click("Kawiarnia")
         composeRule.waitUntil(5_000) { container() != null }
         assertEquals(full, container()!!.height, 1f)
+        click(str(R.string.close))
+        composeRule.waitUntil(5_000) { container() == null }
+    }
+
+    @Test
+    fun cancelledEditorGestureSpringsBackAndTheEditorStays() {
+        click("Kawiarnia")
+        val full = container()!!
+        composeRule.mainClock.autoAdvance = false
+        composeRule.runOnUiThread { dispatcher.dispatchOnBackStarted(event(0f, BackEventCompat.EDGE_LEFT)) }
+        editorFrame()
+        val held = dragAndHold(0f, 0.6f, BackEventCompat.EDGE_LEFT).last().bounds!!
+        assertTrue("didn't drift towards the finger (left edge -> right): $held vs $full", held.center.x > full.center.x + 4)
+        composeRule.runOnUiThread { dispatcher.dispatchOnBackCancelled() }
+        repeat(60) { editorFrame() }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        val restored = container()!!
+        assertEquals(full.height, restored.height, 1f)
+        assertEquals(full.center.x, restored.center.x, 1f)
+        assertNull(EditorFlights.current)
+        assertNull(PredictiveBackGesture.closingEntryId)
+        // Still the editor, and it still closes normally.
         click(str(R.string.close))
         composeRule.waitUntil(5_000) { container() == null }
     }

@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -103,8 +104,9 @@ fun ShiftTrackerNavHost() {
                             if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.backwardExit()
                         },
                         predictivePopEnterTransition = { transitions.predictiveBackEnter() },
-                        // Only called for a back gesture. An editor then shrinks back into its card
-                        // (container transform); any other screen is drawn by predictiveBackSurface.
+                        // Only called for a back gesture. An editor opened from a card is then held and
+                        // flown into its card (ContainerTransformHost); any other screen is drawn by
+                        // predictiveBackSurface.
                         predictivePopExitTransition = { swipeEdge ->
                             PredictiveBackGesture.mark(initialState.id, swipeEdge)
                             ExitTransition.KeepUntilTransitionsFinished
@@ -126,8 +128,16 @@ fun ShiftTrackerNavHost() {
                             val key = entry.toRoute<EditShiftRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
                                 Box(if (key == null) Modifier.predictiveBackSurface(this@composable) else Modifier) {
-                                    ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface).testTag(EDITOR_CONTAINER_TAG)) {
+                                    ContainerTransformHost(this@composable, sharedKey = key) { shape, containerModifier, contentModifier ->
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .then(containerModifier)
+                                                .sharedContainer(key, shape, isEditor = true)
+                                                .clip(shape)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .testTag(EDITOR_CONTAINER_TAG),
+                                        ) {
                                             EditShiftScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -142,8 +152,16 @@ fun ShiftTrackerNavHost() {
                             val key = entry.toRoute<EditBonusRoute>().sharedKey
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
                                 Box(if (key == null) Modifier.predictiveBackSurface(this@composable) else Modifier) {
-                                    ContainerTransformHost(this@composable, enabled = key != null) { shape, contentModifier ->
-                                        Box(Modifier.fillMaxSize().sharedContainer(key, shape, isEditor = true).background(MaterialTheme.colorScheme.surface).testTag(EDITOR_CONTAINER_TAG)) {
+                                    ContainerTransformHost(this@composable, sharedKey = key) { shape, containerModifier, contentModifier ->
+                                        Box(
+                                            Modifier
+                                                .fillMaxSize()
+                                                .then(containerModifier)
+                                                .sharedContainer(key, shape, isEditor = true)
+                                                .clip(shape)
+                                                .background(MaterialTheme.colorScheme.surface)
+                                                .testTag(EDITOR_CONTAINER_TAG),
+                                        ) {
                                             EditBonusScreen(
                                                 onClose = { rootNav.navigateUp() },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
@@ -167,6 +185,8 @@ fun ShiftTrackerNavHost() {
                     }
                 }
             }
+            // An editor closed by a back gesture flies into its card above everything (draw only).
+            EditorFlightOverlay()
             SnackbarHost(
                 hostState = snackbarHostState,
                 modifier = Modifier

@@ -40,11 +40,17 @@ object AppMotion {
      * pixels past the card when closing), so it lands solid. The stiffness keeps the settle time of
      * the quicker 0.86 spring (~195 ms to 99 %), as more damping alone would make it slower.
      */
-    fun <T> containerTransform(visibilityThreshold: T? = null): FiniteAnimationSpec<T> = spring(
+    fun <T> containerTransform(visibilityThreshold: T? = null, afterBackGesture: Boolean = false): FiniteAnimationSpec<T> = spring(
         dampingRatio = 0.9f,
-        stiffness = 690f,
+        stiffness = if (afterBackGesture) 690f * AFTER_GESTURE_STIFFNESS_FACTOR else 690f,
         visibilityThreshold = visibilityThreshold,
     )
+
+    /**
+     * Closing an editor after a released back gesture: 10 % quicker than a normal close (duration goes
+     * with 1/√stiffness, and 1/0.9² ≈ 1.235).
+     */
+    const val AFTER_GESTURE_STIFFNESS_FACTOR = 1.235f
 
     /** A motion-scheme spring made quicker for screen transitions; any other spec is returned as is. */
     fun <T> quicker(spec: FiniteAnimationSpec<T>): FiniteAnimationSpec<T> =

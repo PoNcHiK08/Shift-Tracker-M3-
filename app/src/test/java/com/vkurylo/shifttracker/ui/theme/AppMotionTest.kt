@@ -55,6 +55,15 @@ class AppMotionTest {
     }
 
     @Test
+    fun `after a back gesture the editor closes 10 percent quicker`() {
+        val normal = AppMotion.containerTransform<Float>(0.5f) as SpringSpec<Float>
+        val quick = AppMotion.containerTransform<Float>(0.5f, afterBackGesture = true) as SpringSpec<Float>
+        assertEquals("same bounce", normal.dampingRatio, quick.dampingRatio, 0f)
+        val ratio = fullScreenMoveMs(quick) / fullScreenMoveMs(normal)
+        assertEquals("duration ratio", 0.9, ratio, 0.02)
+    }
+
+    @Test
     fun `a spec that is not a spring is left alone`() {
         val tween = androidx.compose.animation.core.tween<Float>(300)
         assertSame(tween, AppMotion.quicker(tween))
