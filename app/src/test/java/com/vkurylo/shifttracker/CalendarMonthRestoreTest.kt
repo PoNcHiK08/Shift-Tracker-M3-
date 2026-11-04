@@ -23,6 +23,9 @@ import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.YearMonth
+import com.vkurylo.shifttracker.ui.calendar.CALENDAR_LIST_TAG
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performScrollToNode
 import javax.inject.Inject
 
 /**
@@ -59,6 +62,8 @@ class CalendarMonthRestoreTest {
 
     private fun click(label: String, scroll: Boolean = false) {
         val matcher = (hasText(label) or hasContentDescription(label)) and hasClickAction()
+        // On this small default screen (320 x 470 dp) the day's buttons are below the fold.
+        if (scroll) composeRule.onNodeWithTag(CALENDAR_LIST_TAG).performScrollToNode(matcher)
         composeRule.waitUntilExactlyOneExists(matcher, timeoutMillis = 10_000)
         val node = composeRule.onNode(matcher)
         if (scroll) node.performScrollTo()
@@ -73,7 +78,7 @@ class CalendarMonthRestoreTest {
         val nextMonth = Formatters.monthYear(YearMonth.now().plusMonths(1), locale)
         val thisMonth = Formatters.monthYear(YearMonth.now(), locale)
 
-        waitForText(str(R.string.add_shift))
+        waitForText(str(R.string.earnings_month))
         click(str(R.string.next_month))
         waitForText(nextMonth)
         waitGone(thisMonth)

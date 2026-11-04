@@ -28,14 +28,14 @@ import org.robolectric.annotation.GraphicsMode
 import java.util.Locale
 
 /**
- * The month tiles: the big earnings tile and the column of hours + shifts must line up at the top
- * and the bottom (in 1.0.11 the column was 12 dp taller), the two small tiles must be equal, and
+ * The month strip at the top of the calendar: earnings, hours and shifts side by side must line up
+ * at the top and the bottom, stay compact (so the calendar and the day below keep their room), and
  * nothing may be cut off with a large font, where all of them grow together instead.
  */
 @RunWith(AndroidJUnit4::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE) // real text measuring, so wrapping at large font sizes is real
 @Config(application = Application::class, sdk = [35], qualifiers = "en-rUS-w384dp-h832dp-night-xxhdpi")
-class MonthTilesLayoutTest {
+class MonthStripLayoutTest {
     @get:Rule val composeRule = createComposeRule()
 
     private val summary = MonthSummary(
@@ -47,7 +47,6 @@ class MonthTilesLayoutTest {
         perJob = emptyList(),
     )
     private val total = Formatters.money(summary.totalEarningsGrosze, Locale.US)
-    private val bonusLine = "incl. bonuses " + Formatters.money(summary.bonusGrosze, Locale.US)
 
     private fun show(fontScale: Float) {
         composeRule.setContent {
@@ -56,7 +55,7 @@ class MonthTilesLayoutTest {
                 ShiftTrackerTheme(darkTheme = true, dynamicColor = false) {
                     // The calendar's width on a 384 dp phone (12 dp padding on each side).
                     Box(Modifier.width(384.dp).padding(horizontal = 12.dp)) {
-                        MonthTiles(summary)
+                        MonthStrip(summary)
                     }
                 }
             }
@@ -70,9 +69,11 @@ class MonthTilesLayoutTest {
         val earnings = bounds(MONTH_TILE_EARNINGS)
         val hours = bounds(MONTH_TILE_HOURS)
         val shifts = bounds(MONTH_TILE_SHIFTS)
-        assertEquals("tops differ", earnings.top.value, hours.top.value, 0.5f)
-        assertEquals("bottoms differ", earnings.bottom.value, shifts.bottom.value, 0.5f)
-        assertEquals("small tiles differ", (hours.bottom - hours.top).value, (shifts.bottom - shifts.top).value, 0.5f)
+        listOf(hours, shifts).forEach {
+            assertEquals("tops differ", earnings.top.value, it.top.value, 0.5f)
+            assertEquals("bottoms differ", earnings.bottom.value, it.bottom.value, 0.5f)
+        }
+        assertTrue("not left to right", earnings.right <= hours.left && hours.right <= shifts.left)
         return Triple(earnings, hours, shifts)
     }
 
@@ -86,24 +87,23 @@ class MonthTilesLayoutTest {
         assertInside("43", hours)
         assertInside("6", shifts)
         assertInside(total, earnings)
-        assertInside(bonusLine, earnings)
     }
 
     @Test
-    fun tilesLineUpAndAreCompact() {
+    fun stripLinesUpAndIsCompact() {
         show(fontScale = 1f)
         val (earnings, hours, shifts) = assertLinedUp()
         val height = (earnings.bottom - earnings.top).value
-        // 1.0.11: a 148 dp big tile next to a 160 dp column.
-        assertTrue("tiles are $height dp high", height in 136f..150f)
+        // The old tiles below the day were 144 dp high; this sits above the calendar.
+        assertTrue("strip is $height dp high", height in 40f..56f)
         assertEverythingFits(earnings, hours, shifts)
     }
 
     @Test
-    fun withAHugeFontTheyGrowTogetherAndNothingIsCut() {
+    fun withAHugeFontItGrowsTogetherAndNothingIsCut() {
         show(fontScale = 2f)
         val (earnings, hours, shifts) = assertLinedUp()
-        assertTrue("didn't grow with the font", (earnings.bottom - earnings.top).value > 160f)
+        assertTrue("didn't grow with the font", (earnings.bottom - earnings.top).value > 64f)
         assertEverythingFits(earnings, hours, shifts)
     }
 }

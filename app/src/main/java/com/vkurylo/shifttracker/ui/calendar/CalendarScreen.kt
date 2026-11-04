@@ -68,6 +68,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
@@ -188,9 +190,18 @@ fun CalendarScreen(
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().testTag(CALENDAR_LIST_TAG),
             contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
         ) {
+            // The month at a glance, first thing on screen: earnings, hours and shifts in one compact row.
+            if (state.loading || hasJobs) {
+                item(key = "month") {
+                    MonthStrip(
+                        summary = state.monthSummary,
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 6.dp),
+                    )
+                }
+            }
             item(key = "weekdays") { WeekdayHeader() }
             item(key = "grid") {
                 HorizontalPager(
@@ -237,12 +248,6 @@ fun CalendarScreen(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
-                item(key = "month") {
-                    MonthTiles(
-                        summary = state.monthSummary,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                    )
-                }
             }
         }
     }
@@ -277,12 +282,13 @@ private fun MonthGrid(
     val today = LocalDate.now()
 
     Column(modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-        // Always 6 rows so the pager height never jumps.
+        // Always 6 rows so the pager height never jumps. Rows are a little flatter than square (the
+        // day itself stays round), which makes room for the month strip above the calendar.
         for (row in 0 until 6) {
             Row(Modifier.fillMaxWidth()) {
                 for (col in 0 until 7) {
                     val dayNumber = row * 7 + col - leadingBlanks + 1
-                    Box(Modifier.weight(1f).aspectRatio(1f), contentAlignment = Alignment.Center) {
+                    Box(Modifier.weight(1f).aspectRatio(DAY_CELL_ASPECT), contentAlignment = Alignment.Center) {
                         if (dayNumber in 1..month.lengthOfMonth()) {
                             val date = month.atDay(dayNumber)
                             DayCell(
@@ -380,7 +386,8 @@ private fun DayCell(
     ) {
         Box(
             Modifier
-                .matchParentSize()
+                .fillMaxHeight()
+                .aspectRatio(1f)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -566,66 +573,73 @@ private fun DayPanel(
     }
 }
 
+/** The calendar screen's scrolling list (strip, calendar, day, …). */
+internal const val CALENDAR_LIST_TAG = "calendar-list"
+
+/** Width : height of a calendar row's cell (the round day inside is as wide as the cell is high). */
+private const val DAY_CELL_ASPECT = 1.15f
+
 internal const val MONTH_TILE_EARNINGS = "month-tile-earnings"
 internal const val MONTH_TILE_HOURS = "month-tile-hours"
 internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
 
 /**
- * Bento tiles for the month: a big earnings tile (rolling counter) next to hours and shifts.
- * The big tile and the column of two equal small ones share one height (whichever needs more, e.g.
- * with a large font), so their tops and bottoms always line up.
+ * The month at a glance, at the top of the calendar: earnings, hours and shifts as one connected row
+ * (segments 2 dp apart, large outer and small inner corners, like the app's segmented lists). All
+ * three share one height (whichever needs more, e.g. with a large font), so they always line up.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun MonthTiles(summary: MonthSummary, modifier: Modifier = Modifier) {
+internal fun MonthStrip(summary: MonthSummary, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val colors = MaterialTheme.colorScheme
-    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    val outer = 20.dp
+    val inner = 4.dp
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Tile(
             container = colors.primaryContainer,
-            modifier = Modifier.weight(1.55f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
+            shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
+            modifier = Modifier.weight(1.7f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
         ) {
-            Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelLarge, color = colors.onPrimaryContainer)
-            Spacer(Modifier.weight(1f))
+            Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelSmall, color = colors.onPrimaryContainer)
             RollingMoney(
                 grosze = summary.totalEarningsGrosze,
-                style = MaterialTheme.typography.headlineMediumEmphasized,
+                style = MaterialTheme.typography.titleMediumEmphasized,
                 color = colors.onPrimaryContainer,
             )
-            if (summary.bonusGrosze > 0) {
-                Text(
-                    stringResource(R.string.including_bonuses, Formatters.money(summary.bonusGrosze, locale)),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = colors.onPrimaryContainer.copy(alpha = 0.8f),
-                )
-            }
         }
-        Column(Modifier.weight(1f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Tile(container = colors.secondaryContainer, modifier = Modifier.fillMaxWidth().weight(1f).testTag(MONTH_TILE_HOURS)) {
-                Text(stringResource(R.string.hours), style = MaterialTheme.typography.labelMedium, color = colors.onSecondaryContainer)
-                RollingText(
-                    text = Formatters.decimalHours(summary.totalPaidMinutes, locale),
-                    value = summary.totalPaidMinutes,
-                    style = MaterialTheme.typography.titleLargeEmphasized,
-                    color = colors.onSecondaryContainer,
-                )
-            }
-            Tile(container = colors.tertiaryContainer, modifier = Modifier.fillMaxWidth().weight(1f).testTag(MONTH_TILE_SHIFTS)) {
-                Text(stringResource(R.string.shifts), style = MaterialTheme.typography.labelMedium, color = colors.onTertiaryContainer)
-                RollingText(
-                    text = summary.shiftCount.toString(),
-                    value = summary.shiftCount.toLong(),
-                    style = MaterialTheme.typography.titleLargeEmphasized,
-                    color = colors.onTertiaryContainer,
-                )
-            }
+        Tile(
+            container = colors.secondaryContainer,
+            shape = RoundedCornerShape(inner),
+            modifier = Modifier.weight(1f).fillMaxHeight().testTag(MONTH_TILE_HOURS),
+        ) {
+            Text(stringResource(R.string.hours), style = MaterialTheme.typography.labelSmall, color = colors.onSecondaryContainer)
+            RollingText(
+                text = Formatters.decimalHours(summary.totalPaidMinutes, locale),
+                value = summary.totalPaidMinutes,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = colors.onSecondaryContainer,
+            )
+        }
+        Tile(
+            container = colors.tertiaryContainer,
+            shape = RoundedCornerShape(topStart = inner, bottomStart = inner, topEnd = outer, bottomEnd = outer),
+            modifier = Modifier.weight(0.85f).fillMaxHeight().testTag(MONTH_TILE_SHIFTS),
+        ) {
+            Text(stringResource(R.string.shifts), style = MaterialTheme.typography.labelSmall, color = colors.onTertiaryContainer)
+            RollingText(
+                text = summary.shiftCount.toString(),
+                value = summary.shiftCount.toLong(),
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = colors.onTertiaryContainer,
+            )
         }
     }
 }
 
 @Composable
-private fun Tile(container: Color, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = modifier, shape = MaterialTheme.shapes.extraLarge, color = container) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { content() }
+private fun Tile(container: Color, shape: Shape, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Surface(modifier = modifier, shape = shape, color = container) {
+        Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) { content() }
     }
 }

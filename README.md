@@ -21,8 +21,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
   calendar and summary, but not towards hours or the average hourly rate.
 - **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
   M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
-  "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. Below it, Bento tiles
-  for the month's earnings, hours and shifts (the big tile and the two small ones always share one height).
+  "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. The month's earnings,
+  hours and shifts are the first thing on screen: one compact connected row right under the month name
+  (all three share one height).
   Under the finger every day morphs into the squircle too.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year. Paging slides the period label in the direction of travel.
