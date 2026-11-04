@@ -90,6 +90,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
+import androidx.compose.ui.text.style.TextOverflow
+import com.vkurylo.shifttracker.ui.util.earningsModeLabel
+import com.vkurylo.shifttracker.ui.util.EarningsModeTag
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Amounts
@@ -447,7 +451,7 @@ private fun DayPanel(
     val shifts = shiftsByDate[date].orEmpty()
     val bonuses = bonusesByDate[date].orEmpty()
     // Per currency: a day with entries in two currencies shows two amounts, never their sum.
-    val total = ShiftCalculator.earnings(shifts, bonuses)
+    val total = ShiftCalculator.earnings(shifts, bonuses, LocalEarningsDisplay.current.mode)
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -490,13 +494,16 @@ private fun DayPanel(
                 }
                 if (total.byCurrency.values.any { it > 0 }) {
                     Spacer(Modifier.width(12.dp))
-                    RollingAmounts(
-                        amounts = Amounts(total.byCurrency.filterValues { it > 0 }),
-                        fallbackCurrency = Currencies.DEFAULT,
-                        style = MaterialTheme.typography.titleLargeEmphasized,
-                        color = MaterialTheme.colorScheme.primary,
-                        horizontalAlignment = Alignment.End,
-                    )
+                    Column(horizontalAlignment = Alignment.End) {
+                        RollingAmounts(
+                            amounts = Amounts(total.byCurrency.filterValues { it > 0 }),
+                            fallbackCurrency = Currencies.DEFAULT,
+                            style = MaterialTheme.typography.titleLargeEmphasized,
+                            color = MaterialTheme.colorScheme.primary,
+                            horizontalAlignment = Alignment.End,
+                        )
+                        EarningsModeTag(color = MaterialTheme.colorScheme.primary)
+                    }
                 }
             }
 
@@ -608,7 +615,15 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
             modifier = Modifier.weight(1.7f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
         ) {
-            Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelSmall, color = colors.onPrimaryContainer)
+            // "Earned this month · Net" when jobs have deductions, so it's never ambiguous.
+            val tag = earningsModeLabel()
+            Text(
+                stringResource(R.string.earnings_month) + (tag?.let { " · $it" } ?: ""),
+                style = MaterialTheme.typography.labelSmall,
+                color = colors.onPrimaryContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             // One line per currency (several only when jobs are paid in different currencies).
             RollingAmounts(
                 amounts = summary.totalEarnings,

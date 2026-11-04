@@ -21,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.ui.components.CrashReportDialog
 import com.vkurylo.shifttracker.ui.navigation.ShiftTrackerNavHost
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
+import androidx.compose.runtime.CompositionLocalProvider
 import com.vkurylo.shifttracker.ui.theme.isDark
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val preferences by viewModel.preferences.collectAsStateWithLifecycle()
             val prefs = preferences ?: return@setContent // DataStore loads in a few ms
+            val earningsDisplay by viewModel.earningsDisplay.collectAsStateWithLifecycle()
             val darkTheme = prefs.themeMode.isDark()
 
             // Keep status/navigation bar icons readable when the app theme differs from the system one.
@@ -48,8 +51,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             ShiftTrackerTheme(darkTheme = darkTheme, dynamicColor = prefs.useDynamicColor) {
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    ShiftTrackerNavHost()
+                CompositionLocalProvider(LocalEarningsDisplay provides earningsDisplay) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        ShiftTrackerNavHost()
+                    }
                 }
                 // A crash/unexpected close last time? Show it so it can be copied and sent.
                 var crashReport by remember { mutableStateOf(CrashReporter.consume(this@MainActivity)) }

@@ -3,6 +3,9 @@ package com.vkurylo.shifttracker.domain.model
 import java.time.LocalDate
 import java.time.YearMonth
 
+/** Which earnings the screens show: before or after each job's deductions. */
+enum class EarningsMode { GROSS, NET }
+
 /** How a job pays. New types (e.g. a fixed amount per shift) can be added here. */
 enum class PayType {
     /** Shifts earn their saved hourly rate(s), as the app always did. */
@@ -22,6 +25,11 @@ data class PaySettings(
     val payType: PayType = PayType.HOURLY,
     /** The salary of a [PayType.FIXED_MONTHLY] month, in minor units of the job's currency. */
     val monthlyAmountMinor: Long = 0,
+    /**
+     * Deductions in basis points (13.71 % = 1371, 0..10 000): net = gross minus this share, on shift
+     * pay, salary and bonuses alike. A plain user-entered number; no tax rules are applied.
+     */
+    val deductionBp: Int = 0,
 ) {
     companion object {
         /** A job with no history: hourly, as every job before pay types. */
@@ -34,6 +42,9 @@ fun Job.payFor(month: YearMonth): PaySettings =
     payHistory.lastOrNull { it.from == null || !it.from.isAfter(month) } ?: PaySettings.DEFAULT
 
 fun Job.payFor(date: LocalDate): PaySettings = payFor(YearMonth.from(date))
+
+/** Any month of the job has deductions (then gross and net differ and screens say which is shown). */
+val Job.hasDeductions: Boolean get() = payHistory.any { it.deductionBp > 0 }
 
 /** Whether shifts of this job on [date] earn their hourly rate (false: covered by a monthly salary). */
 fun Job.paysHourly(date: LocalDate): Boolean = payFor(date).payType == PayType.HOURLY

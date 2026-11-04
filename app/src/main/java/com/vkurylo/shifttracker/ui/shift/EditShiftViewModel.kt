@@ -7,7 +7,9 @@ import androidx.navigation.toRoute
 import com.vkurylo.shifttracker.di.ApplicationScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.payFor
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.TimedRate
@@ -57,6 +59,10 @@ data class EditShiftUiState(
     val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)
     val paidMinutes: Long get() = pay.paidMinutes
     val earningsGrosze: Long get() = pay.earningsGrosze
+
+    /** The preview's earnings, gross or after the job's deductions in the shift's month. */
+    fun earningsIn(mode: EarningsMode): Long =
+        if (mode == EarningsMode.NET) ShiftCalculator.net(earningsGrosze, selectedJob?.payFor(date)?.deductionBp ?: 0) else earningsGrosze
     val isOvernight: Boolean get() = ShiftCalculator.isOvernight(start, end)
     val breakTooLong: Boolean get() = (breakValue ?: 0) >= durationMinutes
     val jobMissing: Boolean get() = selectedJob == null

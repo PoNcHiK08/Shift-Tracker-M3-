@@ -254,7 +254,13 @@ private fun JobEditorSheet(
     // Decimals and limits follow the job's currency (0 decimals for JPY, 3 for KWD).
     val rateGrosze = MoneyParser.parseMinor(rate, digits)
     val secondRateGrosze = MoneyParser.parseMinor(secondRate, digits)
+    var deduction by rememberSaveable(job.id) {
+        mutableStateOf(if (initialPay.deductionBp == 0) "" else MoneyParser.toInput(initialPay.deductionBp.toLong(), 2))
+    }
     val monthlyMinor = MoneyParser.parseMinor(monthlyAmount, digits, MoneyParser.AMOUNT_WHOLE_DIGITS)
+    // 13,71 % -> 1371 basis points; empty means none.
+    val deductionBp = if (deduction.isBlank()) 0 else MoneyParser.parseMinor(deduction, 2, wholeDigits = 3)?.takeIf { it <= 10_000 }?.toInt()
+    val deductionError = deductionBp == null
     val hourly = payType == PayType.HOURLY
     val nameError = name.isBlank()
     val rateError = hourly && rateGrosze == null
@@ -424,6 +430,20 @@ private fun JobEditorSheet(
                 }
             }
 
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = deduction,
+                onValueChange = { deduction = it },
+                label = { Text(stringResource(R.string.deduction_percent)) },
+                placeholder = { Text("0") },
+                suffix = { Text("%") },
+                singleLine = true,
+                isError = showErrors && deductionError,
+                supportingText = { Text(stringResource(if (showErrors && deductionError) R.string.error_percent_invalid else R.string.deduction_hint)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.job_color), style = MaterialTheme.typography.titleSmall)
             Spacer(Modifier.height(12.dp))
@@ -437,7 +457,7 @@ private fun JobEditorSheet(
                 }
                 Button(
                     onClick = {
-                        if (nameError || rateError || secondRateError || windowError || monthlyError) {
+                        if (nameError || rateError || secondRateError || windowError || monthlyError || deductionError) {
                             showErrors = true
                         } else {
                             // A salaried job keeps its last hourly rate (shifts still snapshot one).
@@ -448,6 +468,7 @@ private fun JobEditorSheet(
                                 from = if (hasEntries) payFrom else null,
                                 payType = payType,
                                 monthlyAmountMinor = if (hourly) 0 else monthlyMinor ?: 0,
+                                deductionBp = deductionBp ?: 0,
                             )
                             onSave(
                                 job.copy(
@@ -497,8 +518,16 @@ private fun JobEditorSheet(
 /** "33,00 zł/h · 23:00–06:00: 37,00 zł/h" */
 @Composable
 fun jobRatesLabel(job: Job): String {
-    val locale = currentLocale()
     val pay = job.payFor(YearMonth.now())
+    val deductions = if (pay.deductionBp > 0) {
+        " · " + stringResource(R.string.deduction_value, MoneyParser.toInput(pay.deductionBp.toLong(), 2, decimalSeparator(currentLocale())))
+    } else ""
+    return payLabel(job, pay) + deductions
+}
+
+@Composable
+private fun payLabel(job: Job, pay: PaySettings): String {
+    val locale = currentLocale()
     if (pay.payType == PayType.FIXED_MONTHLY) {
         return stringResource(R.string.fixed_salary_per_month, Formatters.money(pay.monthlyAmountMinor, job.currency, locale))
     }
@@ -564,3 +593,5 @@ private fun AppliesFromField(month: YearMonth, onChange: (YearMonth) -> Unit) {
         }
     }
 }
+
+private fun decimalSeparator(locale: java.util.Locale): Char = java.text.DecimalFormatSymbols.getInstance(locale).decimalSeparator

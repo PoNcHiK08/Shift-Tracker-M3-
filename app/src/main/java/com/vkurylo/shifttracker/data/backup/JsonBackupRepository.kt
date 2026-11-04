@@ -37,7 +37,7 @@ data class BackupFile(
 
         /**
          * Every exporter so far wrote its version explicitly: 1 (jobs + shifts), 2 (+ second rates),
-         * 3 (+ bonuses), 4 (+ a currency and pay settings history per job). All of them decode into
+         * 3 (+ bonuses), 4 (+ a currency and a pay settings history with deductions per job). All of them decode into
          * these classes (newer fields have defaults: an older file's jobs are PLN and hourly).
          */
         const val MIN_VERSION = 1
@@ -67,6 +67,8 @@ data class BackupPaySettings(
     val from: String? = null,
     @SerialName("pay_type") val payType: String = "HOURLY",
     @SerialName("monthly_amount_minor") val monthlyAmountMinor: Long = 0,
+    /** Deductions in percent as text, e.g. "13.71" (0–100, at most 2 decimals). */
+    @SerialName("deduction_percent") val deductionPercent: String = "0",
 )
 
 /** Optional second rate between [from] and [to] (HH:mm). Added in backup version 2. */
@@ -134,6 +136,7 @@ class JsonBackupRepository @Inject constructor(
                             from = monthKeyToYearMonth(entry.fromMonth)?.toString(),
                             payType = entry.payType,
                             monthlyAmountMinor = entry.monthlyAmountMinor,
+                            deductionPercent = java.math.BigDecimal.valueOf(entry.deductionBp.toLong(), 2).stripTrailingZeros().toPlainString(),
                         )
                     },
                 )
@@ -242,7 +245,12 @@ class JsonBackupRepository @Inject constructor(
             require(entry.monthlyAmountMinor in 0..MoneyParser.maxMinor(digits, MoneyParser.AMOUNT_WHOLE_DIGITS)) {
                 "monthly amount of job ${job.id} out of range: ${entry.monthlyAmountMinor}"
             }
-            PaySettings(month, type, entry.monthlyAmountMinor).toEntity(job.id)
+            require(entry.deductionPercent.matches(Regex("""\d{1,3}(\.\d{1,2})?"""))) {
+                "deduction of job ${job.id} is not a percentage with up to 2 decimals: '${entry.deductionPercent}'"
+            }
+            val bp = java.math.BigDecimal(entry.deductionPercent).movePointRight(2).toInt()
+            require(bp in 0..10_000) { "deduction of job ${job.id} over 100 %: ${entry.deductionPercent}" }
+            PaySettings(month, type, entry.monthlyAmountMinor, bp).toEntity(job.id)
         }
         val duplicates = entries.groupingBy { it.fromMonth }.eachCount().filterValues { it > 1 }.keys
         require(duplicates.isEmpty()) { "job ${job.id} has two pay settings for the same month" }

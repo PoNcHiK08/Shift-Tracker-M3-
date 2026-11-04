@@ -189,6 +189,8 @@ data class JobPaySettingsEntity(
     @ColumnInfo(name = "pay_type") val payType: String,
     /** Minor units of the job's currency. */
     @ColumnInfo(name = "monthly_amount_minor") val monthlyAmountMinor: Long,
+    /** Deductions in basis points (13.71 % = 1371). Added in DB version 6. */
+    @ColumnInfo(name = "deduction_bp", defaultValue = "0") val deductionBp: Int = 0,
 )
 
 /** First and last date (epoch day) with any shift or bonus of a job. */
@@ -206,6 +208,7 @@ fun JobPaySettingsEntity.toDomain() = PaySettings(
     // An unknown type (written by a newer app version) reads as hourly rather than crashing.
     payType = PayType.entries.firstOrNull { it.name == payType } ?: PayType.HOURLY,
     monthlyAmountMinor = monthlyAmountMinor,
+    deductionBp = deductionBp,
 )
 
 fun PaySettings.toEntity(jobId: Long) = JobPaySettingsEntity(
@@ -213,4 +216,5 @@ fun PaySettings.toEntity(jobId: Long) = JobPaySettingsEntity(
     fromMonth = from.toMonthKey(),
     payType = payType.name,
     monthlyAmountMinor = monthlyAmountMinor,
+    deductionBp = deductionBp,
 )

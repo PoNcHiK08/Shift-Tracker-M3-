@@ -11,6 +11,7 @@ import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -46,6 +47,7 @@ class CalendarViewModel @Inject constructor(
     shiftRepository: ShiftRepository,
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
+    preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(YearMonth.now())
@@ -66,7 +68,8 @@ class CalendarViewModel @Inject constructor(
         around,
         jobRepository.observeJobs(),
         selectedDate.map(LocalDate::ofEpochDay),
-    ) { window, jobs, selected ->
+        preferencesRepository.preferences.map { it.earningsMode },
+    ) { window, jobs, selected, mode ->
         val m = window.month
         val monthShifts = window.shifts.filter { YearMonth.from(it.shift.date) == m }
         val monthBonuses = window.bonuses.filter { YearMonth.from(it.bonus.date) == m }
@@ -74,7 +77,7 @@ class CalendarViewModel @Inject constructor(
             month = m,
             shiftsByDate = window.shifts.groupBy { it.shift.date },
             bonusesByDate = window.bonuses.groupBy { it.bonus.date },
-            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m)),
+            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m), mode),
             jobs = jobs,
             defaultCurrency = Currencies.defaultFor(jobs),
             selectedDate = selected,

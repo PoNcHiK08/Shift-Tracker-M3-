@@ -3,6 +3,7 @@ package com.vkurylo.shifttracker.domain.model
 data class UserPreferences(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val useDynamicColor: Boolean = true,
+    val earningsMode: EarningsMode = EarningsMode.GROSS,
 )
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }

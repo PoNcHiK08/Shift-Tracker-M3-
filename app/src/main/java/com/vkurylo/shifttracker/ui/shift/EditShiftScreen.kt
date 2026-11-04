@@ -68,7 +68,9 @@ import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.jobs.jobRatesLabel
+import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.Formatters
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
 import java.time.ZoneOffset
@@ -314,9 +316,12 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                         Text(stringResource(R.string.pay_type), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
                         Text(stringResource(R.string.fixed_salary), style = MaterialTheme.typography.headlineMediumEmphasized, color = onColor)
                     } else {
-                        Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                            EarningsModeTag(Modifier.padding(start = 6.dp), color = onColor)
+                        }
                         RollingMoney(
-                            grosze = pay.earningsGrosze,
+                            grosze = state.earningsIn(LocalEarningsDisplay.current.mode),
                             currency = state.currency,
                             style = MaterialTheme.typography.headlineMediumEmphasized,
                             color = onColor,

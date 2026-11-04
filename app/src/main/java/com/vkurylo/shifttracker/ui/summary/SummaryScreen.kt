@@ -59,6 +59,7 @@ import com.vkurylo.shifttracker.ui.components.SegmentedItem
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.domain.model.Amounts
+import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
@@ -217,7 +218,9 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
     val locale = currentLocale()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val onColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val currencies = summary.currencies.ifEmpty { listOf(defaultCurrency) }
+    // An average hourly rate only where there was hourly-paid time (a salaried job has none).
+    val rated = summary.perJob.filter { it.hourlyPaidMinutes > 0 }.map { it.currency }.distinct()
+    val currencies = rated.ifEmpty { listOf(summary.currencies.firstOrNull() ?: defaultCurrency) }
     val averageText = currencies.joinToString(" · ") { Formatters.money(summary.averageRate(it), it, locale) }
     val title = when (period) {
         SummaryPeriod.WEEK -> R.string.earnings_week
@@ -235,7 +238,11 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                 transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
                 label = "totalsTitle",
             ) { res ->
-                Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+                    // Gross or net, whenever jobs have deductions.
+                    EarningsModeTag(Modifier.padding(start = 8.dp), color = onColor)
+                }
             }
             RollingAmounts(
                 amounts = summary.totalEarnings,

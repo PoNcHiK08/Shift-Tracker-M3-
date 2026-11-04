@@ -33,6 +33,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
 import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -92,6 +94,7 @@ fun ShiftCard(
     count: Int = 1,
 ) {
     val locale = currentLocale()
+    val mode = LocalEarningsDisplay.current.mode
     val shift = item.shift
     val details = buildList {
         add("${Formatters.time(shift.start)}–${Formatters.time(shift.end)}")
@@ -142,7 +145,7 @@ fun ShiftCard(
         Column(horizontalAlignment = Alignment.End) {
             // A salaried job's shift counts for hours only; its pay is the monthly salary.
             Text(
-                if (item.job.paysHourly(shift.date)) Formatters.money(shift.earningsGrosze, item.job.currency, locale)
+                if (item.job.paysHourly(shift.date)) Formatters.money(ShiftCalculator.shiftEarnings(item, mode), item.job.currency, locale)
                 else stringResource(R.string.fixed_salary),
                 style = MaterialTheme.typography.titleMedium,
             )
@@ -209,7 +212,7 @@ fun BonusCard(
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            "+" + Formatters.money(bonus.amountGrosze, item.job.currency, locale),
+            "+" + Formatters.money(ShiftCalculator.bonusAmount(item, LocalEarningsDisplay.current.mode), item.job.currency, locale),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
         )

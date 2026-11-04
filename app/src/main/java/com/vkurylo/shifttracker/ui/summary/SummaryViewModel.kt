@@ -7,11 +7,13 @@ import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -78,6 +81,7 @@ class SummaryViewModel @Inject constructor(
     shiftRepository: ShiftRepository,
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
+    preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val period = savedStateHandle.getStateFlow(KEY_PERIOD, SummaryPeriod.MONTH.name)
@@ -91,11 +95,12 @@ class SummaryViewModel @Inject constructor(
                 shiftRepository.observeShifts(range.from, range.to),
                 bonusRepository.observeBonuses(range.from, range.to),
                 jobRepository.observeJobs(),
-            ) { shifts, bonuses, jobs ->
+                preferencesRepository.preferences.map { it.earningsMode },
+            ) { shifts, bonuses, jobs, mode ->
                 SummaryUiState(
                     range = range,
-                    summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to)),
-                    breakdown = breakdown(range, shifts, bonuses, jobs),
+                    summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode),
+                    breakdown = breakdown(range, shifts, bonuses, jobs, mode),
                     defaultCurrency = Currencies.defaultFor(jobs),
                     loading = false,
                 )
@@ -129,10 +134,11 @@ class SummaryViewModel @Inject constructor(
         shifts: List<ShiftWithJob>,
         bonuses: List<BonusWithJob>,
         jobs: List<Job>,
+        mode: EarningsMode,
     ): List<BreakdownEntry> = when (range.period) {
         SummaryPeriod.WEEK -> (0L..6L).map { offset ->
             val day = range.from.plusDays(offset)
-            entry(day, shifts.filter { it.shift.date == day }, bonuses.filter { it.bonus.date == day })
+            entry(day, shifts.filter { it.shift.date == day }, bonuses.filter { it.bonus.date == day }, mode)
         }
         SummaryPeriod.YEAR -> (1..12).map { month ->
             val first = range.from.withMonth(month).withDayOfMonth(1)
@@ -140,9 +146,10 @@ class SummaryViewModel @Inject constructor(
                 first,
                 shifts.filter { it.shift.date.monthValue == month },
                 bonuses.filter { it.bonus.date.monthValue == month },
+                mode,
                 // Each month of the year carries its fixed salaries.
                 salaries = jobs.fold(Amounts.EMPTY) { acc, job ->
-                    ShiftCalculator.salary(job, YearMonth.from(first)).let { if (it > 0) acc.plus(job.currency, it) else acc }
+                    ShiftCalculator.salary(job, YearMonth.from(first), mode).let { if (it > 0) acc.plus(job.currency, it) else acc }
                 },
             )
         }
@@ -153,11 +160,12 @@ class SummaryViewModel @Inject constructor(
         date: LocalDate,
         shifts: List<ShiftWithJob>,
         bonuses: List<BonusWithJob>,
+        mode: EarningsMode,
         salaries: Amounts = Amounts.EMPTY,
     ) = BreakdownEntry(
         date = date,
         paidMinutes = shifts.sumOf { it.shift.paidMinutes },
-        earnings = ShiftCalculator.earnings(shifts, bonuses) + salaries,
+        earnings = ShiftCalculator.earnings(shifts, bonuses, mode) + salaries,
         hasSalary = !salaries.isEmpty,
         shiftCount = shifts.size,
         bonusCount = bonuses.size,

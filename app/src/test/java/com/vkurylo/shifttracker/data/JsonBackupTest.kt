@@ -161,6 +161,10 @@ class JsonBackupTest {
                 version = 4,
                 jobs = job(1, pay = """[{"pay_type":"FIXED_MONTHLY","monthly_amount_minor":${MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS) + 1}}]"""),
             ),
+            "negative deduction" to backup(version = 4, jobs = job(1, pay = """[{"deduction_percent":"-1"}]""")),
+            "deduction over 100 %" to backup(version = 4, jobs = job(1, pay = """[{"deduction_percent":"100.01"}]""")),
+            "deduction with 3 decimals" to backup(version = 4, jobs = job(1, pay = """[{"deduction_percent":"13.711"}]""")),
+            "deduction not a number" to backup(version = 4, jobs = job(1, pay = """[{"deduction_percent":"abc"}]""")),
             "JPY shift rate above max" to backup(version = 4, jobs = job(1, currency = "JPY"), shifts = shift(rate = 10_000_000)),
         )
         val db = seededDb()
@@ -190,19 +194,24 @@ class JsonBackupTest {
             version = 4,
             jobs = job(
                 1,
-                pay = """[{"pay_type":"HOURLY"},{"from":"2026-07","pay_type":"FIXED_MONTHLY","monthly_amount_minor":300000}]""",
+                pay = """[{"pay_type":"HOURLY","deduction_percent":"13.71"},""" +
+                    """{"from":"2026-07","pay_type":"FIXED_MONTHLY","monthly_amount_minor":300000,"deduction_percent":"100"}]""",
             ),
         )
         val db = newDb()
         JsonBackupRepository(db).importJson(json)
         val history = db.paySettingsDao().getAll().map { it.toDomain() }
         assertEquals(
-            listOf(PaySettings(null, PayType.HOURLY, 0), PaySettings(java.time.YearMonth.of(2026, 7), PayType.FIXED_MONTHLY, 300_000)),
+            listOf(
+                PaySettings(null, PayType.HOURLY, 0, deductionBp = 1_371),
+                PaySettings(java.time.YearMonth.of(2026, 7), PayType.FIXED_MONTHLY, 300_000, deductionBp = 10_000),
+            ),
             history,
         )
         val again = newDb()
         JsonBackupRepository(again).importJson(JsonBackupRepository(db).exportJson())
         assertEquals(history, again.paySettingsDao().getAll().map { it.toDomain() })
+        assertTrue(JsonBackupRepository(db).exportJson().contains("\"deduction_percent\": \"13.71\""))
 
         for (version in 1..3) {
             val old = newDb()

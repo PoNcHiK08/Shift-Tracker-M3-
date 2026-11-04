@@ -257,4 +257,12 @@
     <string name="salary_value">оклад %1$s</string>
     <string name="fixed_salary_shift_hint">Ця зміна рахується в години: роботі платять місячний оклад.</string>
     <string name="week_fixed_pay_note">Роботи з окладом рахуються помісячно, тож за тиждень тут лише їхні години.</string>
+    <string name="earnings_gross">Брутто</string>
+    <string name="earnings_net">Нетто</string>
+    <string name="earnings_mode">Заробіток показувати</string>
+    <string name="earnings_mode_summary">Нетто = брутто мінус відсоток утримань кожної роботи.</string>
+    <string name="deduction_percent">Утримання</string>
+    <string name="deduction_hint">0 — без утримань. Ваш власний відсоток (податки, внески); програма не рахує податки сама.</string>
+    <string name="error_percent_invalid">Від 0 до 100, не більше двох знаків після коми</string>
+    <string name="deduction_value">утримання %1$s %%</string>
 </resources>

@@ -238,4 +238,12 @@
     <string name="salary_value">salary %1$s</string>
     <string name="fixed_salary_shift_hint">This shift counts for hours: the job is paid a monthly salary.</string>
     <string name="week_fixed_pay_note">Salaried jobs count their pay per month, so this week shows only their hours.</string>
+    <string name="earnings_gross">Gross</string>
+    <string name="earnings_net">Net</string>
+    <string name="earnings_mode">Show earnings</string>
+    <string name="earnings_mode_summary">Net = gross minus each job\'s deduction percentage.</string>
+    <string name="deduction_percent">Deductions</string>
+    <string name="deduction_hint">0 = none. Your own percentage (taxes, contributions); the app doesn\'t compute taxes.</string>
+    <string name="error_percent_invalid">0 to 100, at most two decimals</string>
+    <string name="deduction_value">deductions %1$s %%</string>
 </resources>

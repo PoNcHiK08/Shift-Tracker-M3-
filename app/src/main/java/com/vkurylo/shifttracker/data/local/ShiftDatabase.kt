@@ -6,7 +6,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [JobEntity::class, ShiftEntity::class, BonusEntity::class, JobPaySettingsEntity::class],
-    version = 5,
+    version = 6,
     exportSchema = true,
     autoMigrations = [
         // v2: optional second (timed) rate on jobs and shift snapshots.
@@ -17,6 +17,8 @@ import androidx.room.RoomDatabase
         AutoMigration(from = 3, to = 4),
         // v5: pay settings history per job (no rows = hourly, as before).
         AutoMigration(from = 4, to = 5),
+        // v6: deduction percentage in the pay settings history (0 = none).
+        AutoMigration(from = 5, to = 6),
     ],
 )
 abstract class ShiftDatabase : RoomDatabase() {

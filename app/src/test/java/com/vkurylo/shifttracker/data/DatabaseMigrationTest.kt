@@ -97,6 +97,11 @@ class DatabaseMigrationTest {
             assertEquals("PLN", jobs.single().currency)
             // v5: no pay history, which means hourly as before.
             assertEquals(0, db.paySettingsDao().getAll().size)
+            // v6: the deduction column exists, 0 by default (no deductions, gross = net).
+            db.openHelper.writableDatabase.execSQL(
+                "INSERT INTO job_pay_settings (job_id, from_month, pay_type, monthly_amount_minor) VALUES (1, 0, 'HOURLY', 0)",
+            )
+            assertEquals(0, db.paySettingsDao().getAll().single().deductionBp)
         } finally {
             db.close()
         }

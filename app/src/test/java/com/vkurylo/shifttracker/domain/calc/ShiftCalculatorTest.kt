@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.domain.calc
 
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
@@ -263,5 +264,52 @@ class ShiftCalculatorTest {
         assertEquals(listOf(nov), ShiftCalculator.wholeMonths(LocalDate.of(2026, 11, 1), LocalDate.of(2026, 11, 30)))
         assertEquals(emptyList<java.time.YearMonth>(), ShiftCalculator.wholeMonths(LocalDate.of(2026, 11, 2), LocalDate.of(2026, 11, 8)))
         assertEquals(12, ShiftCalculator.wholeMonths(LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31)).size)
+    }
+    // --- Net -----------------------------------------------------------------------------------------
+
+    @Test
+    fun `net subtracts the deduction rounded half up in minor units`() {
+        assertEquals(8_629L, ShiftCalculator.net(10_000, 1_371)) // 13.71 % of 100.00 = 13.71
+        assertEquals(8_624L, ShiftCalculator.net(10_005, 1_380)) // 1 380.69 minor units -> 1 381 deducted
+        assertEquals(1L, ShiftCalculator.net(3, 5_000)) // 1.5 -> 2 deducted (half up)
+        assertEquals(0L, ShiftCalculator.net(1, 5_000)) // 0.5 -> 1 deducted
+        assertEquals(3L, ShiftCalculator.net(3, 1_000)) // 0.3 -> 0 deducted
+        assertEquals(0L, ShiftCalculator.net(24_100, 10_000)) // 100 %
+        assertEquals(24_100L, ShiftCalculator.net(24_100, 0))
+        // The largest amount at 100 % doesn't overflow.
+        val largest = MoneyParser.maxMinor(3, MoneyParser.AMOUNT_WHOLE_DIGITS)
+        assertEquals(0L, ShiftCalculator.net(largest, 10_000))
+        assertEquals(largest - (largest * 1_371 + 5_000) / 10_000, ShiftCalculator.net(largest, 1_371))
+    }
+
+    @Test
+    fun `net mode applies each month's deduction to shifts, bonuses and salaries`() {
+        // 10 % from the start, 20 % from October: September stays at 10 %.
+        val history = listOf(
+            PaySettings(null, PayType.HOURLY, deductionBp = 1_000),
+            PaySettings(java.time.YearMonth.of(2026, 10), PayType.HOURLY, deductionBp = 2_000),
+        )
+        val cafe = Job(id = 1, name = "Cafe", hourlyRateGrosze = 3000, color = 0, payHistory = history,
+            firstEntry = LocalDate.of(2026, 9, 1), lastEntry = LocalDate.of(2026, 10, 31))
+        val sep = ShiftWithJob(Shift(id = 1, jobId = 1, date = LocalDate.of(2026, 9, 7), start = t(8), end = t(16), hourlyRateGrosze = 3000), cafe)
+        val oct = ShiftWithJob(Shift(id = 2, jobId = 1, date = LocalDate.of(2026, 10, 7), start = t(8), end = t(16), hourlyRateGrosze = 3000), cafe)
+        val bonus = BonusWithJob(Bonus(jobId = 1, date = LocalDate.of(2026, 10, 9), amountGrosze = 1_005), cafe)
+
+        assertEquals(24_000L, ShiftCalculator.shiftEarnings(sep))
+        assertEquals(21_600L, ShiftCalculator.shiftEarnings(sep, EarningsMode.NET))
+        assertEquals(19_200L, ShiftCalculator.shiftEarnings(oct, EarningsMode.NET))
+        assertEquals(804L, ShiftCalculator.bonusAmount(bonus, EarningsMode.NET)) // 20 % of 10.05 = 2.01 deducted
+
+        val gross = ShiftCalculator.summarize(listOf(sep, oct), listOf(bonus), listOf(cafe))
+        val net = ShiftCalculator.summarize(listOf(sep, oct), listOf(bonus), listOf(cafe), mode = EarningsMode.NET)
+        assertEquals(49_005L, gross.totalEarnings["PLN"])
+        assertEquals(21_600L + 19_200L + 804L, net.totalEarnings["PLN"]) // the sum of what the entries show
+        assertEquals(2_550L, net.averageRate("PLN")) // (216 + 192) zl over 16 h
+
+        // A salary is netted too.
+        val office = Job(id = 2, name = "Office", hourlyRateGrosze = 0, color = 0, currency = "EUR",
+            payHistory = listOf(PaySettings(null, PayType.FIXED_MONTHLY, 300_000, deductionBp = 1_371)),
+            firstEntry = LocalDate.of(2026, 11, 2), lastEntry = LocalDate.of(2026, 11, 2))
+        assertEquals(258_870L, ShiftCalculator.salary(office, nov, EarningsMode.NET))
     }
 }

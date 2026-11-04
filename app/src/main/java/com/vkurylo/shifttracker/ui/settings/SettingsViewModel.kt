@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.data.DocumentIo
 import com.vkurylo.shifttracker.domain.model.AppLanguage
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.domain.model.UserPreferences
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
@@ -65,6 +66,7 @@ class SettingsViewModel @Inject constructor(
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setDynamicColor(enabled) }
+    fun setEarningsMode(mode: EarningsMode) = viewModelScope.launch { preferencesRepository.setEarningsMode(mode) }
 
     fun setLanguage(value: AppLanguage) {
         language.update { value }

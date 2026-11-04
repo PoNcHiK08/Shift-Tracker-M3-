@@ -3,6 +3,7 @@ package com.vkurylo.shifttracker.domain.repository
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.Shift
@@ -58,6 +59,7 @@ interface PreferencesRepository {
     val preferences: Flow<UserPreferences>
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setDynamicColor(enabled: Boolean)
+    suspend fun setEarningsMode(mode: EarningsMode)
 }
 
 /** Per-app UI language (stored by the platform / AppCompat, not by us). */
