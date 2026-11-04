@@ -54,7 +54,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.rememberGraphicsLayer
@@ -134,8 +137,21 @@ fun Modifier.sharedContainer(key: String?, shape: Shape, isEditor: Boolean = fal
             override val shouldKeepEnabledForOngoingAnimation: Boolean get() = false
         }
     }
-    // Where the card is, for the flight after a back gesture. Measured in place (before sharedBounds).
+    // Where the card is and what it looks like, for the flight after a back gesture. Measured in place
+    // (before sharedBounds); drawn through a layer (inside it) so the flight can take a snapshot.
     val cardBounds = if (isEditor) Modifier else Modifier.onGloballyPositioned { CardBounds[key] = it.boundsInRoot() }
+    val cardLayer = if (isEditor) null else rememberGraphicsLayer()
+    if (cardLayer != null) {
+        DisposableEffect(key, cardLayer) {
+            CardBounds.layers[key] = cardLayer
+            onDispose { if (CardBounds.layers[key] === cardLayer) CardBounds.layers.remove(key) }
+        }
+    }
+    val cardLook = if (cardLayer == null) Modifier else Modifier.drawWithContent {
+        cardLayer.record { this@drawWithContent.drawContent() }
+        // While an editor flies into it the flight draws the card (there's one card, not two).
+        if (!EditorFlights.isFlying(key)) drawLayer(cardLayer)
+    }
     return with(sharedScope) {
         this@sharedContainer.then(cardBounds).sharedBounds(
             sharedContentState = rememberSharedContentState(key, config),
@@ -148,7 +164,7 @@ fun Modifier.sharedContainer(key: String?, shape: Shape, isEditor: Boolean = fal
             // morphing shape; the editor inside keeps its full-screen layout (see ContainerTransformHost).
             resizeMode = SharedTransitionScope.ResizeMode.RemeasureToBounds,
             clipInOverlayDuringTransition = OverlayClip(shape),
-        )
+        ).then(cardLook)
     }
 }
 
@@ -161,6 +177,9 @@ internal object CardBounds {
     operator fun set(key: String, rect: Rect) {
         if (bounds[key] != rect) bounds[key] = rect
     }
+
+    /** Each card's drawing (only read when a flight starts, so not snapshot state). */
+    val layers = HashMap<String, GraphicsLayer>()
 }
 
 /** How much an editor shrinks at most while a back gesture holds it (M3 predictive back: to 90 %). */
@@ -336,9 +355,17 @@ fun ContainerTransformHost(
     }
 }
 
-/** Where on its way to the card (0..1) the flying editor starts to dissolve, and over how much of the way. */
-private const val FLIGHT_FADE_FROM = 0.2f
-private const val FLIGHT_FADE_LENGTH = 0.7f
+/**
+ * The flight is a full container transform into the card, in plain view all the way (the spring covers
+ * half the way in ~55 ms, so anything that fades on the way is hardly seen): the editor's content fades
+ * out early ([FLIGHT_CONTENT_FADE]), the card's own look fades in on top of the shrinking container
+ * ([FLIGHT_CARD_IN_FROM], scaled to its width like the editor), and the container's background goes
+ * last ([FLIGHT_CONTAINER_FADE_FROM]..1), so what lands is exactly the card, in its place.
+ */
+private const val FLIGHT_CONTENT_FADE = 0.35f
+private const val FLIGHT_CARD_IN_FROM = 0.25f
+private const val FLIGHT_CARD_IN_LENGTH = 0.35f
+private const val FLIGHT_CONTAINER_FADE_FROM = 0.75f
 
 /** How far ahead the flight's clock starts: one 60 Hz frame (from rest the spring barely moves in it). */
 private const val FLIGHT_HEAD_START_NANOS = 16_666_667L
@@ -372,15 +399,18 @@ internal object EditorFlights {
 
 /**
  * Draws the flight of an editor closed by a back gesture, above all screens: the held editor shrinks
- * into its card on the container-transform spring (calmer after a gesture, see AppMotion), its corners
- * round to the card's, it dissolves before it reaches the card and the scrim lifts. It only draws; touches
- * go to the screen below.
+ * into its card on the container-transform spring (calmer after a gesture, see AppMotion), all the way
+ * and in plain view: its corners round to the card's, its content fades out early, and at the end the
+ * container fades into the real card underneath; the scrim lifts. It only draws; touches go to the
+ * screen below.
  */
 @Composable
 fun EditorFlightOverlay(modifier: Modifier = Modifier) {
     val flight = EditorFlights.current ?: return
     val t = remember(flight) { mutableFloatStateOf(0f) }
+    var cardImage by remember(flight) { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(flight) {
+        launch { cardImage = CardBounds.layers[flight.key]?.let { runCatching { it.toImageBitmap() }.getOrNull() } }
         launch {
             withFrameNanos { } // the first frame of the flight is on screen (over the editor, same place)
             flight.shown = true
@@ -415,22 +445,28 @@ fun EditorFlightOverlay(modifier: Modifier = Modifier) {
         drawRect(Color.Black.copy(alpha = (flight.fromScrim * (1f - done)).coerceIn(0f, 1f)))
         if (rect.width <= 0f || rect.height <= 0f) return@Canvas
         val radius = lerp(flight.fromCorner.toPx(), ContainerCornerRadius.toPx(), done).coerceAtLeast(0f)
-        // The editor dissolves as a whole while it shrinks, and is gone before it reaches the card's
-        // size: the card is already there in its place, so no square-to-card morph is ever seen.
-        val alpha = 1f - FastOutSlowInEasing.transform(((done - FLIGHT_FADE_FROM) / FLIGHT_FADE_LENGTH).coerceIn(0f, 1f))
-        if (alpha <= 0f) return@Canvas
-        val outline = Path().apply { addRoundRect(RoundRect(rect, CornerRadius(radius))) }
-        clipPath(outline) {
-            drawRect(surface, topLeft = rect.topLeft, size = rect.size, alpha = alpha)
-            // Pinned to the top-left like the container transform, scaled with the width.
-            val scale = rect.width / flight.image.width
+        fun ramp(from: Float, length: Float) = FastOutSlowInEasing.transform(((done - from) / length).coerceIn(0f, 1f))
+        val card = cardImage
+        val contentAlpha = 1f - ramp(0f, FLIGHT_CONTENT_FADE)
+        val cardAlpha = if (card == null) 0f else ramp(FLIGHT_CARD_IN_FROM, FLIGHT_CARD_IN_LENGTH)
+        val containerAlpha = 1f - ramp(FLIGHT_CONTAINER_FADE_FROM, 1f - FLIGHT_CONTAINER_FADE_FROM)
+        // Pinned to the top-left like the container transform, scaled with the width.
+        fun DrawScope.drawPinned(image: ImageBitmap, alpha: Float) {
+            val scale = rect.width / image.width
             drawImage(
-                image = flight.image,
+                image = image,
                 dstOffset = IntOffset(rect.left.roundToInt(), rect.top.roundToInt()),
-                dstSize = IntSize((flight.image.width * scale).roundToInt(), (flight.image.height * scale).roundToInt()),
+                dstSize = IntSize((image.width * scale).roundToInt(), (image.height * scale).roundToInt()),
                 alpha = alpha,
             )
         }
+        val outline = Path().apply { addRoundRect(RoundRect(rect, CornerRadius(radius))) }
+        clipPath(outline) {
+            if (containerAlpha > 0f) drawRect(surface, topLeft = rect.topLeft, size = rect.size, alpha = containerAlpha)
+            if (contentAlpha > 0f) drawPinned(flight.image, contentAlpha)
+        }
+        // The card draws its own shape, so it is only kept inside the container's box.
+        if (card != null && cardAlpha > 0f) clipRect(rect.left, rect.top, rect.right, rect.bottom) { drawPinned(card, cardAlpha) }
     }
 }
 

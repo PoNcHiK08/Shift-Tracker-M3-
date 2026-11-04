@@ -352,9 +352,11 @@ class PredictiveBackGestureTest {
             assertTrue("$what: no flight", flew)
             after.forEach { f -> f.bounds?.let { assertTrue("$what: the editor morphed (${it.height} of $full)", it.height >= full * 0.88f) } }
             val home = after.last().pixels
-            for (i in 0..3) assertTrue("$what: blank frame $i", diff(after[i].pixels, home) >= CLEARLY_VISIBLE)
+            // The flight is seen, not just a flash: it stays clearly on screen for 8 frames (~130 ms)
+            // after NavHost's latency, until it has landed in the card's place.
+            for (i in 0..9) assertTrue("$what: hardly visible at frame $i", diff(after[i].pixels, home) >= CLEARLY_VISIBLE)
             val gone = after.indexOfFirst { diff(it.pixels, home) < VISIBLE }
-            assertTrue("$what: took $gone frames", gone in 1..16)
+            assertTrue("$what: took $gone frames", gone in 1..20)
             composeRule.mainClock.autoAdvance = true
             composeRule.waitForIdle()
             assertNull(container())
