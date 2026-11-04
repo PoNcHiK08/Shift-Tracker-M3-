@@ -223,4 +223,8 @@
         <item quantity="one">Imported %1$d shift</item>
         <item quantity="other">Imported %1$d shifts</item>
     </plurals>
+    <string name="currency">Currency</string>
+    <string name="currency_pick_title">Job currency</string>
+    <string name="currency_search">Search: code or name</string>
+    <string name="currency_locked">The currency can\'t change once the job has shifts or bonuses. Create a new job for another currency.</string>
 </resources>

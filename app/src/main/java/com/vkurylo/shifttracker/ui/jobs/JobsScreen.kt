@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
@@ -77,6 +78,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.JobPalette
 import com.vkurylo.shifttracker.domain.model.TimedRate
@@ -169,6 +171,7 @@ fun JobsScreen(
     state.editing?.let { job ->
         JobEditorSheet(
             job = job,
+            currencyLocked = state.currencyLocked,
             onDismiss = viewModel::dismissEditor,
             onSave = viewModel::save,
             onDelete = { viewModel.requestDelete(job) },
@@ -200,18 +203,23 @@ fun JobsScreen(
 @Composable
 private fun JobEditorSheet(
     job: Job,
+    currencyLocked: Boolean,
     onDismiss: () -> Unit,
     onSave: (Job) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isNew = job.id == 0L
     var name by rememberSaveable(job.id) { mutableStateOf(job.name) }
-    var rate by rememberSaveable(job.id) { mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze)) }
+    var currency by rememberSaveable(job.id) { mutableStateOf(job.currency) }
+    val digits = Currencies.fractionDigits(currency)
+    var rate by rememberSaveable(job.id) {
+        mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze, Currencies.fractionDigits(job.currency)))
+    }
     var color by rememberSaveable(job.id) { mutableIntStateOf(job.color) }
     var showErrors by rememberSaveable(job.id) { mutableStateOf(false) }
     var secondEnabled by rememberSaveable(job.id) { mutableStateOf(job.secondRate != null) }
     var secondRate by rememberSaveable(job.id) {
-        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze) } ?: "")
+        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze, Currencies.fractionDigits(job.currency)) } ?: "")
     }
     var secondFrom by rememberSaveable(job.id) {
         mutableIntStateOf((job.secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toSecondOfDay() / 60)
@@ -221,9 +229,11 @@ private fun JobEditorSheet(
     }
     var pickingFrom by rememberSaveable { mutableStateOf(false) }
     var pickingTo by rememberSaveable { mutableStateOf(false) }
+    var pickingCurrency by rememberSaveable { mutableStateOf(false) }
 
-    val rateGrosze = MoneyParser.parseGrosze(rate)
-    val secondRateGrosze = MoneyParser.parseGrosze(secondRate)
+    // Decimals and limits follow the job's currency (0 decimals for JPY, 3 for KWD).
+    val rateGrosze = MoneyParser.parseMinor(rate, digits)
+    val secondRateGrosze = MoneyParser.parseMinor(secondRate, digits)
     val nameError = name.isBlank()
     val rateError = rateGrosze == null
     val secondRateError = secondEnabled && secondRateGrosze == null
@@ -264,11 +274,32 @@ private fun JobEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
+            if (currencyLocked) {
+                OutlinedTextField(
+                    value = currencyLabel(currency),
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false,
+                    label = { Text(stringResource(R.string.currency)) },
+                    supportingText = { Text(stringResource(R.string.currency_locked)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                PickerField(
+                    label = stringResource(R.string.currency),
+                    value = currencyLabel(currency),
+                    icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                    onClick = { pickingCurrency = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = rate,
                 onValueChange = { rate = it },
                 label = { Text(stringResource(if (secondEnabled) R.string.base_rate else R.string.hourly_rate)) },
-                suffix = { Text("zł/h") },
+                suffix = { Text(Formatters.rateSuffix(currency)) },
                 singleLine = true,
                 isError = showErrors && rateError,
                 supportingText = if (showErrors && rateError) {
@@ -294,7 +325,7 @@ private fun JobEditorSheet(
                         value = secondRate,
                         onValueChange = { secondRate = it },
                         label = { Text(stringResource(R.string.second_rate)) },
-                        suffix = { Text("zł/h") },
+                        suffix = { Text(Formatters.rateSuffix(currency)) },
                         singleLine = true,
                         isError = showErrors && secondRateError,
                         supportingText = if (showErrors && secondRateError) {
@@ -350,7 +381,7 @@ private fun JobEditorSheet(
                             val second = if (secondEnabled && secondRateGrosze != null) {
                                 TimedRate(secondRateGrosze, fromTime, toTime)
                             } else null
-                            onSave(job.copy(name = name, hourlyRateGrosze = rateGrosze, color = color, secondRate = second))
+                            onSave(job.copy(name = name, hourlyRateGrosze = rateGrosze, color = color, secondRate = second, currency = currency))
                         }
                     },
                     modifier = Modifier.weight(1f).height(52.dp),
@@ -361,6 +392,13 @@ private fun JobEditorSheet(
         }
     }
 
+    if (pickingCurrency) {
+        CurrencyPickerDialog(
+            selected = currency,
+            onSelect = { currency = it; pickingCurrency = false },
+            onDismiss = { pickingCurrency = false },
+        )
+    }
     if (pickingFrom) {
         TimeDialog(
             title = stringResource(R.string.second_rate_from),
@@ -383,13 +421,13 @@ private fun JobEditorSheet(
 @Composable
 fun jobRatesLabel(job: Job): String {
     val locale = currentLocale()
-    val base = Formatters.rate(job.hourlyRateGrosze, locale)
+    val base = Formatters.rate(job.hourlyRateGrosze, job.currency, locale)
     val second = job.secondRate ?: return base
     return base + " · " + stringResource(
         R.string.second_rate_summary,
         Formatters.time(second.from),
         Formatters.time(second.to),
-        Formatters.rate(second.rateGrosze, locale),
+        Formatters.rate(second.rateGrosze, job.currency, locale),
     )
 }
 

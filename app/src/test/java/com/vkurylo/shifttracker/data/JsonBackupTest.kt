@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.vkurylo.shifttracker.data.backup.BackupFile
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.toDomain
@@ -111,7 +112,7 @@ class JsonBackupTest {
     fun rejectsNewerVersionWithItsOwnReason() = runBlocking {
         val db = seededDb()
         val before = snapshot(db)
-        val e = rejected(db, backup(version = 4))
+        val e = rejected(db, backup(version = BackupFile.CURRENT_VERSION + 1))
         assertEquals(InvalidBackupException.Reason.NEWER_VERSION, e.reason)
         assertEquals(before, snapshot(db))
     }
@@ -141,7 +142,13 @@ class JsonBackupTest {
             "bad date" to backup(shifts = shift(date = "2026-02-30")),
             "shift for unknown job" to backup(shifts = shift(jobId = 9)),
             "zero bonus" to backup(bonuses = bonus(amount = 0)),
-            "bonus above max" to backup(bonuses = bonus(amount = tooMuch)),
+            "bonus above max" to backup(bonuses = bonus(amount = MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS) + 1)),
+            "unknown currency" to backup(version = 4, jobs = job(1, currency = "XYZ")),
+            "lower-case currency" to backup(version = 4, jobs = job(1, currency = "pln")),
+            "currency without decimals rules (gold)" to backup(version = 4, jobs = job(1, currency = "XAU")),
+            // 10 000 000 yen is 8 whole digits: over the rate limit, although fine as zł grosze.
+            "JPY rate above max" to backup(version = 4, jobs = job(1, rate = 10_000_000, currency = "JPY")),
+            "JPY shift rate above max" to backup(version = 4, jobs = job(1, currency = "JPY"), shifts = shift(rate = 10_000_000)),
         )
         val db = seededDb()
         val before = snapshot(db)
@@ -157,9 +164,38 @@ class JsonBackupTest {
         val json = backup(
             jobs = job(1, rate = MoneyParser.MAX_GROSZE) + "," + job(2, rate = 0),
             shifts = shift(start = "08:00", end = "16:00", breakMinutes = 479) + "," + shift(start = "00:00", end = "00:00", breakMinutes = 1439),
-            bonuses = bonus(amount = MoneyParser.MAX_GROSZE),
+            bonuses = bonus(amount = MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS)),
         )
         assertEquals(BackupCounts(2, 2, 1), JsonBackupRepository(newDb()).importJson(json))
+    }
+
+    // --- Currencies (version 4) -----------------------------------------------------------------
+
+    @Test
+    fun olderVersionsImportAsPln() = runBlocking {
+        for (version in 1..3) {
+            val db = newDb()
+            JsonBackupRepository(db).importJson(backup(version = version, bonuses = if (version < 3) "" else bonus()))
+            assertEquals("v$version", "PLN", db.jobDao().getAll().single().currency)
+        }
+    }
+
+    @Test
+    fun currencyRoundTripsAndLimitsFollowIt() = runBlocking {
+        val json = backup(
+            version = 4,
+            jobs = job(1, rate = MoneyParser.maxMinor(0), currency = "JPY") + "," + job(2, rate = MoneyParser.maxMinor(3), currency = "KWD"),
+            shifts = shift(jobId = 1, rate = 1500) + "," + shift(jobId = 2, rate = 12_345),
+            bonuses = bonus(jobId = 1, amount = 5000),
+        )
+        val db = newDb()
+        assertEquals(BackupCounts(2, 2, 1), JsonBackupRepository(db).importJson(json))
+        assertEquals(listOf("JPY", "KWD"), db.jobDao().getAll().map { it.currency })
+
+        val again = newDb()
+        JsonBackupRepository(again).importJson(JsonBackupRepository(db).exportJson())
+        assertEquals(db.jobDao().getAll(), again.jobDao().getAll())
+        assertTrue(JsonBackupRepository(db).exportJson().contains("\"currency\": \"KWD\""))
     }
 
     // --- Atomicity ------------------------------------------------------------------------------
@@ -211,8 +247,9 @@ class JsonBackupTest {
         bonuses: String = bonus(),
     ) = """{"format":"shift-tracker-backup","version":$version,"exported_at":"x","jobs":[$jobs],"shifts":[$shifts],"bonuses":[$bonuses]}"""
 
-    private fun job(id: Long, name: String = "Job $id", rate: Long = 3300, second: String? = null) =
-        """{"id":$id,"name":"$name","hourly_rate_grosze":$rate,"color":1${second?.let { ",\"second_rate\":$it" } ?: ""}}"""
+    private fun job(id: Long, name: String = "Job $id", rate: Long = 3300, second: String? = null, currency: String? = null) =
+        """{"id":$id,"name":"$name","hourly_rate_grosze":$rate,"color":1${second?.let { ",\"second_rate\":$it" } ?: ""}""" +
+            (currency?.let { ",\"currency\":\"$it\"" } ?: "") + "}"
 
     private fun shift(
         jobId: Long = 1,

@@ -18,6 +18,12 @@ interface JobRepository {
     suspend fun upsert(job: Job): Long
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
+
+    /** Shifts + bonuses of the job; a job with entries keeps its currency. */
+    suspend fun entryCount(jobId: Long): Int
+
+    /** Currency of the most recently created job, or null when there is none. */
+    suspend fun latestCurrency(): String?
 }
 
 interface ShiftRepository {

@@ -92,6 +92,9 @@ class DatabaseMigrationTest {
             val raw = db.jobDao().getAll().single()
             assertEquals(23 * 60, raw.secondRateFromMinute)
             assertEquals(6 * 60, raw.secondRateToMinute)
+
+            // v4: jobs made before currencies are PLN.
+            assertEquals("PLN", jobs.single().currency)
         } finally {
             db.close()
         }

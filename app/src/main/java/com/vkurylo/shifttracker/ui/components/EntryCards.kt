@@ -139,7 +139,7 @@ fun ShiftCard(
         }
         Spacer(Modifier.width(12.dp))
         Column(horizontalAlignment = Alignment.End) {
-            Text(Formatters.money(shift.earningsGrosze, locale), style = MaterialTheme.typography.titleMedium)
+            Text(Formatters.money(shift.earningsGrosze, item.job.currency, locale), style = MaterialTheme.typography.titleMedium)
             Text(
                 hoursLabel(shift.paidMinutes),
                 style = MaterialTheme.typography.bodySmall,
@@ -203,7 +203,7 @@ fun BonusCard(
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            "+" + Formatters.money(bonus.amountGrosze, locale),
+            "+" + Formatters.money(bonus.amountGrosze, item.job.currency, locale),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onTertiaryContainer,
         )

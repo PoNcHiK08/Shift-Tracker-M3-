@@ -90,6 +90,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -98,7 +101,7 @@ import com.vkurylo.shifttracker.ui.components.CircleToSquircle
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.MorphShape
-import com.vkurylo.shifttracker.ui.components.RollingMoney
+import com.vkurylo.shifttracker.ui.components.RollingAmounts
 import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.ShiftCard
@@ -198,6 +201,7 @@ fun CalendarScreen(
                 item(key = "month") {
                     MonthStrip(
                         summary = state.monthSummary,
+                        defaultCurrency = state.defaultCurrency,
                         modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 6.dp),
                     )
                 }
@@ -442,7 +446,8 @@ private fun DayPanel(
     val locale = currentLocale()
     val shifts = shiftsByDate[date].orEmpty()
     val bonuses = bonusesByDate[date].orEmpty()
-    val total = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze }
+    // Per currency: a day with entries in two currencies shows two amounts, never their sum.
+    val total = ShiftCalculator.earnings(shifts, bonuses)
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -483,12 +488,14 @@ private fun DayPanel(
                         }
                     }
                 }
-                if (total > 0) {
+                if (total.byCurrency.values.any { it > 0 }) {
                     Spacer(Modifier.width(12.dp))
-                    RollingMoney(
-                        grosze = total,
+                    RollingAmounts(
+                        amounts = Amounts(total.byCurrency.filterValues { it > 0 }),
+                        fallbackCurrency = Currencies.DEFAULT,
                         style = MaterialTheme.typography.titleLargeEmphasized,
                         color = MaterialTheme.colorScheme.primary,
+                        horizontalAlignment = Alignment.End,
                     )
                 }
             }
@@ -590,7 +597,7 @@ internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun MonthStrip(summary: MonthSummary, modifier: Modifier = Modifier) {
+internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val colors = MaterialTheme.colorScheme
     val outer = 20.dp
@@ -602,8 +609,10 @@ internal fun MonthStrip(summary: MonthSummary, modifier: Modifier = Modifier) {
             modifier = Modifier.weight(1.7f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
         ) {
             Text(stringResource(R.string.earnings_month), style = MaterialTheme.typography.labelSmall, color = colors.onPrimaryContainer)
-            RollingMoney(
-                grosze = summary.totalEarningsGrosze,
+            // One line per currency (several only when jobs are paid in different currencies).
+            RollingAmounts(
+                amounts = summary.totalEarnings,
+                fallbackCurrency = defaultCurrency,
                 style = MaterialTheme.typography.titleMediumEmphasized,
                 color = colors.onPrimaryContainer,
             )

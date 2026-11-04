@@ -312,6 +312,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                     Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
                     RollingMoney(
                         grosze = pay.earningsGrosze,
+                        currency = state.currency,
                         style = MaterialTheme.typography.headlineMediumEmphasized,
                         color = onColor,
                     )
@@ -330,7 +331,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             val second = state.secondRate
             if (second == null) {
                 Text(
-                    stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, locale)),
+                    stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, state.currency, locale)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
@@ -338,7 +339,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                 Text(
                     stringResource(
                         R.string.rate_line_base,
-                        Formatters.rate(state.rateGrosze, locale),
+                        Formatters.rate(state.rateGrosze, state.currency, locale),
                         Formatters.hoursMinutes(pay.baseRateMinutes),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
@@ -348,7 +349,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                         R.string.rate_line_second,
                         Formatters.time(second.from),
                         Formatters.time(second.to),
-                        Formatters.rate(second.rateGrosze, locale),
+                        Formatters.rate(second.rateGrosze, state.currency, locale),
                         Formatters.hoursMinutes(pay.secondRateMinutes),
                     ),
                     style = MaterialTheme.typography.bodyMedium,

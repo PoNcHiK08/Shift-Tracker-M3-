@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -31,6 +32,8 @@ data class CalendarUiState(
     val bonusesByDate: Map<LocalDate, List<BonusWithJob>> = emptyMap(),
     val monthSummary: MonthSummary = MonthSummary.EMPTY,
     val jobs: List<Job> = emptyList(),
+    /** Shown for zero totals (no entries): the latest job's currency. */
+    val defaultCurrency: String = Currencies.DEFAULT,
     /** The day shown in the panel under the grid; always inside [month]. */
     val selectedDate: LocalDate = LocalDate.now(),
     val loading: Boolean = true,
@@ -73,6 +76,7 @@ class CalendarViewModel @Inject constructor(
             bonusesByDate = window.bonuses.groupBy { it.bonus.date },
             monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses),
             jobs = jobs,
+            defaultCurrency = Currencies.defaultFor(jobs),
             selectedDate = selected,
             loading = false,
         )

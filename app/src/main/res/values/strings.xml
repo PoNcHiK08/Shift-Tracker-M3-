@@ -242,4 +242,8 @@
         <item quantity="many">Імпортовано %1$d змін</item>
         <item quantity="other">Імпортовано %1$d зміни</item>
     </plurals>
+    <string name="currency">Валюта</string>
+    <string name="currency_pick_title">Валюта роботи</string>
+    <string name="currency_search">Пошук: код або назва</string>
+    <string name="currency_locked">Валюту не можна змінити, коли вже є зміни чи бонуси. Для іншої валюти створіть нову роботу.</string>
 </resources>

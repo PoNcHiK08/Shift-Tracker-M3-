@@ -32,6 +32,8 @@ class RoomJobRepository @Inject constructor(
     }
     override suspend fun delete(job: Job) = dao.delete(job.toEntity())
     override suspend fun shiftCount(jobId: Long): Int = dao.shiftCount(jobId)
+    override suspend fun entryCount(jobId: Long): Int = dao.entryCount(jobId)
+    override suspend fun latestCurrency(): String? = dao.latestCurrency()
 }
 
 @Singleton

@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.util.Formatters
@@ -40,13 +41,13 @@ class MonthStripLayoutTest {
 
     private val summary = MonthSummary(
         totalPaidMinutes = 43 * 60,
-        shiftEarningsGrosze = 140_200,
-        bonusGrosze = 7_500,
+        shiftEarnings = Amounts.of("PLN", 140_200),
+        bonuses = Amounts.of("PLN", 7_500),
         shiftCount = 6,
         bonusCount = 1,
         perJob = emptyList(),
     )
-    private val total = Formatters.money(summary.totalEarningsGrosze, Locale.US)
+    private val total = Formatters.money(summary.totalEarnings["PLN"], "PLN", Locale.US)
 
     private fun show(fontScale: Float) {
         composeRule.setContent {
@@ -55,7 +56,7 @@ class MonthStripLayoutTest {
                 ShiftTrackerTheme(darkTheme = true, dynamicColor = false) {
                     // The calendar's width on a 384 dp phone (12 dp padding on each side).
                     Box(Modifier.width(384.dp).padding(horizontal = 12.dp)) {
-                        MonthStrip(summary)
+                        MonthStrip(summary, defaultCurrency = "PLN")
                     }
                 }
             }

@@ -4,10 +4,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
+import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -47,8 +50,8 @@ data class PeriodRange(val period: SummaryPeriod, val from: LocalDate, val to: L
 data class BreakdownEntry(
     val date: LocalDate,
     val paidMinutes: Long,
-    /** Shift pay + bonuses of that day / month. */
-    val earningsGrosze: Long,
+    /** Shift pay + bonuses of that day / month, per currency. */
+    val earnings: Amounts,
     val shiftCount: Int,
     val bonusCount: Int,
 ) {
@@ -60,6 +63,8 @@ data class SummaryUiState(
     val summary: MonthSummary = MonthSummary.EMPTY,
     /** Days of the week (WEEK) or months of the year (YEAR); empty for MONTH. */
     val breakdown: List<BreakdownEntry> = emptyList(),
+    /** Shown for zero totals (no entries): the latest job's currency. */
+    val defaultCurrency: String = Currencies.DEFAULT,
     val loading: Boolean = true,
 )
 
@@ -69,6 +74,7 @@ class SummaryViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     shiftRepository: ShiftRepository,
     bonusRepository: BonusRepository,
+    jobRepository: JobRepository,
 ) : ViewModel() {
 
     private val period = savedStateHandle.getStateFlow(KEY_PERIOD, SummaryPeriod.MONTH.name)
@@ -81,11 +87,13 @@ class SummaryViewModel @Inject constructor(
             combine(
                 shiftRepository.observeShifts(range.from, range.to),
                 bonusRepository.observeBonuses(range.from, range.to),
-            ) { shifts, bonuses ->
+                jobRepository.observeJobs(),
+            ) { shifts, bonuses, jobs ->
                 SummaryUiState(
                     range = range,
                     summary = ShiftCalculator.summarize(shifts, bonuses),
                     breakdown = breakdown(range, shifts, bonuses),
+                    defaultCurrency = Currencies.defaultFor(jobs),
                     loading = false,
                 )
             }
@@ -136,7 +144,7 @@ class SummaryViewModel @Inject constructor(
     private fun entry(date: LocalDate, shifts: List<ShiftWithJob>, bonuses: List<BonusWithJob>) = BreakdownEntry(
         date = date,
         paidMinutes = shifts.sumOf { it.shift.paidMinutes },
-        earningsGrosze = shifts.sumOf { it.shift.earningsGrosze } + bonuses.sumOf { it.bonus.amountGrosze },
+        earnings = ShiftCalculator.earnings(shifts, bonuses),
         shiftCount = shifts.size,
         bonusCount = bonuses.size,
     )

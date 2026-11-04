@@ -7,6 +7,7 @@ import androidx.navigation.toRoute
 import com.vkurylo.shifttracker.di.ApplicationScope
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Bonus
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
@@ -36,7 +37,10 @@ data class EditBonusUiState(
     val showErrors: Boolean = false,
     val confirmDelete: Boolean = false,
 ) {
-    val amountGrosze: Long? get() = MoneyParser.parseGrosze(amount)?.takeIf { it > 0 }
+    /** The bonus is in its job's currency (decimals and limits follow it). */
+    val currency: String get() = jobs.firstOrNull { it.id == jobId }?.currency ?: Currencies.DEFAULT
+    val amountGrosze: Long? get() =
+        MoneyParser.parseMinor(amount, Currencies.fractionDigits(currency), MoneyParser.AMOUNT_WHOLE_DIGITS)?.takeIf { it > 0 }
     val jobMissing: Boolean get() = jobs.none { it.id == jobId }
     val canSave: Boolean get() = !jobMissing && amountGrosze != null
 }
@@ -75,7 +79,10 @@ class EditBonusViewModel @Inject constructor(
                     jobs = jobs,
                     jobId = existing.jobId,
                     date = existing.date,
-                    amount = MoneyParser.toInput(existing.amountGrosze),
+                    amount = MoneyParser.toInput(
+                        existing.amountGrosze,
+                        Currencies.fractionDigits(jobs.firstOrNull { it.id == existing.jobId }?.currency ?: Currencies.DEFAULT),
+                    ),
                     note = existing.note.orEmpty(),
                 )
             } else {

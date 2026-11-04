@@ -3,7 +3,9 @@ package com.vkurylo.shifttracker.domain.model
 import java.time.LocalTime
 
 /**
- * A place of work. Money is kept in grosze (1/100 PLN) to avoid floating point errors.
+ * A place of work. Money is kept as Long minor units of the job's [currency] (grosze for PLN, cents
+ * for EUR; the `*Grosze` names predate other currencies) to avoid floating point errors. Its shifts
+ * and bonuses are in the same currency.
  *
  * [hourlyRateGrosze] is the base rate. [secondRate] optionally pays a different rate inside a
  * daily time window, e.g. 37 zł/h from 23:00 to 06:00 while the base rate is 33 zł/h.
@@ -15,6 +17,8 @@ data class Job(
     /** ARGB color from [JobPalette]. */
     val color: Int,
     val secondRate: TimedRate? = null,
+    /** ISO 4217 code, see [Currencies]. Fixed once the job has shifts or bonuses. */
+    val currency: String = Currencies.DEFAULT,
 )
 
 /**

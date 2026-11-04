@@ -25,6 +25,8 @@ data class JobEntity(
     @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
     @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
+    /** ISO 4217 code; amounts of the job, its shifts and bonuses are minor units of it. Added in DB version 4. */
+    @ColumnInfo(defaultValue = "PLN") val currency: String = "PLN",
 )
 
 @Entity(
@@ -73,6 +75,7 @@ fun JobEntity.toDomain() = Job(
     hourlyRateGrosze = hourlyRateGrosze,
     color = color,
     secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
+    currency = currency,
 )
 
 fun Job.toEntity() = JobEntity(
@@ -83,6 +86,7 @@ fun Job.toEntity() = JobEntity(
     secondRateGrosze = secondRate?.rateGrosze,
     secondRateFromMinute = (secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toMinute(),
     secondRateToMinute = (secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toMinute(),
+    currency = currency,
 )
 
 fun ShiftEntity.toDomain() = Shift(

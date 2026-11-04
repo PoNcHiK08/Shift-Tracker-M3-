@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.vkurylo.shifttracker.di.ApplicationScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftPay
@@ -44,6 +45,9 @@ data class EditShiftUiState(
     val confirmDelete: Boolean = false,
 ) {
     val selectedJob: Job? get() = jobs.firstOrNull { it.id == jobId }
+
+    /** The shift's currency: its job's. */
+    val currency: String get() = selectedJob?.currency ?: Currencies.DEFAULT
     val breakValue: Int? get() = breakMinutes.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..1440 }
     val durationMinutes: Long get() = ShiftCalculator.durationMinutes(start, end)
     val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)

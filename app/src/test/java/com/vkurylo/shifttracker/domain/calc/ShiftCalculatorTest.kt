@@ -102,7 +102,7 @@ class ShiftCalculatorTest {
 
         assertEquals(3, summary.shiftCount)
         assertEquals((8 + 4) * 60L + 450, summary.totalPaidMinutes)
-        assertEquals(36000L + 21000L, summary.totalEarningsGrosze)
+        assertEquals(36000L + 21000L, summary.totalEarnings["PLN"])
         assertEquals(listOf("Cafe", "Shop"), summary.perJob.map { it.job.name })
         assertEquals(2, summary.perJob[0].shiftCount)
         assertEquals(36000L, summary.perJob[0].earningsGrosze)
@@ -124,11 +124,11 @@ class ShiftCalculatorTest {
 
         val summary = ShiftCalculator.summarize(shifts, bonuses)
 
-        assertEquals(26400L, summary.shiftEarningsGrosze) // 8 h * 33
-        assertEquals(8500L, summary.bonusGrosze)
-        assertEquals(34900L, summary.totalEarningsGrosze)
+        assertEquals(26400L, summary.shiftEarnings["PLN"]) // 8 h * 33
+        assertEquals(8500L, summary.bonuses["PLN"])
+        assertEquals(34900L, summary.totalEarnings["PLN"])
         assertEquals(480L, summary.totalPaidMinutes)
-        assertEquals(3300L, summary.averageRateGrosze) // bonuses don't inflate the hourly rate
+        assertEquals(3300L, summary.averageRate("PLN")) // bonuses don't inflate the hourly rate
         assertEquals(1, summary.shiftCount)
         assertEquals(2, summary.bonusCount)
         // A job with only a bonus in the period still shows up in the breakdown.
@@ -145,8 +145,8 @@ class ShiftCalculatorTest {
             listOf(BonusWithJob(Bonus(jobId = 1, date = LocalDate.of(2026, 8, 31), amountGrosze = 7500), job)),
         )
         assertEquals(false, summary.isEmpty)
-        assertEquals(7500L, summary.totalEarningsGrosze)
-        assertEquals(0L, summary.averageRateGrosze)
+        assertEquals(7500L, summary.totalEarnings["PLN"])
+        assertEquals(0L, summary.averageRate("PLN"))
     }
 
     @Test
@@ -157,5 +157,35 @@ class ShiftCalculatorTest {
         assertEquals(24 * max, base.earningsGrosze)
         val night = TimedRate(max, t(22), t(6))
         assertEquals(24 * max, ShiftCalculator.pay(t(0), t(0), 0, max, night).earningsGrosze)
+    }
+    @Test
+    fun `amounts in different currencies are never added together`() {
+        val warsaw = Job(id = 1, name = "Warsaw", hourlyRateGrosze = 3000, color = 0, currency = "PLN")
+        val berlin = Job(id = 2, name = "Berlin", hourlyRateGrosze = 1500, color = 0, currency = "EUR")
+        val tokyo = Job(id = 3, name = "Tokyo", hourlyRateGrosze = 1200, color = 0, currency = "JPY")
+        val date = LocalDate.of(2026, 11, 4)
+        val shifts = listOf(
+            ShiftWithJob(Shift(id = 1, jobId = 1, date = date, start = t(8), end = t(16), hourlyRateGrosze = 3000), warsaw),
+            ShiftWithJob(Shift(id = 2, jobId = 2, date = date, start = t(8), end = t(12), hourlyRateGrosze = 1500), berlin),
+            ShiftWithJob(Shift(id = 3, jobId = 3, date = date, start = t(9), end = t(10), hourlyRateGrosze = 1200), tokyo),
+        )
+        val bonuses = listOf(BonusWithJob(Bonus(jobId = 2, date = date, amountGrosze = 5000), berlin))
+
+        val summary = ShiftCalculator.summarize(shifts, bonuses)
+
+        assertEquals(mapOf("PLN" to 24000L, "EUR" to 11000L, "JPY" to 1200L), summary.totalEarnings.byCurrency)
+        assertEquals(6000L, summary.shiftEarnings["EUR"])
+        assertEquals(5000L, summary.bonuses["EUR"])
+        assertEquals(0L, summary.bonuses["PLN"])
+        // Hours are plain totals; the average rate is per currency, over that currency's hours.
+        assertEquals(13 * 60L, summary.totalPaidMinutes)
+        assertEquals(3000L, summary.averageRate("PLN"))
+        assertEquals(1500L, summary.averageRate("EUR"))
+        assertEquals(1200L, summary.averageRate("JPY"))
+        // Largest first (by number, only to order the lines); jobs grouped by currency.
+        assertEquals(listOf("PLN", "EUR", "JPY"), summary.currencies)
+        assertEquals(listOf("Warsaw", "Berlin", "Tokyo"), summary.perJob.map { it.job.name })
+        // A day's total.
+        assertEquals(mapOf("PLN" to 24000L, "EUR" to 11000L, "JPY" to 1200L), ShiftCalculator.earnings(shifts, bonuses).byCurrency)
     }
 }
