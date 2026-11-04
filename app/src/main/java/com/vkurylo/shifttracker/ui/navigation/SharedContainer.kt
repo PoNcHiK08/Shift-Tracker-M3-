@@ -252,14 +252,17 @@ fun ContainerTransformHost(
     val amount = held.coerceIn(0f, 1.1f)
 
     // A snapshot of the editor for the flight, taken as the gesture starts (the form can't change
-    // under a back gesture).
+    // under a back gesture). The editor has been drawn at least once by then (it was on screen).
     val layer = rememberGraphicsLayer()
     var snapshot by remember { mutableStateOf<ImageBitmap?>(null) }
+    var snapshotTaken by remember { mutableStateOf(false) }
     LaunchedEffect(gesture) {
         snapshot = null
+        snapshotTaken = false
         if (gesture) {
-            withFrameNanos { } // recorded at least once
+            // The editor is always drawn through the layer, so it already holds the last frame.
             snapshot = runCatching { layer.toImageBitmap() }.getOrNull()
+            snapshotTaken = true
         }
     }
     val heldCorner = ContainerCornerRadius * amount.coerceAtMost(1f)
@@ -280,8 +283,10 @@ fun ContainerTransformHost(
     // Read it directly instead of BoxWithConstraints: no subcomposition inside the shared transition.
     val windowSize = LocalWindowInfo.current.containerDpSize
     val density = LocalDensity.current
-    // Released without a snapshot (a flick quicker than a frame): fade out over the rest of the timeline.
-    val fallbackAlpha = if (released && !latch.flown) 1f - ((progress - latch.releasedAt) / (1f - latch.releasedAt).coerceAtLeast(0.01f)).coerceIn(0f, 1f) else 1f
+    // Released before the snapshot is ready (a quick flick): the editor stays as it is for the frame or
+    // two until it is, then flies. Only if there is no snapshot at all does it fade out over the rest
+    // of the timeline.
+    val fallbackAlpha = if (released && !latch.flown && snapshotTaken) 1f - ((progress - latch.releasedAt) / (1f - latch.releasedAt).coerceAtLeast(0.01f)).coerceIn(0f, 1f) else 1f
     Box(
         Modifier
             .fillMaxSize()
@@ -307,13 +312,11 @@ fun ContainerTransformHost(
                 }
             }
             .onGloballyPositioned { latch.bounds = it.boundsInRoot() }
+            // Always drawn through a layer, so a snapshot for the flight can be taken the moment a
+            // back gesture starts (or a quick flick is already released), without waiting a frame.
             .drawWithContent {
-                if (gesture) {
-                    layer.record { this@drawWithContent.drawContent() }
-                    drawLayer(layer)
-                } else {
-                    drawContent()
-                }
+                layer.record { this@drawWithContent.drawContent() }
+                drawLayer(layer)
             }
         // ...and the content shrinks with it, so it looks like the same screen, only smaller.
         val fullSize = Modifier

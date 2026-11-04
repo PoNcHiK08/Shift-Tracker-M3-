@@ -101,7 +101,18 @@ fun ShiftTrackerNavHost() {
                             if (initialState.containerKey() != null) EnterTransition.None else transitions.backwardEnter()
                         },
                         popExitTransition = {
-                            if (initialState.containerKey() != null) ExitTransition.KeepUntilTransitionsFinished else transitions.backwardExit()
+                            if (initialState.containerKey() != null) {
+                                // An editor closed by back that NavHost didn't treat as a gesture: a quick
+                                // flick released before NavHost's predictive back caught up (it needs a
+                                // couple of frames), or the system back button. It closes like a released
+                                // gesture (flies into its card) instead of the card morph being cut short.
+                                if (!PredictiveBackGesture.isClosedByButton(initialState.id)) {
+                                    PredictiveBackGesture.mark(initialState.id, PredictiveBackGesture.swipeEdge)
+                                }
+                                ExitTransition.KeepUntilTransitionsFinished
+                            } else {
+                                transitions.backwardExit()
+                            }
                         },
                         predictivePopEnterTransition = { transitions.predictiveBackEnter() },
                         // Only called for a back gesture. An editor opened from a card is then held and
@@ -139,7 +150,10 @@ fun ShiftTrackerNavHost() {
                                                 .testTag(EDITOR_CONTAINER_TAG),
                                         ) {
                                             EditShiftScreen(
-                                                onClose = { rootNav.navigateUp() },
+                                                onClose = {
+                                                    PredictiveBackGesture.closingByButton(entry.id)
+                                                    rootNav.navigateUp()
+                                                },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
                                                 modifier = contentModifier,
                                             )
@@ -163,7 +177,10 @@ fun ShiftTrackerNavHost() {
                                                 .testTag(EDITOR_CONTAINER_TAG),
                                         ) {
                                             EditBonusScreen(
-                                                onClose = { rootNav.navigateUp() },
+                                                onClose = {
+                                                    PredictiveBackGesture.closingByButton(entry.id)
+                                                    rootNav.navigateUp()
+                                                },
                                                 onManageJobs = { rootNav.navigate(JobsRoute) },
                                                 modifier = contentModifier,
                                             )

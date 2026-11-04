@@ -329,6 +329,53 @@ class PredictiveBackGestureTest {
         composeRule.waitUntil(5_000) { container() == null }
     }
 
+    /**
+     * However quick the flick, every back gesture closes an editor the same way: it flies into its card.
+     * (A flick released before NavHost's predictive back caught up used to fall back to the card
+     * morph, cut short and jumping, so it looked like the animation worked only every other time.)
+     * The close button still uses the normal container transform.
+     */
+    @Test
+    fun everyBackGestureFliesIntoTheCardHoweverQuickAndTheCloseButtonStillMorphs() {
+        for (progressEvents in listOf(0, 1, 2, 6, 1, 0)) {
+            click("Kawiarnia")
+            composeRule.waitUntil(5_000) { container() != null }
+            val full = container()!!.height
+            composeRule.mainClock.autoAdvance = false
+            composeRule.runOnUiThread { dispatcher.dispatchOnBackStarted(event(0f, BackEventCompat.EDGE_RIGHT)) }
+            editorFrame()
+            repeat(progressEvents) { i -> dragEditor(0.3f * (i + 1) / progressEvents); editorFrame() }
+            composeRule.runOnUiThread { dispatcher.onBackPressed() }
+            var flew = false
+            val after = List(30) { editorFrame().also { if (EditorFlights.current != null) flew = true } }
+            val what = "flick with $progressEvents progress events"
+            assertTrue("$what: no flight", flew)
+            after.forEach { f -> f.bounds?.let { assertTrue("$what: the editor morphed (${it.height} of $full)", it.height >= full * 0.88f) } }
+            val home = after.last().pixels
+            for (i in 0..3) assertTrue("$what: blank frame $i", diff(after[i].pixels, home) >= CLEARLY_VISIBLE)
+            val gone = after.indexOfFirst { diff(it.pixels, home) < VISIBLE }
+            assertTrue("$what: took $gone frames", gone in 1..16)
+            composeRule.mainClock.autoAdvance = true
+            composeRule.waitForIdle()
+            assertNull(container())
+            assertNull(EditorFlights.current)
+            assertNull(PredictiveBackGesture.closingEntryId)
+        }
+
+        click("Kawiarnia")
+        composeRule.waitUntil(5_000) { container() != null }
+        val full = container()!!.height
+        composeRule.mainClock.autoAdvance = false
+        composeRule.onNode(hasContentDescription(str(R.string.close)) and hasClickAction()).performClick()
+        var flew = false
+        val heights = List(40) { editorFrame().also { if (EditorFlights.current != null) flew = true }.bounds?.height }
+        composeRule.mainClock.autoAdvance = true
+        composeRule.waitForIdle()
+        assertTrue("the close button started a flight", !flew)
+        assertTrue("the close button didn't morph the editor into its card: $heights", heights.any { it != null && it < full * 0.5f })
+        assertNull(container())
+    }
+
     private fun container(): Rect? =
         composeRule.onAllNodes(hasTestTag(EDITOR_CONTAINER_TAG)).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
 

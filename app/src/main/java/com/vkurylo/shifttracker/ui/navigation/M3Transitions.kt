@@ -159,6 +159,17 @@ object PredictiveBackGesture {
     fun clear(vararg entryIds: String?) {
         if (closingEntryId != null && closingEntryId in entryIds) closingEntryId = null
     }
+
+    // The editor entry being closed by its own button (close / save / delete) rather than by back.
+    // Read only while NavHost picks the pop transition, so a plain field is enough.
+    private var closedByButtonId: String? = null
+
+    /** Call right before an editor closes itself, so its close stays the normal container transform. */
+    fun closingByButton(entryId: String) {
+        closedByButtonId = entryId
+    }
+
+    fun isClosedByButton(entryId: String): Boolean = closedByButtonId == entryId
 }
 
 /** What the closing screen looks like at a point of the predictive back timeline. */
