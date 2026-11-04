@@ -2,7 +2,6 @@ package com.vkurylo.shifttracker.widget
 
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidgetManager
-import androidx.glance.appwidget.updateAll
 import com.vkurylo.shifttracker.di.ApplicationScope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -42,7 +41,7 @@ class WidgetUpdater @Inject constructor(
                 .distinctUntilChanged()
                 // The first state is what the widget drew itself when it was (re)placed or refreshed.
                 .drop(1)
-                .collect { ShiftTrackerWidget().updateAll(context) }
+                .collect { runCatching { WidgetRenderer.renderAll(context) } }
         }
     }
 

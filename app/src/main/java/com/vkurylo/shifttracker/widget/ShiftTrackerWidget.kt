@@ -52,7 +52,7 @@ import dagger.hilt.android.EntryPointAccessors
  */
 class ShiftTrackerWidget : GlanceAppWidget() {
 
-    override val sizeMode = SizeMode.Responsive(setOf(COMPACT, MEDIUM))
+    override val sizeMode = SizeMode.Responsive(SIZES)
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val entryPoint = EntryPointAccessors.fromApplication(context.applicationContext, WidgetEntryPoint::class.java)
@@ -71,6 +71,7 @@ class ShiftTrackerWidget : GlanceAppWidget() {
     companion object {
         val COMPACT = DpSize(110.dp, 48.dp)
         val MEDIUM = DpSize(250.dp, 110.dp)
+        val SIZES = setOf(COMPACT, MEDIUM)
     }
 }
 
