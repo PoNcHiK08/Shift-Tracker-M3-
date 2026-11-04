@@ -286,10 +286,11 @@ class PredictiveBackGestureTest {
         // Something (the editor, then its flight) is on screen in every frame until it has moved on.
         val home = after.last().pixels
         for (i in 0..3) assertTrue("blank frame $i after release", diff(after[i].pixels, home) >= CLEARLY_VISIBLE)
-        // And it keeps moving/dissolving until it is gone (after NavHost's own latency).
+        // And it keeps moving/dissolving until it is gone: after NavHost's one frame of latency the
+        // flight is already moving in the frame it takes over (its clock starts a frame early).
         val gone = after.indexOfFirst { diff(it.pixels, home) < VISIBLE }
         assertTrue("flight never finished", gone > 0)
-        for (i in 3 until gone - 1) {
+        for (i in 1 until gone - 1) {
             assertTrue("flight stalled at frame $i", diff(after[i].pixels, after[i + 1].pixels) >= MOVING)
         }
         assertTrue("flight took $gone frames", gone <= 20)

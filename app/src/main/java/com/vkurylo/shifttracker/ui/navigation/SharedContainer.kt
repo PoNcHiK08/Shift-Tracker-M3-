@@ -8,10 +8,11 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.TargetBasedAnimation
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
@@ -35,6 +36,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -200,7 +202,7 @@ private class EditorGestureLatch {
  * not morphed by the finger. While the finger is down it only shrinks a little, rounds its corners
  * and drifts towards the finger, on a spring and up to a limit ([editorDragAmount]); cancelling
  * springs it back. On release a snapshot of it flies into its card from exactly where it was held
- * ([EditorFlightOverlay]), on a spring 10 % quicker than a normal close, however far the finger went.
+ * ([EditorFlightOverlay]), on a calm spring (a little longer than a normal close), however far the finger went.
  */
 @Composable
 fun ContainerTransformHost(
@@ -335,6 +337,9 @@ fun ContainerTransformHost(
 private const val FLIGHT_FADE_FROM = 0.2f
 private const val FLIGHT_FADE_LENGTH = 0.7f
 
+/** How far ahead the flight's clock starts: one 60 Hz frame (from rest the spring barely moves in it). */
+private const val FLIGHT_HEAD_START_NANOS = 16_666_667L
+
 /** An editor closed by a back gesture, flying from where it was held into its card. */
 internal class EditorFlight(
     val key: String,
@@ -364,25 +369,36 @@ internal object EditorFlights {
 
 /**
  * Draws the flight of an editor closed by a back gesture, above all screens: the held editor shrinks
- * into its card on the container-transform spring (10 % quicker than a normal close), its corners
+ * into its card on the container-transform spring (calmer after a gesture, see AppMotion), its corners
  * round to the card's, it dissolves before it reaches the card and the scrim lifts. It only draws; touches
  * go to the screen below.
  */
 @Composable
 fun EditorFlightOverlay(modifier: Modifier = Modifier) {
     val flight = EditorFlights.current ?: return
-    val t = remember(flight) { Animatable(0f) }
+    val t = remember(flight) { mutableFloatStateOf(0f) }
     LaunchedEffect(flight) {
         launch {
             withFrameNanos { } // the first frame of the flight is on screen (over the editor, same place)
             flight.shown = true
         }
-        t.animateTo(1f, AppMotion.containerTransform(0.001f, afterBackGesture = true))
+        // The flight's clock starts one frame early: the frame the editor hands over to the flight
+        // already moves, instead of the spring spending it at rest (one static frame fewer).
+        val spring = TargetBasedAnimation(
+            AppMotion.containerTransform(0.001f, afterBackGesture = true), Float.VectorConverter, 0f, 1f,
+        )
+        var start = Long.MIN_VALUE
+        do {
+            val now = withFrameNanos { it }
+            if (start == Long.MIN_VALUE) start = now - FLIGHT_HEAD_START_NANOS
+            val playTime = now - start
+            t.floatValue = spring.getValueFromNanos(playTime)
+        } while (!spring.isFinishedFromNanos(playTime))
         EditorFlights.finish(flight)
     }
     val surface = MaterialTheme.colorScheme.surface
     Canvas(modifier.fillMaxSize()) {
-        val p = t.value
+        val p = t.floatValue
         val done = p.coerceIn(0f, 1f)
         val from = flight.from
         // No card on screen (scrolled away): shrink towards the middle instead.
