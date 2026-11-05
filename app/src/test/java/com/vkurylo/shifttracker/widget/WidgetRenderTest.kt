@@ -22,7 +22,10 @@ import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertNotNull
 import org.junit.Before
 import org.junit.Rule
@@ -82,6 +85,22 @@ class WidgetRenderTest {
         val month = java.time.YearMonth.now()
         assertTrue(texts.toString(), month.month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale.US) in texts)
         assertTrue(texts.toString(), (1..month.lengthOfMonth()).all { it.toString() in texts })
+    }
+
+    /** The observer, the 30 min update and a resize firing together: all finish (no deadlock), and the widget is drawn. */
+    @Test
+    fun concurrentRendersAllFinish() = runBlocking {
+        val manager = AppWidgetManager.getInstance(context)
+        val shadow = shadowOf(manager)
+        val id = shadow.createWidget(ShiftTrackerWidgetReceiver::class.java, R.layout.widget_loading)
+        withTimeout(60_000) {
+            (1..3).map {
+                async(Dispatchers.Default) {
+                    if (it % 2 == 0) WidgetRenderer.render(context, manager, id) else WidgetRenderer.renderAll(context)
+                }
+            }.forEach { it.await() }
+        }
+        assertTrue("Kawiarnia" in texts(shadow.getViewFor(id)))
     }
 
     private fun texts(view: View): List<String> {

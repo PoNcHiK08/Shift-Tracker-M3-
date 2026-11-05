@@ -208,8 +208,11 @@ private fun NextShiftLines(state: WidgetState, width: Dp, height: Dp, fit: Widge
  */
 @Composable
 private fun RowScope.DayCell(day: WidgetState.CalendarDay?, cell: Dp, sp: Float) {
+    if (day == null) {
+        Spacer(GlanceModifier.defaultWeight().height(cell))
+        return
+    }
     Box(GlanceModifier.defaultWeight().height(cell), contentAlignment = Alignment.Center) {
-        if (day == null) return@Box
         val background = when {
             day.today -> GlanceTheme.colors.primary
             day.shiftColor != null -> Color(day.shiftColor).copy(alpha = SHIFT_TINT).let { ColorProvider(it, it) }

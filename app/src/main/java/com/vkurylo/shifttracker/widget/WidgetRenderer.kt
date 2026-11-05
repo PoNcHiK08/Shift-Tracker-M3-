@@ -11,6 +11,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.appwidget.compose
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Draws the widget straight into AppWidgetManager: composes [ShiftTrackerWidget] into RemoteViews
@@ -22,13 +24,25 @@ import androidx.glance.appwidget.compose
 @OptIn(ExperimentalGlanceApi::class)
 object WidgetRenderer {
 
-    suspend fun renderAll(context: Context) {
-        val manager = AppWidgetManager.getInstance(context) ?: return
+    /**
+     * One render at a time (the data observer, the 30 min update, resizing and clock changes can all
+     * fire together): renders don't overlap, and each one reads the data after the previous finished,
+     * so an older picture can't land on top of a newer one. Not reentrant: only the public entry
+     * points take it.
+     */
+    private val renderMutex = Mutex()
+
+    suspend fun renderAll(context: Context) = renderMutex.withLock {
+        val manager = AppWidgetManager.getInstance(context) ?: return@withLock
         val ids = manager.getAppWidgetIds(ComponentName(context, ShiftTrackerWidgetReceiver::class.java))
-        ids.forEach { render(context, manager, it) }
+        ids.forEach { draw(context, manager, it) }
     }
 
-    suspend fun render(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
+    suspend fun render(context: Context, manager: AppWidgetManager, appWidgetId: Int) = renderMutex.withLock {
+        draw(context, manager, appWidgetId)
+    }
+
+    private suspend fun draw(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
         val widget = ShiftTrackerWidget()
         val options = manager.getAppWidgetOptions(appWidgetId) ?: Bundle()
         val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
