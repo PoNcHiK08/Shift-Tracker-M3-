@@ -4,5 +4,6 @@
     <dimen name="widget_radius">16dp</dimen>
     <dimen name="widget_inner_radius">12dp</dimen>
     <dimen name="widget_button_radius">22dp</dimen>
-    <dimen name="widget_tag_radius">6dp</dimen>
+    <!-- A calendar day: a circle (a radius above half the size rounds it fully). -->
+    <dimen name="widget_day_radius">50dp</dimen>
 </resources>

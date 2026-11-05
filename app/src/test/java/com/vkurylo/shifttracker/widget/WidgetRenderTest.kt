@@ -70,14 +70,18 @@ class WidgetRenderTest {
         val shadow = shadowOf(manager)
         val id = shadow.createWidget(ShiftTrackerWidgetReceiver::class.java, R.layout.widget_loading)
         WidgetRenderer.render(context, manager, id)
-        // No size reported yet: drawn for every layout's breakpoint; the smallest has the total, hours and "+".
+        // No size reported yet: drawn for every layout's breakpoint; the smallest has the next shift and "+".
         val compact = texts(shadow.getViewFor(id))
-        assertTrue(compact.toString(), compact.containsAll(listOf("244.00\u00A0zł", "8 h", "+")))
+        assertTrue(compact.toString(), compact.containsAll(listOf("Kawiarnia", "+")))
 
         // The 4×2 layout inflates with the next shift.
         val medium = ShiftTrackerWidget().compose(context, size = DpSize(250.dp, 120.dp))
         val texts = texts(medium.apply(context, FrameLayout(context)))
         assertTrue(texts.toString(), "Kawiarnia" in texts && "08:00–16:00" in texts && "+ Shift" in texts)
+        // ... next to the month.
+        val month = java.time.YearMonth.now()
+        assertTrue(texts.toString(), month.month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale.US) in texts)
+        assertTrue(texts.toString(), (1..month.lengthOfMonth()).all { it.toString() in texts })
     }
 
     private fun texts(view: View): List<String> {

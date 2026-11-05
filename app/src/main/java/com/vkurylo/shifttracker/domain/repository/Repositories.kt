@@ -60,7 +60,6 @@ interface PreferencesRepository {
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setDynamicColor(enabled: Boolean)
     suspend fun setEarningsMode(mode: EarningsMode)
-    suspend fun setHideWidgetAmounts(hide: Boolean)
 }
 
 /** Per-app UI language (stored by the platform / AppCompat, not by us). */

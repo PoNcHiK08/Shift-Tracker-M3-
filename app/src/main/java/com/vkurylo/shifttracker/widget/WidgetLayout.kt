@@ -71,6 +71,13 @@ class WidgetTextFit(context: Context) {
         return minSp
     }
 
+    /** Whether [text] at [sp] fits [width] on one line ([sp] may be a minimum that [sp] gave up at). */
+    fun fits(text: String, width: Dp, sp: Float, bold: Boolean): Boolean {
+        paint.typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+        paint.textSize = sp * fontScale * density
+        return paint.measureText(text) <= width.value * density * WIDTH_SAFETY
+    }
+
     /** The height a one-line text of [sp] takes (with the TextView's font padding). */
     fun lineHeight(sp: Float): Dp {
         paint.typeface = Typeface.DEFAULT

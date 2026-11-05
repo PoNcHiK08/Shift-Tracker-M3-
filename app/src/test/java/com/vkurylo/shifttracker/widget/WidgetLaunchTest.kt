@@ -125,15 +125,14 @@ class WidgetLaunchTest {
     }
 
     @Test
-    fun earningsOpenTheSummaryTabAndAddFirstJobOpensJobs() {
-        launch(LaunchRequest.Summary)
-        waitFor(str(R.string.summary_title))
+    fun addFirstJobOpensJobsOnAWarmStart() {
+        launch(null)
+        assertOnCalendar()
         // Warm start (singleTop): the next tap arrives through onNewIntent.
         newIntent(LaunchRequest.Jobs)
         waitFor(str(R.string.jobs_title))
         back()
-        waitFor(str(R.string.summary_title))
-        assertEquals("home", CrashReporter.currentScreen)
+        assertOnCalendar()
     }
 
     @Test
@@ -170,7 +169,7 @@ class WidgetLaunchTest {
         launch(LaunchRequest.EditShift(shiftId))
         waitFor(str(R.string.edit_shift))
         newIntent(LaunchRequest.NewShift)
-        newIntent(LaunchRequest.Summary)
+        newIntent(LaunchRequest.Jobs)
         // The editor is still there, alone: no "New shift" on top, and one Back reaches the calendar.
         assertEquals(0, count(str(R.string.new_shift)))
         waitFor(str(R.string.edit_shift))

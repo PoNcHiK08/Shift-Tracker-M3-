@@ -2,38 +2,42 @@ package com.vkurylo.shifttracker.widget
 
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
-import com.vkurylo.shifttracker.domain.model.BonusWithJob
-import com.vkurylo.shifttracker.domain.model.Currencies
-import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
-import com.vkurylo.shifttracker.domain.model.hasDeductions
 import com.vkurylo.shifttracker.ui.util.Formatters
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 
 /** What the home-screen widget shows, fully formatted; the Glance UI only lays it out. */
 data class WidgetState(
-    /** "This month" (+ nothing else: the tag is separate). */
+    /** "Листопад" / "November": the month grid's title. */
     val monthTitle: String,
-    /** At most two lines, one per currency, the largest first; "•••" when amounts are hidden. */
-    val amountLines: List<String>,
-    /** "+1" when more currencies than lines, else null. */
-    val moreCurrencies: String?,
-    /** "Gross" / "Net", only when some job has deductions (the app's rule). */
-    val modeTag: String?,
-    /** "42 h" */
-    val hours: String,
+    /** "Пн".."Нд" / "Mo".."Su", Monday first (the app's week). */
+    val weekdays: List<String>,
+    /** The month as weeks of 7 days, Monday first; null where a day belongs to the next or previous month. */
+    val monthWeeks: List<List<CalendarDay?>>,
+    /** The current week, Monday to Sunday (its days may fall in a neighbouring month). */
+    val week: List<CalendarDay>,
     val nextShift: NextShift?,
     /** Shown instead of [nextShift]: "No upcoming shifts" or "Add your first job". */
     val emptyMessage: String?,
-    /** No jobs at all: taps lead to the Jobs screen. */
+    /** No jobs at all: "+" leads to the Jobs screen. */
     val noJobs: Boolean,
     val addShiftLabel: String,
 ) {
+    data class CalendarDay(
+        val day: Int,
+        val today: Boolean,
+        /** ARGB color of the first job with a shift that day (by start time), null when there is none. */
+        val shiftColor: Int?,
+    )
+
     data class NextShift(
         val shiftId: Long,
         val jobName: String,
@@ -55,46 +59,31 @@ fun interface WidgetText {
 data class WidgetInput(
     val now: LocalDateTime,
     val jobs: List<Job>,
-    /** Shifts and bonuses of the month of [now]. */
-    val monthShifts: List<ShiftWithJob>,
-    val monthBonuses: List<BonusWithJob>,
-    /** Shifts starting from the day before [now] up to [LOOK_AHEAD_DAYS] ahead. */
-    val upcoming: List<ShiftWithJob>,
-    val mode: EarningsMode,
-    val hideAmounts: Boolean,
+    /** Shifts from the day before [now] (or the start of the calendar, if earlier) up to [LOOK_AHEAD_DAYS] ahead. */
+    val shifts: List<ShiftWithJob>,
     val locale: Locale,
 ) {
     companion object {
         const val LOOK_AHEAD_DAYS = 60L
-        const val MAX_AMOUNT_LINES = 2
-        const val HIDDEN = "•••"
     }
 }
 
 object WidgetStateBuilder {
 
-    /**
-     * The month figures come from [ShiftCalculator.summarize] with exactly the arguments the calendar
-     * uses for its month total (bonuses, fixed salaries, Gross/Net, per currency): no pay maths here.
-     */
     fun build(input: WidgetInput, text: WidgetText): WidgetState {
-        val month = YearMonth.from(input.now)
-        val summary = ShiftCalculator.summarize(input.monthShifts, input.monthBonuses, input.jobs, listOf(month), input.mode)
-        val lines = summary.totalEarnings.sortedByValue().ifEmpty { listOf(Currencies.defaultFor(input.jobs) to 0L) }
-        val shown = lines.take(WidgetInput.MAX_AMOUNT_LINES)
-        val amountLines = if (input.hideAmounts) listOf(WidgetInput.HIDDEN) else {
-            shown.map { (code, value) -> Formatters.money(value, code, input.locale) }
-        }
-        val more = lines.size - shown.size
-        val next = nextShift(input.now, input.upcoming)
+        val today = input.now.toLocalDate()
+        val month = YearMonth.from(today)
+        // The first job (by start time) with a shift on each day.
+        val colors = input.shifts.sortedWith(compareBy({ it.shift.date }, { it.shift.start }))
+            .groupBy { it.shift.date }
+            .mapValues { (_, day) -> day.first().job.color }
+        fun day(date: LocalDate) = WidgetState.CalendarDay(date.dayOfMonth, date == today, colors[date])
+        val next = nextShift(input.now, input.shifts)
         return WidgetState(
-            monthTitle = text.get(R.string.widget_this_month),
-            amountLines = amountLines,
-            moreCurrencies = if (more > 0 && !input.hideAmounts) text.get(R.string.widget_more_currencies, more) else null,
-            modeTag = if (input.jobs.any { it.hasDeductions }) {
-                text.get(if (input.mode == EarningsMode.NET) R.string.earnings_net else R.string.earnings_gross)
-            } else null,
-            hours = text.get(R.string.hours_value, Formatters.decimalHours(summary.totalPaidMinutes, input.locale)),
+            monthTitle = DateTimeFormatter.ofPattern("LLLL", input.locale).format(month).replaceFirstChar { it.titlecase(input.locale) },
+            weekdays = DayOfWeek.entries.map { weekdayLabel(it, input.locale) },
+            monthWeeks = monthWeeks(month).map { week -> week.map { date -> date?.let(::day) } },
+            week = weekOf(today).map(::day),
             nextShift = next?.let { nextShiftUi(it, input.now, input.locale, text) },
             emptyMessage = when {
                 input.jobs.isEmpty() -> text.get(R.string.widget_add_first_job)
@@ -105,6 +94,28 @@ object WidgetStateBuilder {
             addShiftLabel = text.get(R.string.widget_add_shift),
         )
     }
+
+    /** The week (Monday to Sunday) that contains [date]. */
+    fun weekOf(date: LocalDate): List<LocalDate> {
+        val monday = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return (0L until 7L).map { monday.plusDays(it) }
+    }
+
+    /** [month] as Monday-first weeks; days of other months are null. 4 to 6 weeks. */
+    fun monthWeeks(month: YearMonth): List<List<LocalDate?>> {
+        val first = month.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val weeks = mutableListOf<List<LocalDate?>>()
+        var monday = first
+        while (!monday.isAfter(month.atEndOfMonth())) {
+            weeks += (0L until 7L).map { monday.plusDays(it).takeIf { d -> YearMonth.from(d) == month } }
+            monday = monday.plusWeeks(1)
+        }
+        return weeks
+    }
+
+    /** "Пн" / "Mo": two letters at most, capitalized. */
+    fun weekdayLabel(day: DayOfWeek, locale: Locale): String =
+        day.getDisplayName(TextStyle.SHORT_STANDALONE, locale).trimEnd('.').take(2).replaceFirstChar { it.titlecase(locale) }
 
     /**
      * The shift in progress at [now], otherwise the nearest one starting after it (within the

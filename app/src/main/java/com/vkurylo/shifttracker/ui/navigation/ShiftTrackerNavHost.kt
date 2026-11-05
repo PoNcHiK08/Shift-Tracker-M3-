@@ -18,8 +18,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -71,8 +69,6 @@ data object MainRoute
 @Composable
 fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: () -> Unit = {}) {
     val rootNav = rememberNavController()
-    // Widget taps: incremented to make the home screen switch to the Summary tab.
-    var summaryTabRequests by remember { mutableIntStateOf(0) }
     LaunchedEffect(launchRequest) {
         val request = launchRequest ?: return@LaunchedEffect
         onLaunchHandled()
@@ -84,10 +80,6 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
             // No shared key: the card isn't on screen, so the editor slides in instead of growing out of it.
             LaunchRequest.NewShift -> rootNav.navigate(EditShiftRoute(dateEpochDay = LocalDate.now().toEpochDay()))
             is LaunchRequest.EditShift -> rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
-            LaunchRequest.Summary -> {
-                rootNav.popBackStack(MainRoute, inclusive = false)
-                summaryTabRequests++
-            }
             LaunchRequest.Jobs -> if (top?.hasRoute(JobsRoute::class) != true) rootNav.navigate(JobsRoute)
         }
     }
@@ -150,7 +142,7 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
                     ) {
                         composable<MainRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                HomeScreen(rootNav, transitions, summaryTabRequests)
+                                HomeScreen(rootNav, transitions)
                             }
                         }
                         composable<JobsRoute> {
@@ -242,16 +234,8 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
 }
 
 @Composable
-private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, summaryTabRequests: Int = 0) {
+private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
     val tabNav = rememberNavController()
-    LaunchedEffect(summaryTabRequests) {
-        if (summaryTabRequests == 0) return@LaunchedEffect
-        tabNav.navigate(SummaryRoute) {
-            popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
-    }
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
 

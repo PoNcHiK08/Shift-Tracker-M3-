@@ -4,16 +4,9 @@ import android.content.Context
 import android.content.res.Configuration
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
-import com.vkurylo.shifttracker.domain.model.Bonus
-import com.vkurylo.shifttracker.domain.model.BonusWithJob
-import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
-import com.vkurylo.shifttracker.domain.model.PaySettings
-import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
-import com.vkurylo.shifttracker.ui.util.Formatters
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -26,7 +19,7 @@ import java.time.LocalTime
 import java.time.YearMonth
 import java.util.Locale
 
-/** The widget's content from domain data: next shift, month totals (the app's own pipeline), texts. */
+/** The widget's content from domain data: next shift, the month and week calendar, texts. */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
 class WidgetStateBuilderTest {
@@ -56,22 +49,10 @@ class WidgetStateBuilderTest {
 
     private fun input(
         shifts: List<ShiftWithJob> = emptyList(),
-        bonuses: List<BonusWithJob> = emptyList(),
         jobs: List<Job> = listOf(cafe, shop),
         at: LocalDateTime = now,
-        mode: EarningsMode = EarningsMode.GROSS,
-        hide: Boolean = false,
         locale: Locale = en,
-    ) = WidgetInput(
-        now = at,
-        jobs = jobs,
-        monthShifts = shifts.filter { YearMonth.from(it.shift.date) == YearMonth.from(at) },
-        monthBonuses = bonuses.filter { YearMonth.from(it.bonus.date) == YearMonth.from(at) },
-        upcoming = shifts,
-        mode = mode,
-        hideAmounts = hide,
-        locale = locale,
-    )
+    ) = WidgetInput(now = at, jobs = jobs, shifts = shifts, locale = locale)
 
     private fun build(input: WidgetInput) = WidgetStateBuilder.build(input, text(input.locale))
 
@@ -125,89 +106,56 @@ class WidgetStateBuilderTest {
         val state = build(input(jobs = emptyList()))
         assertTrue(state.noJobs)
         assertEquals("Add your first job", state.emptyMessage)
-        assertEquals(listOf("0.00${nbsp}zł"), state.amountLines)
-        assertEquals("0 h", state.hours)
     }
 
-    // --- Month earnings ----------------------------------------------------------------------------
+    // --- Calendar ----------------------------------------------------------------------------------
 
     @Test
-    fun `the month total is the calendar's, bonuses included`() {
-        val shifts = listOf(shift(cafe, today.minusDays(2), 8, 16), shift(cafe, today, 8, 12), shift(cafe, LocalDate.of(2026, 10, 30), 8, 16))
-        val bonuses = listOf(BonusWithJob(Bonus(jobId = 1, date = today, amountGrosze = 5_000), cafe))
-        val input = input(shifts, bonuses)
-        val state = build(input)
-        // Same call the calendar makes for its month total.
-        val calendar = ShiftCalculator.summarize(input.monthShifts, input.monthBonuses, input.jobs, listOf(YearMonth.from(now)), EarningsMode.GROSS)
-        assertEquals(41_000L, calendar.totalEarnings["PLN"])
-        assertEquals(listOf(Formatters.money(41_000, "PLN", en)), state.amountLines)
-        assertEquals("12 h", state.hours)
-        assertNull(state.modeTag)
-        assertNull(state.moreCurrencies)
-    }
-
-    @Test
-    fun `currencies are listed apart, two lines then +N`() {
-        val euro = Job(id = 3, name = "Berlin", hourlyRateGrosze = 1500, color = 0, currency = "EUR")
-        val yen = Job(id = 4, name = "Tokyo", hourlyRateGrosze = 1200, color = 0, currency = "JPY")
-        val shifts = listOf(shift(cafe, today, 6, 10), shift(euro, today, 6, 10))
-        val two = build(input(shifts, jobs = listOf(cafe, euro)))
-        assertEquals(listOf("120.00${nbsp}zł", "€60.00"), two.amountLines)
-        assertNull(two.moreCurrencies)
-
-        val three = build(input(shifts + shift(yen, today, 6, 7), jobs = listOf(cafe, euro, yen)))
-        assertEquals(2, three.amountLines.size)
-        assertEquals("+1", three.moreCurrencies)
+    fun `the month grid starts on Monday and marks today and shift days`() {
+        val cafeDay = shift(cafe, LocalDate.of(2026, 11, 2), 8, 16)
+        // Two jobs on the 10th: the earlier shift's job gives the color.
+        val late = shift(cafe, LocalDate.of(2026, 11, 10), 18, 22)
+        val early = shift(shop, LocalDate.of(2026, 11, 10), 6, 10)
+        val state = build(input(listOf(cafeDay, late, early, shift(cafe, LocalDate.of(2026, 10, 30), 8, 16))))
+        assertEquals("November", state.monthTitle)
+        assertEquals(listOf("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"), state.weekdays)
+        // 1 November 2026 is a Sunday: 6 weeks, the first with six empty days.
+        assertEquals(6, state.monthWeeks.size)
+        assertEquals(listOf(null, null, null, null, null, null), state.monthWeeks[0].take(6))
+        assertEquals(1, state.monthWeeks[0][6]!!.day)
+        assertEquals(30, state.monthWeeks[5][0]!!.day)
+        assertTrue(state.monthWeeks[5].drop(1).all { it == null })
+        val days = state.monthWeeks.flatten().filterNotNull()
+        assertEquals((1..30).toList(), days.map { it.day })
+        assertEquals(listOf(4), days.filter { it.today }.map { it.day })
+        assertEquals(mapOf(2 to cafe.color, 10 to shop.color), days.filter { it.shiftColor != null }.associate { it.day to it.shiftColor })
     }
 
     @Test
-    fun `a fixed monthly salary counts once in the month`() {
-        val office = Job(
-            id = 5, name = "Office", hourlyRateGrosze = 0, color = 0, currency = "EUR",
-            payHistory = listOf(PaySettings(null, PayType.FIXED_MONTHLY, 300_000)), firstEntry = today, lastEntry = today,
-        )
-        val state = build(input(listOf(shift(office, today, 9, 17)), jobs = listOf(office)))
-        assertEquals(listOf("€3,000.00"), state.amountLines)
-        assertEquals("8 h", state.hours)
-    }
-
-    @Test
-    fun `net mode and the gross or net tag follow the app's rule`() {
-        val taxed = cafe.copy(payHistory = listOf(PaySettings(deductionBp = 1_000)))
-        val shifts = listOf(shift(taxed, today, 6, 10))
-        val net = build(input(shifts, jobs = listOf(taxed, shop), mode = EarningsMode.NET))
-        assertEquals(listOf("108.00${nbsp}zł"), net.amountLines)
-        assertEquals("Net", net.modeTag)
-        assertEquals("Gross", build(input(shifts, jobs = listOf(taxed, shop))).modeTag)
-        // No deductions anywhere: gross = net, no tag.
-        assertNull(build(input(listOf(shift(cafe, today, 6, 10)), mode = EarningsMode.NET)).modeTag)
-    }
-
-    @Test
-    fun `hidden amounts show dots, hours stay`() {
-        val euro = Job(id = 3, name = "Berlin", hourlyRateGrosze = 1500, color = 0, currency = "EUR")
-        val state = build(input(listOf(shift(cafe, today, 6, 10), shift(euro, today, 6, 8)), jobs = listOf(cafe, euro), hide = true))
-        assertEquals(listOf("•••"), state.amountLines)
-        assertNull(state.moreCurrencies)
-        assertEquals("6 h", state.hours)
+    fun `the week runs Monday to Sunday and can cross a month`() {
+        val sunday = LocalDateTime.of(2026, 11, 1, 9, 0)
+        val october = shift(cafe, LocalDate.of(2026, 10, 27), 8, 16)
+        val state = build(input(listOf(october), at = sunday))
+        assertEquals(listOf(26, 27, 28, 29, 30, 31, 1), state.week.map { it.day })
+        assertEquals(listOf(1), state.week.filter { it.today }.map { it.day })
+        assertEquals(cafe.color, state.week[1].shiftColor)
+        // February 2027 starts on a Monday and has exactly 4 weeks.
+        assertEquals(4, WidgetStateBuilder.monthWeeks(YearMonth.of(2027, 2)).size)
     }
 
     // --- Language ----------------------------------------------------------------------------------
 
     @Test
-    fun `texts, dates and amounts follow the app language`() {
+    fun `texts and dates follow the app language`() {
         val shifts = listOf(shift(cafe, LocalDate.of(2026, 11, 9), 8, 16), shift(cafe, today, 6, 10))
         val ukState = build(input(shifts, locale = uk))
-        assertEquals("За місяць", ukState.monthTitle)
-        assertEquals("360,00${nbsp}zł", ukState.amountLines.single()) // 8 h + 4 h at 30 zł
-        assertEquals("12 год", ukState.hours)
+        assertEquals("Листопад", ukState.monthTitle)
+        assertEquals(listOf("Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"), ukState.weekdays)
         assertEquals("+ Зміна", ukState.addShiftLabel)
         assertEquals(WidgetStateBuilder.dayLabel(LocalDate.of(2026, 11, 9), uk), ukState.nextShift!!.whenLabel)
         assertTrue(ukState.nextShift!!.whenLabel, ukState.nextShift!!.whenLabel.startsWith("Пн"))
 
         val enState = build(input(shifts, locale = en))
-        assertEquals("This month", enState.monthTitle)
-        assertEquals("360.00${nbsp}zł", enState.amountLines.single())
         assertEquals("Mon 9 Nov", enState.nextShift!!.whenLabel)
         assertEquals("До 18:00", build(input(listOf(shift(cafe, today, 10, 18)), locale = uk)).nextShift!!.whenLabel)
     }

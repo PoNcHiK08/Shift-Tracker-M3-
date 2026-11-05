@@ -27,7 +27,7 @@ import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
-import androidx.glance.layout.ColumnScope
+import androidx.glance.layout.RowScope
 import androidx.glance.layout.Row
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxHeight
@@ -39,6 +39,7 @@ import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.material3.ColorProviders
 import androidx.glance.text.FontWeight
+import androidx.glance.text.TextAlign
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
@@ -48,7 +49,7 @@ import com.vkurylo.shifttracker.ui.theme.LightColors
 import dagger.hilt.android.EntryPointAccessors
 
 /**
- * Home-screen widget: this month's earnings (per currency, Gross/Net tag), paid hours, the shift in
+ * Home-screen widget: a shift calendar (the month, or the current week in one row), the shift in
  * progress or the next one, and "+ Shift". The layout follows the widget's width AND height
  * ([WidgetLayout]); it is composed for the exact sizes the launcher reports, so a 4×1 bar is drawn
  * for one row instead of squeezing the 4×2 layout into it. All content comes from
@@ -74,7 +75,7 @@ class ShiftTrackerWidget : GlanceAppWidget() {
 }
 
 /** The taps, shared by every layout. */
-private class WidgetActions(val open: Action, val summary: Action, val add: Action, val nextShift: Action)
+private class WidgetActions(val open: Action, val add: Action, val nextShift: Action)
 
 @Composable
 private fun WidgetContent(state: WidgetState) {
@@ -84,7 +85,6 @@ private fun WidgetContent(state: WidgetState) {
     val next = state.nextShift
     val actions = WidgetActions(
         open = open,
-        summary = actionStartActivity(WidgetLaunch.intent(context, LaunchRequest.Summary)),
         add = actionStartActivity(WidgetLaunch.intent(context, if (state.noJobs) LaunchRequest.Jobs else LaunchRequest.NewShift)),
         nextShift = when {
             state.noJobs -> actionStartActivity(WidgetLaunch.intent(context, LaunchRequest.Jobs))
@@ -118,78 +118,51 @@ private fun WidgetContent(state: WidgetState) {
 private val GAP = 6.dp
 private val ROUND_BUTTON = 40.dp
 private val PILL = 36.dp
-private const val HOURS_SP = 11f
+private const val DETAIL_SP = 11f
 
-/** The first amount (plus "+1" for more currencies) and "43 h · Net": what the 1-row layouts show. */
-private fun oneRowAmount(state: WidgetState) = state.amountLines.first() + (state.moreCurrencies?.let { " $it" } ?: "")
-private fun oneRowHours(state: WidgetState) = listOfNotNull(state.hours, state.modeTag).joinToString(" · ")
-
-/**
- * Earnings and hours, stacked and centred, sized to fit [width] × [height] (the tile's content area):
- * the hours line is dropped only when the tile is too short for two lines.
- */
+/** A tile in the secondary container color with the next shift (or the empty message), tapping into it. */
 @Composable
-private fun EarningsLines(state: WidgetState, width: Dp, height: Dp, fit: WidgetTextFit) {
-    val color = GlanceTheme.colors.onPrimaryContainer
-    val hoursHeight = fit.lineHeight(HOURS_SP)
-    val showHours = height >= hoursHeight + fit.lineHeight(12f)
-    val amount = oneRowAmount(state)
-    val amountSp = fit.sp(listOf(amount), width, if (showHours) height - hoursHeight else height, maxSp = 18f, minSp = 9f, bold = true)
-    Text(amount, style = TextStyle(color = color, fontSize = amountSp.sp, fontWeight = FontWeight.Bold), maxLines = 1)
-    if (showHours) {
-        val hours = oneRowHours(state)
-        val hoursSp = fit.sp(listOf(hours), width, hoursHeight, maxSp = HOURS_SP, minSp = 8f, bold = false)
-        Text(hours, style = TextStyle(color = color, fontSize = hoursSp.sp), maxLines = 1)
+private fun NextShiftTile(state: WidgetState, actions: WidgetActions, modifier: GlanceModifier, contentWidth: Dp, contentHeight: Dp, fit: WidgetTextFit) {
+    Column(
+        modifier
+            .rounded(GlanceTheme.colors.secondaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
+            .clickable(actions.nextShift)
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        NextShiftLines(state, contentWidth, contentHeight, fit)
     }
 }
 
-/** Mode A, 2×1: the earnings tile and a round "+". */
+/** Mode A, 2×1: the next shift and a round "+". */
 @Composable
 private fun CompactRow(state: WidgetState, actions: WidgetActions, inner: DpSize, fit: WidgetTextFit) {
     val button = minOf(ROUND_BUTTON, inner.height)
     val tileWidth = inner.width - GAP - button
     Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        Column(
-            GlanceModifier.defaultWeight().fillMaxHeight()
-                .rounded(GlanceTheme.colors.primaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
-                .clickable(actions.summary)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            EarningsLines(state, tileWidth - 16.dp, inner.height - 4.dp, fit)
-        }
+        NextShiftTile(state, actions, GlanceModifier.defaultWeight().fillMaxHeight(), tileWidth - 16.dp, inner.height - 4.dp, fit)
         Spacer(GlanceModifier.width(GAP))
         AddButton(label = "+", action = actions.add, modifier = GlanceModifier.size(button))
     }
 }
 
-/** Mode B, 3×1 / 4×1: earnings | next shift | round "+", one row. */
+/** Mode B, 3×1 / 4×1: this week | next shift | round "+", one row. */
 @Composable
 private fun WideRow(state: WidgetState, actions: WidgetActions, inner: DpSize, fit: WidgetTextFit) {
     val button = minOf(ROUND_BUTTON, inner.height)
     val tileWidth = (inner.width - GAP * 2 - button) / 2
-    val contentWidth = tileWidth - 16.dp
-    val contentHeight = inner.height - 4.dp
     Row(GlanceModifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-        Column(
+        Box(
             GlanceModifier.defaultWeight().fillMaxHeight()
                 .rounded(GlanceTheme.colors.primaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
-                .clickable(actions.summary)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .clickable(actions.open)
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            EarningsLines(state, contentWidth, contentHeight, fit)
+            WeekStrip(state, tileWidth - 8.dp, inner.height - 4.dp, fit)
         }
         Spacer(GlanceModifier.width(GAP))
-        Column(
-            GlanceModifier.defaultWeight().fillMaxHeight()
-                .rounded(GlanceTheme.colors.secondaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
-                .clickable(actions.nextShift)
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            NextShiftLines(state, contentWidth, contentHeight, fit)
-        }
+        NextShiftTile(state, actions, GlanceModifier.defaultWeight().fillMaxHeight(), tileWidth - 16.dp, inner.height - 4.dp, fit)
         Spacer(GlanceModifier.width(GAP))
         AddButton(label = "+", action = actions.add, modifier = GlanceModifier.size(button))
     }
@@ -210,33 +183,92 @@ private fun NextShiftLines(state: WidgetState, width: Dp, height: Dp, fit: Widge
         return
     }
     val detail = "${next.whenLabel} · ${next.time}"
-    val detailHeight = fit.lineHeight(HOURS_SP)
-    val showDetail = height >= detailHeight + fit.lineHeight(12f)
+    val detailHeight = fit.lineHeight(DETAIL_SP)
+    // "Tomorrow · 18:00–01:30" on one line when it fits, else "Tomorrow" over "18:00–01:30" (2×1).
+    val oneLine = fit.sp(listOf(detail), width, detailHeight, maxSp = DETAIL_SP, minSp = 9f, bold = false)
+    val split = !fit.fits(detail, width, oneLine, bold = false) && height >= fit.lineHeight(12f) + detailHeight * 2
+    val detailLines = if (split) listOf(next.whenLabel, next.time) else listOf(detail)
+    val showDetail = height >= detailHeight * detailLines.size + fit.lineHeight(12f)
     val dot = "● "
-    val nameSp = fit.sp(listOf(dot + next.jobName), width, if (showDetail) height - detailHeight else height, maxSp = 13f, minSp = 9f, bold = true)
+    val nameHeight = if (showDetail) height - detailHeight * detailLines.size else height
+    val nameSp = fit.sp(listOf(dot + next.jobName), width, nameHeight, maxSp = 13f, minSp = 9f, bold = true)
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(dot, style = TextStyle(color = ColorProvider(Color(next.color), Color(next.color)), fontSize = nameSp.sp))
         Text(next.jobName, style = TextStyle(color = color, fontSize = nameSp.sp, fontWeight = FontWeight.Bold), maxLines = 1)
     }
     if (showDetail) {
-        val detailSp = fit.sp(listOf(detail), width, detailHeight, maxSp = HOURS_SP, minSp = 8f, bold = false)
-        Text(detail, style = TextStyle(color = color, fontSize = detailSp.sp), maxLines = 1)
+        val detailSp = fit.sp(detailLines, width, detailHeight, maxSp = DETAIL_SP, minSp = 8f, bold = false)
+        detailLines.forEach { Text(it, style = TextStyle(color = color, fontSize = detailSp.sp), maxLines = 1) }
     }
 }
 
-/** "This month" with the Gross/Net tag. */
+/**
+ * One day of a calendar in a [cell]-sized circle: today filled with the primary color, a day with a
+ * shift tinted with its job's color, other days plain. Null (another month): an empty cell.
+ */
 @Composable
-private fun MonthTitle(state: WidgetState) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(state.monthTitle, style = TextStyle(color = GlanceTheme.colors.onPrimaryContainer, fontSize = 12.sp), maxLines = 1)
-        state.modeTag?.let { tag ->
-            Spacer(GlanceModifier.width(6.dp))
+private fun RowScope.DayCell(day: WidgetState.CalendarDay?, cell: Dp, sp: Float) {
+    Box(GlanceModifier.defaultWeight().height(cell), contentAlignment = Alignment.Center) {
+        if (day == null) return@Box
+        val background = when {
+            day.today -> GlanceTheme.colors.primary
+            day.shiftColor != null -> Color(day.shiftColor).copy(alpha = SHIFT_TINT).let { ColorProvider(it, it) }
+            else -> null
+        }
+        val textColor = if (day.today) GlanceTheme.colors.onPrimary else GlanceTheme.colors.onPrimaryContainer
+        val number = @Composable {
             Text(
-                tag,
-                modifier = GlanceModifier
-                    .rounded(GlanceTheme.colors.surface, R.dimen.widget_tag_radius, R.drawable.widget_round_tag)
-                    .padding(horizontal = 6.dp, vertical = 1.dp),
-                style = TextStyle(color = GlanceTheme.colors.onSurface, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                day.day.toString(),
+                style = TextStyle(
+                    color = textColor,
+                    fontSize = sp.sp,
+                    fontWeight = if (day.today || day.shiftColor != null) FontWeight.Bold else FontWeight.Normal,
+                    textAlign = TextAlign.Center,
+                ),
+                maxLines = 1,
+            )
+        }
+        if (background == null) {
+            number()
+        } else {
+            Box(
+                GlanceModifier.size(cell).rounded(background, R.dimen.widget_day_radius, R.drawable.widget_round_day),
+                contentAlignment = Alignment.Center,
+            ) { number() }
+        }
+    }
+}
+
+/** How much of a job's color tints its shift days (the number stays readable on it, light or dark). */
+private const val SHIFT_TINT = 0.45f
+
+/** A day number's font size for a [cell]-sized circle ("30" fits with a little room). */
+private fun daySp(fit: WidgetTextFit, cell: Dp): Float =
+    fit.sp(listOf("30"), cell * 0.8f, cell, maxSp = 13f, minSp = 7f, bold = true)
+
+/** Weekday letters over the current week's days (the letters are dropped when the tile is too short). */
+@Composable
+private fun WeekStrip(state: WidgetState, width: Dp, height: Dp, fit: WidgetTextFit) {
+    val labelHeight = fit.lineHeight(9f)
+    val showLabels = height >= labelHeight + 20.dp
+    val cell = minOf(width / 7, (if (showLabels) height - labelHeight else height) - 2.dp, 30.dp)
+    val sp = daySp(fit, cell)
+    Column(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        if (showLabels) WeekdayRow(state, fit.sp(state.weekdays, width / 7, labelHeight, maxSp = 9f, minSp = 7f, bold = false))
+        Row(GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            state.week.forEach { DayCell(it, cell, sp) }
+        }
+    }
+}
+
+@Composable
+private fun WeekdayRow(state: WidgetState, sp: Float) {
+    Row(GlanceModifier.fillMaxWidth()) {
+        state.weekdays.forEach { label ->
+            Text(
+                label,
+                modifier = GlanceModifier.defaultWeight(),
+                style = TextStyle(color = GlanceTheme.colors.onPrimaryContainer, fontSize = sp.sp, textAlign = TextAlign.Center),
                 maxLines = 1,
             )
         }
@@ -244,44 +276,52 @@ private fun MonthTitle(state: WidgetState) {
 }
 
 /**
- * The tall earnings card: title, every currency line (one shared size that fits [width]) and hours.
- * [height] is its content height; amounts never get more than what's left after title and hours.
+ * The month grid card: its name, the weekday letters and 4–6 weeks, sized to [width] × [height] (the
+ * card's content area). Tapping it opens the app.
  */
 @Composable
-private fun ColumnScope.EarningsCard(state: WidgetState, width: Dp, height: Dp, maxSp: Float, fit: WidgetTextFit) {
-    val color = GlanceTheme.colors.onPrimaryContainer
-    val fixed = fit.lineHeight(12f) + fit.lineHeight(13f) + (if (state.moreCurrencies != null) fit.lineHeight(12f) else 0.dp)
-    val perLine = (height - fixed) / state.amountLines.size
-    val top = if (state.amountLines.size > 1) minOf(maxSp, 17f) else maxSp
-    val amountSp = fit.sp(state.amountLines, width, perLine, maxSp = top, minSp = 10f, bold = true)
-    MonthTitle(state)
-    Spacer(GlanceModifier.defaultWeight())
-    state.amountLines.forEach { line ->
-        Text(line, style = TextStyle(color = color, fontSize = amountSp.sp, fontWeight = FontWeight.Bold), maxLines = 1)
+private fun MonthCalendar(state: WidgetState, actions: WidgetActions, modifier: GlanceModifier, width: Dp, height: Dp, fit: WidgetTextFit) {
+    val titleHeight = fit.lineHeight(12f)
+    val labelHeight = fit.lineHeight(9f)
+    val rows = state.monthWeeks.size
+    val rowHeight = (height - titleHeight - labelHeight - 2.dp) / rows
+    val cell = minOf(width / 7, rowHeight, 30.dp)
+    val sp = daySp(fit, cell)
+    Column(
+        modifier
+            .rounded(GlanceTheme.colors.primaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
+            .clickable(actions.open)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+    ) {
+        Text(
+            state.monthTitle,
+            modifier = GlanceModifier.padding(start = 4.dp),
+            style = TextStyle(color = GlanceTheme.colors.onPrimaryContainer, fontSize = 12.sp, fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(2.dp))
+        WeekdayRow(state, fit.sp(state.weekdays, width / 7, labelHeight, maxSp = 9f, minSp = 7f, bold = false))
+        Spacer(GlanceModifier.defaultWeight())
+        state.monthWeeks.forEach { week ->
+            Row(GlanceModifier.fillMaxWidth().height(rowHeight), verticalAlignment = Alignment.CenterVertically) {
+                week.forEach { DayCell(it, cell, sp) }
+            }
+        }
+        Spacer(GlanceModifier.defaultWeight())
     }
-    state.moreCurrencies?.let {
-        Text(it, style = TextStyle(color = color, fontSize = 12.sp), maxLines = 1)
-    }
-    Text(state.hours, style = TextStyle(color = color, fontSize = 13.sp), maxLines = 1)
 }
 
-/** Mode C, 2×2 / 2×3: earnings card on top; next shift and a full-width "+ Shift" below. */
+/** Mode C, 2×2 / 2×3: the month on top; the next shift (when there's room) and a full-width "+ Shift" below. */
 @Composable
 private fun NarrowStack(state: WidgetState, actions: WidgetActions, inner: DpSize, fit: WidgetTextFit) {
     val pill = if (inner.height >= 140.dp) PILL else 32.dp
-    val shiftHeight = fit.lineHeight(12f) + fit.lineHeight(HOURS_SP)
-    // The next shift only when the card above keeps room for title, amount and hours.
-    val showShift = inner.height - pill - GAP - shiftHeight - GAP >= 64.dp
+    val shiftHeight = fit.lineHeight(12f) + fit.lineHeight(DETAIL_SP)
+    // The next shift only when the month keeps at least 16 dp a week.
+    val calendarMin = fit.lineHeight(12f) + fit.lineHeight(9f) + 14.dp + 16.dp * state.monthWeeks.size
+    val showShift = inner.height - pill - GAP - shiftHeight - GAP >= calendarMin
     val cardHeight = inner.height - pill - GAP - (if (showShift) shiftHeight + GAP else 0.dp)
     Column(GlanceModifier.fillMaxSize()) {
-        Column(
-            GlanceModifier.fillMaxWidth().defaultWeight()
-                .rounded(GlanceTheme.colors.primaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
-                .clickable(actions.summary)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-        ) {
-            EarningsCard(state, inner.width - 20.dp, cardHeight - 12.dp, maxSp = 20f, fit)
-        }
+        MonthCalendar(state, actions, GlanceModifier.fillMaxWidth().defaultWeight(), inner.width - 12.dp, cardHeight - 12.dp, fit)
         if (showShift) {
             Spacer(GlanceModifier.height(GAP))
             Column(GlanceModifier.fillMaxWidth().clickable(actions.nextShift).padding(horizontal = 4.dp)) {
@@ -293,24 +333,14 @@ private fun NarrowStack(state: WidgetState, actions: WidgetActions, inner: DpSiz
     }
 }
 
-/**
- * Mode D, 3×2 and up: the earnings card (a little wider than half, so a 3×2 amount fits) | the next
- * shift card over "+ Shift".
- */
+/** Mode D, 3×2 and up: the month (a little wider than half) | the next shift card over "+ Shift". */
 @Composable
 private fun Bento(state: WidgetState, actions: WidgetActions, inner: DpSize, fit: WidgetTextFit) {
     val gap = 8.dp
     val leftWidth = (inner.width - gap) * 0.56f
     val rightWidth = inner.width - gap - leftWidth
     Row(GlanceModifier.fillMaxSize()) {
-        Column(
-            GlanceModifier.width(leftWidth).fillMaxHeight()
-                .rounded(GlanceTheme.colors.primaryContainer, R.dimen.widget_inner_radius, R.drawable.widget_round_inner)
-                .clickable(actions.summary)
-                .padding(10.dp),
-        ) {
-            EarningsCard(state, leftWidth - 20.dp, inner.height - 20.dp, maxSp = 22f, fit)
-        }
+        MonthCalendar(state, actions, GlanceModifier.width(leftWidth).fillMaxHeight(), leftWidth - 12.dp, inner.height - 12.dp, fit)
         Spacer(GlanceModifier.width(gap))
         Column(GlanceModifier.defaultWeight().fillMaxHeight()) {
             Column(

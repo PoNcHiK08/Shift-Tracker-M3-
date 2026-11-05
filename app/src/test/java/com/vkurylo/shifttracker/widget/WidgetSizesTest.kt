@@ -15,10 +15,8 @@ import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.appwidget.compose
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
-import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.testing.HiltAndroidRule
@@ -42,8 +40,9 @@ import javax.inject.Inject
 
 /**
  * The widget at every One UI grid size (Galaxy S23+ density, Ukrainian): laid out at that exact size,
- * the earnings and the add action are on screen, unclipped and with non-zero bounds, the amount isn't
- * ellipsized, a 1-row widget is one row (never blank, never stacked) and a 2×2 is a column.
+ * the calendar (month, or this week in one row), the next shift and the add action are on screen,
+ * unclipped and with non-zero bounds, no day number is ellipsized, no amount is shown anywhere, a
+ * 1-row widget is one row (never blank, never stacked) and a 2×2 is a column.
  */
 @OptIn(ExperimentalGlanceApi::class)
 @HiltAndroidTest
@@ -54,7 +53,6 @@ class WidgetSizesTest {
     @get:Rule val hiltRule = HiltAndroidRule(this)
     @Inject lateinit var jobs: JobRepository
     @Inject lateinit var shifts: ShiftRepository
-    @Inject lateinit var bonuses: BonusRepository
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val density get() = context.resources.displayMetrics.density
     private var jobId = 0L
@@ -69,13 +67,8 @@ class WidgetSizesTest {
         hiltRule.inject()
         runBlocking {
             jobId = jobs.upsert(Job(name = "Burger King", hourlyRateGrosze = 3400, color = 0xFFE53935.toInt()))
-            // This month: 43 h at 34 zł + a 15 zł bonus = 1 477,00 zł, wherever tomorrow falls.
-            val tomorrow = today.plusDays(1)
-            shifts.upsert(shift(tomorrow, 18, 0, 1, 30)) // the next shift, 7.5 h
-            val tomorrowInMonth = YearMonth.from(tomorrow) == YearMonth.from(today)
-            repeat(if (tomorrowInMonth) 4 else 5) { shifts.upsert(shift(firstDay, 0, 0, 8, 0)) }
-            shifts.upsert(if (tomorrowInMonth) shift(firstDay, 8, 0, 11, 30) else shift(firstDay, 8, 0, 11, 0))
-            bonuses.upsert(Bonus(jobId = jobId, date = firstDay, amountGrosze = 1_500))
+            shifts.upsert(shift(today.plusDays(1), 18, 0, 1, 30)) // the next shift
+            shifts.upsert(shift(firstDay, 8, 0, 16, 0)) // a shift day in the calendar
         }
     }
 
@@ -144,73 +137,93 @@ class WidgetSizesTest {
         assertTrue("$where: '${(view as? TextView)?.text}' isn't tappable", tappable)
     }
 
-    private fun checkEarningsAndAdd(drawn: Drawn, amount: String, add: String, where: String) {
-        assertNotTruncated(assertShown(drawn, amount, where), where)
-        assertClickable(assertShown(drawn, add, where), where)
+    private fun checkAdd(drawn: Drawn, add: String, where: String) = assertClickable(assertShown(drawn, add, where), where)
+
+    /** No money anywhere: the widget is a calendar now. */
+    private fun assertNoAmounts(drawn: Drawn, where: String) =
+        assertTrue("$where shows an amount: ${drawn.texts.map { it.text }}", drawn.texts.none { "zł" in it.text })
+
+    /** Every day of the month is drawn whole, and today is among them. */
+    private fun assertMonth(drawn: Drawn, where: String) {
+        assertShown(drawn, monthTitle, where)
+        assertShown(drawn, "Пн", where)
+        for (day in 1..YearMonth.from(today).lengthOfMonth()) assertNotTruncated(assertShown(drawn, day.toString(), where), "$where day $day")
     }
+
+    private val monthTitle = YearMonth.from(today).month.getDisplayName(java.time.format.TextStyle.FULL_STANDALONE, java.util.Locale.forLanguageTag("uk"))
+        .replaceFirstChar { it.titlecase() }
 
     @Test
     fun x2x1CompactRow() {
         val drawn = draw(DpSize(150.dp, 70.dp))
-        checkEarningsAndAdd(drawn, "1 477,00 zł", add1Row, "2x1")
-        assertShown(drawn, "43 год", "2x1")
-        assertTrue("2x1 has no header", drawn.find("За місяць") == null)
+        checkAdd(drawn, add1Row, "2x1")
+        assertNotTruncated(assertShown(drawn, "Burger King", "2x1"), "2x1")
+        // Too narrow for "Завтра · 18:00–01:30" on one line: two lines, both whole.
+        assertNotTruncated(assertShown(drawn, "Завтра", "2x1"), "2x1")
+        assertNotTruncated(assertShown(drawn, "18:00–01:30", "2x1"), "2x1")
+        assertNoAmounts(drawn, "2x1")
     }
 
     @Test
-    fun x4x1IsOneWideRowAndNotBlank() {
+    fun x4x1IsOneWideRowWithThisWeek() {
         val drawn = draw(DpSize(350.dp, 70.dp))
-        checkEarningsAndAdd(drawn, "1 477,00 zł", add1Row, "4x1")
-        val hours = assertShown(drawn, "43 год", "4x1")
+        checkAdd(drawn, add1Row, "4x1")
         val shift = assertShown(drawn, "Burger King", "4x1")
-        assertShown(drawn, "Завтра · 18:00–01:30", "4x1")
+        assertNotTruncated(assertShown(drawn, "Завтра · 18:00–01:30", "4x1"), "4x1")
         assertNull("4x1 must not stack a '+ Зміна' pill", drawn.find(addTall))
-        // One row: the earnings tile is left of the shift tile, which is left of "+".
-        val money = bounds(drawn.find("1 477,00 zł")!!, drawn.root).first
+        assertNoAmounts(drawn, "4x1")
+        // This week, Monday to Sunday, each day whole.
+        assertShown(drawn, "Пн", "4x1")
+        assertShown(drawn, "Нд", "4x1")
+        val week = WidgetStateBuilder.weekOf(today)
+        week.forEach { assertNotTruncated(assertShown(drawn, it.dayOfMonth.toString(), "4x1"), "4x1 ${it}") }
+        // One row: the week tile is left of the shift tile, which is left of "+".
+        val sunday = bounds(drawn.find(week.last().dayOfMonth.toString())!!, drawn.root).first
         val name = bounds(shift, drawn.root).first
         val plus = bounds(drawn.find(add1Row)!!, drawn.root).first
-        assertTrue("4x1 order: $money $name $plus", money.right <= name.left && name.right <= plus.left)
-        assertTrue(bounds(hours, drawn.root).first.bottom <= drawn.root.height)
+        assertTrue("4x1 order: $sunday $name $plus", sunday.right <= name.left && name.right <= plus.left)
     }
 
     @Test
     fun x2x2StacksVertically() {
         val drawn = draw(DpSize(150.dp, 160.dp))
-        checkEarningsAndAdd(drawn, "1 477,00 zł", addTall, "2x2")
-        assertShown(drawn, "За місяць", "2x2")
-        assertShown(drawn, "43 год", "2x2")
-        val money = bounds(drawn.find("1 477,00 zł")!!, drawn.root).first
+        checkAdd(drawn, addTall, "2x2")
+        assertMonth(drawn, "2x2")
+        assertNoAmounts(drawn, "2x2")
+        val lastDay = bounds(drawn.find(YearMonth.from(today).lengthOfMonth().toString())!!, drawn.root).first
         val pill = bounds(pillOf(drawn.find(addTall)!!), drawn.root).first
-        assertTrue("2x2: the earnings ($money) sit above the pill ($pill)", money.bottom <= pill.top)
+        assertTrue("2x2: the month ($lastDay) sits above the pill ($pill)", lastDay.bottom <= pill.top)
         assertTrue("2x2: the pill is full width ($pill of ${drawn.root.width})", pill.width() >= drawn.root.width * 0.8)
     }
 
     @Test
-    fun x3x2DoesNotTruncateTheAmount() {
+    fun x2x3AlsoShowsTheNextShift() {
+        val drawn = draw(DpSize(150.dp, 250.dp))
+        assertMonth(drawn, "2x3")
+        assertShown(drawn, "Burger King", "2x3")
+        checkAdd(drawn, addTall, "2x3")
+    }
+
+    @Test
+    fun x3x2MonthAndNextShift() {
         val drawn = draw(DpSize(250.dp, 160.dp))
-        checkEarningsAndAdd(drawn, "1 477,00 zł", addTall, "3x2")
+        checkAdd(drawn, addTall, "3x2")
+        assertMonth(drawn, "3x2")
         assertShown(drawn, "Burger King", "3x2")
-        assertShown(drawn, "43 год", "3x2")
+        assertNoAmounts(drawn, "3x2")
     }
 
     @Test
     fun x4x2Bento() {
         val drawn = draw(DpSize(350.dp, 160.dp))
-        checkEarningsAndAdd(drawn, "1 477,00 zł", addTall, "4x2")
-        assertShown(drawn, "За місяць", "4x2")
+        checkAdd(drawn, addTall, "4x2")
+        assertMonth(drawn, "4x2")
         assertShown(drawn, "Burger King", "4x2")
         assertShown(drawn, "18:00–01:30", "4x2")
-        assertShown(drawn, "43 год", "4x2")
-    }
-
-    @Test
-    fun aLargerAmountShrinksInsteadOfTruncating() {
-        // + 20 757,01 zł -> 22 234,01 zł.
-        runBlocking { bonuses.upsert(Bonus(jobId = jobId, date = firstDay, amountGrosze = 2_075_701)) }
-        for ((name, size) in listOf("2x1" to DpSize(150.dp, 70.dp), "4x1" to DpSize(350.dp, 70.dp), "2x2" to DpSize(150.dp, 160.dp), "3x2" to DpSize(250.dp, 160.dp))) {
-            val drawn = draw(size)
-            assertNotTruncated(assertShown(drawn, "22 234,01 zł", name), name)
-        }
+        // The month is on the left, the shift card on the right.
+        val month = bounds(drawn.find(monthTitle)!!, drawn.root).first
+        val name = bounds(drawn.find("Burger King")!!, drawn.root).first
+        assertTrue("4x2: $month | $name", month.right <= name.left)
     }
 
     @Test

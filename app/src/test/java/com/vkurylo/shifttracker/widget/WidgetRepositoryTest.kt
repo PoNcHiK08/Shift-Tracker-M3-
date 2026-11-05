@@ -6,7 +6,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.repository.JobDetailsSource
-import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import com.vkurylo.shifttracker.domain.model.AppLanguage
@@ -32,7 +31,7 @@ import java.util.Locale
 
 /**
  * The widget reads the app's own repositories: a write anywhere (here straight into Room, as an
- * import would) produces a new widget state, and the app language and "hide amounts" are applied.
+ * import would) produces a new widget state, in the app language.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
@@ -40,7 +39,7 @@ class WidgetRepositoryTest {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val db = Room.inMemoryDatabaseBuilder(context, ShiftDatabase::class.java).allowMainThreadQueries().build()
     private val details = JobDetailsSource(db.paySettingsDao())
-    private val prefs = MutableStateFlow(UserPreferences(ThemeMode.SYSTEM, true, EarningsMode.GROSS, hideWidgetAmounts = false))
+    private val prefs = MutableStateFlow(UserPreferences(ThemeMode.SYSTEM, true, EarningsMode.GROSS))
     private val now = LocalDateTime.of(2026, 11, 4, 9, 0)
 
     private val language = object : LanguageRepository {
@@ -55,13 +54,11 @@ class WidgetRepositoryTest {
         override suspend fun setThemeMode(mode: ThemeMode) = Unit
         override suspend fun setDynamicColor(enabled: Boolean) = Unit
         override suspend fun setEarningsMode(mode: EarningsMode) = Unit
-        override suspend fun setHideWidgetAmounts(hide: Boolean) { prefs.value = prefs.value.copy(hideWidgetAmounts = hide) }
     }
     private val shifts = RoomShiftRepository(db.shiftDao(), details)
     private val repository = WidgetRepository(
         context,
         shifts,
-        RoomBonusRepository(db.bonusDao(), details),
         RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), details),
         preferences,
         language,
@@ -81,10 +78,9 @@ class WidgetRepositoryTest {
         val state = repository.models { now }.first { it.state.nextShift != null }.state
         assertEquals("Kawiarnia", state.nextShift!!.jobName)
         assertEquals("Сьогодні", state.nextShift!!.whenLabel)
-        assertEquals("240,00 zł", state.amountLines.single())
-        assertEquals("8 год", state.hours)
-
-        preferences.setHideWidgetAmounts(true)
-        assertEquals(listOf("•••"), repository.models { now }.first().state.amountLines)
+        assertEquals("Листопад", state.monthTitle)
+        val day = state.monthWeeks.flatten().single { it?.day == 4 }!!
+        assertEquals(true, day.today)
+        assertEquals(1, day.shiftColor)
     }
 }

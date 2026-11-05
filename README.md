@@ -40,18 +40,16 @@ UI in **Ukrainian** by default with **English** as an alternative.
   Under the finger every day morphs into the squircle too.
 - **Summary** — week / month / year totals (hours, earnings, average rate) with a per-job breakdown,
   plus per-day bars for a week and per-month bars for a year. Paging slides the period label in the direction of travel.
-- **Home-screen widget** (Jetpack Glance, Material 3) — this month's earnings (the same figure as the calendar:
-  bonuses, fixed salaries, Gross/Net, one line per currency, at most two then "+N", with the "Gross"/"Net" tag when
-  jobs have deductions), paid hours, the shift in progress ("Until 06:00", overnight shifts included) or the next one
-  within 60 days, and "+ Shift". Resizable; the layout follows both width and height (drawn for the exact sizes the
-  launcher reports): 2×1 total + hours and "+", 3×1/4×1 one bar (total | next shift | "+"), 2×2/2×3 a column
-  (total, next shift, full-width "+ Shift"), 3×2 and up two columns. Amounts shrink to fit rather than being cut
-  with "…". Taps open the
-  new-shift editor on today, that shift's editor, the Summary tab or Jobs; an open editor is never stacked on.
-  Dynamic colors on Android 12+, the app's palette before; texts, dates and amounts in the app's language.
-  It updates as soon as anything changes in the app, and on its own every 30 min and on clock / time zone / locale
-  changes (so a new day or a finished shift can take up to 30 min to show). "Hide amounts in widget" in Settings
-  shows ••• instead of money.
+- **Home-screen widget** (Jetpack Glance, Material 3) — a shift calendar and the next shift, no money on the home
+  screen: the month grid (Monday first, today filled, shift days tinted with their job's color) or, one row tall, the
+  current week; the shift in progress ("Until 06:00", overnight shifts included) or the next one within 60 days; and
+  "+ Shift". Resizable; the layout follows both width and height (drawn for the exact sizes the launcher reports):
+  2×1 next shift and "+", 3×1/4×1 one bar (this week | next shift | "+"), 2×2/2×3 a column (month, next shift when
+  there's room, full-width "+ Shift"), 3×2 and up the month next to the next shift. Texts shrink to fit rather than
+  being cut with "…". Taps open the new-shift editor on today, that shift's editor or Jobs (no jobs yet); the calendar
+  opens the app; an open editor is never stacked on. Dynamic colors on Android 12+, the app's palette before; texts
+  and dates in the app's language. It updates as soon as anything changes in the app, and on its own every 30 min
+  and on clock / time zone / locale changes (so a new day or a finished shift can take up to 30 min to show).
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
   An import checks the whole file before touching anything (format versions 1–4; files older than 4 import as PLN,

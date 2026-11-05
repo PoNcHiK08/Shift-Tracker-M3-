@@ -67,7 +67,6 @@ class SettingsViewModel @Inject constructor(
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setDynamicColor(enabled) }
     fun setEarningsMode(mode: EarningsMode) = viewModelScope.launch { preferencesRepository.setEarningsMode(mode) }
-    fun setHideWidgetAmounts(hide: Boolean) = viewModelScope.launch { preferencesRepository.setHideWidgetAmounts(hide) }
 
     fun setLanguage(value: AppLanguage) {
         language.update { value }

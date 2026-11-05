@@ -10,7 +10,6 @@ sealed interface LaunchRequest {
     /** The new-shift editor on today's date. */
     data object NewShift : LaunchRequest
     data class EditShift(val shiftId: Long) : LaunchRequest
-    data object Summary : LaunchRequest
     data object Jobs : LaunchRequest
 }
 
@@ -22,7 +21,6 @@ object WidgetLaunch {
 
     private const val NEW_SHIFT = "new-shift"
     private const val SHIFT = "shift"
-    private const val SUMMARY = "summary"
     private const val JOBS = "jobs"
     private const val APP = "app"
 
@@ -31,7 +29,6 @@ object WidgetLaunch {
         val (target, id) = when (request) {
             LaunchRequest.NewShift -> NEW_SHIFT to 0L
             is LaunchRequest.EditShift -> SHIFT to request.shiftId
-            LaunchRequest.Summary -> SUMMARY to 0L
             LaunchRequest.Jobs -> JOBS to 0L
             null -> APP to 0L
         }
@@ -53,7 +50,6 @@ object WidgetLaunch {
         return when (intent.getStringExtra(EXTRA_TARGET)) {
             NEW_SHIFT -> LaunchRequest.NewShift
             SHIFT -> intent.getLongExtra(EXTRA_SHIFT_ID, 0L).takeIf { it > 0 }?.let { LaunchRequest.EditShift(it) }
-            SUMMARY -> LaunchRequest.Summary
             JOBS -> LaunchRequest.Jobs
             else -> null
         }
