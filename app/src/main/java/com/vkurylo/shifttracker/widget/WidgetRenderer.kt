@@ -14,7 +14,7 @@ import androidx.glance.appwidget.compose
 
 /**
  * Draws the widget straight into AppWidgetManager: composes [ShiftTrackerWidget] into RemoteViews
- * (for every responsive size) and hands them over. Glance normally draws in a WorkManager job; that
+ * (for every size the launcher reports) and hands them over. Glance normally draws in a WorkManager job; that
  * job goes through JobScheduler, which drops jobs it rejects without a trace (the widget then stays on
  * its loading layout). Drawing here doesn't depend on it, so the widget always shows its content.
  * Its taps are plain activity PendingIntents, so they don't need Glance's per-widget state.
@@ -32,23 +32,50 @@ object WidgetRenderer {
         val widget = ShiftTrackerWidget()
         val options = manager.getAppWidgetOptions(appWidgetId) ?: Bundle()
         val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // The launcher picks the layout that fits, as Glance's SizeMode.Responsive does.
+            // One layout per size the launcher draws the widget at (portrait, landscape, ...), each laid
+            // out for that exact size; the launcher shows the one that matches.
             RemoteViews(
-                ShiftTrackerWidget.SIZES.associate { size ->
+                sizesFor(options).associate { size ->
                     SizeF(size.width.value, size.height.value) to widget.compose(context, options = options, size = size)
                 },
             )
         } else {
-            widget.compose(context, options = options, size = fittingSize(options))
+            widget.compose(context, options = options, size = portraitSize(options) ?: DEFAULT_SIZE)
         }
         manager.updateAppWidget(appWidgetId, views)
     }
 
-    /** Before Android 12: the size the widget has in portrait (its min width, max height). */
-    private fun fittingSize(options: Bundle): DpSize {
-        val width = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0).dp
-        val height = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0).dp
-        val medium = ShiftTrackerWidget.MEDIUM
-        return if (width >= medium.width && height >= medium.height) medium else ShiftTrackerWidget.COMPACT
+    /**
+     * The sizes to draw for on Android 12+: the ones the launcher reports, else its min/max bounds, else
+     * (nothing reported yet) every layout's smallest size, so the launcher can pick the largest that fits.
+     */
+    internal fun sizesFor(options: Bundle): List<DpSize> {
+        @Suppress("DEPRECATION")
+        val reported = options.getParcelableArrayList<SizeF>(AppWidgetManager.OPTION_APPWIDGET_SIZES)
+            ?.filter { it.width > 0f && it.height > 0f }
+            ?.map { DpSize(it.width.dp, it.height.dp) }
+        if (!reported.isNullOrEmpty()) return reported.distinct().take(MAX_SIZES)
+        val bounds = listOfNotNull(portraitSize(options), landscapeSize(options)).distinct()
+        return bounds.ifEmpty { WidgetLayout.BREAKPOINTS }
     }
+
+    /** Portrait: the widget's min width and max height. */
+    private fun portraitSize(options: Bundle): DpSize? = size(
+        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0),
+        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0),
+    )
+
+    /** Landscape: the widget's max width and min height. */
+    private fun landscapeSize(options: Bundle): DpSize? = size(
+        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 0),
+        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0),
+    )
+
+    private fun size(width: Int, height: Int): DpSize? = if (width > 0 && height > 0) DpSize(width.dp, height.dp) else null
+
+    /** Before anything is reported: the 4×2 the widget is placed at. */
+    private val DEFAULT_SIZE = DpSize(250.dp, 120.dp)
+
+    /** RemoteViews accepts at most 16 sized layouts. */
+    private const val MAX_SIZES = 16
 }

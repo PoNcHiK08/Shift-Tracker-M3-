@@ -70,12 +70,12 @@ class WidgetRenderTest {
         val shadow = shadowOf(manager)
         val id = shadow.createWidget(ShiftTrackerWidgetReceiver::class.java, R.layout.widget_loading)
         WidgetRenderer.render(context, manager, id)
-        // Without a size the launcher shows the compact layout: the month total, hours and "+".
+        // No size reported yet: drawn for every layout's breakpoint; the smallest has the total, hours and "+".
         val compact = texts(shadow.getViewFor(id))
         assertTrue(compact.toString(), compact.containsAll(listOf("244.00\u00A0zł", "8 h", "+")))
 
-        // The medium layout inflates with the next shift.
-        val medium = ShiftTrackerWidget().compose(context, size = ShiftTrackerWidget.MEDIUM)
+        // The 4×2 layout inflates with the next shift.
+        val medium = ShiftTrackerWidget().compose(context, size = DpSize(250.dp, 120.dp))
         val texts = texts(medium.apply(context, FrameLayout(context)))
         assertTrue(texts.toString(), "Kawiarnia" in texts && "08:00–16:00" in texts && "+ Shift" in texts)
     }
