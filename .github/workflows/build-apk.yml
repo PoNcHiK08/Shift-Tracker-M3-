@@ -62,10 +62,12 @@ jobs:
           name: test-reports
           path: app/build/reports/tests/
 
-      # A permanent download link that always points at the newest build:
+      # A permanent download link that always points at the newest build of the default branch:
       # https://github.com/<owner>/<repo>/releases/download/latest-build/ShiftTracker.apk
+      # Other branches and pull requests only upload the workflow artifact above, so a feature branch
+      # (e.g. one with a database migration) never replaces the APK behind this link.
       - name: Publish "latest-build" release
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

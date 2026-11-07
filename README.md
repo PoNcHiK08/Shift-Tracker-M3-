@@ -73,9 +73,10 @@ UI in **Ukrainian** by default with **English** as an alternative.
 
 Every push builds the app on GitHub Actions:
 
-- **Permanent link to the newest build:**
+- **Permanent link to the newest build of the default branch:**
   `https://github.com/PoNcHiK08/Shift-Tracker-M3-/releases/download/latest-build/ShiftTracker.apk`
-- Or open **Actions → Build APK → latest run → Artifacts**.
+  (only pushes to the default branch update it).
+- Builds of other branches and pull requests: **Actions → Build APK → that run → Artifacts**.
 
 All builds are signed with the same development key (`app/signing/dev.keystore`), so a new build installs
 as an update over the old one and keeps your data. Android will ask to allow installs from your browser /
