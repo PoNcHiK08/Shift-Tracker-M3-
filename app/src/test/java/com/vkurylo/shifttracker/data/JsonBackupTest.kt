@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.data.backup.BackupFile
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
+import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.data.local.toEntity
@@ -243,7 +244,8 @@ class JsonBackupTest {
 
         val again = newDb()
         JsonBackupRepository(again).importJson(JsonBackupRepository(db).exportJson())
-        assertEquals(db.jobDao().getAll(), again.jobDao().getAll())
+        // Same jobs; sync ids and change times are the importing database's own (backup v4 carries none).
+        assertEquals(db.jobDao().getAll().map { it.withoutSyncMetadata() }, again.jobDao().getAll().map { it.withoutSyncMetadata() })
         assertTrue(JsonBackupRepository(db).exportJson().contains("\"currency\": \"KWD\""))
     }
 
@@ -270,6 +272,8 @@ class JsonBackupTest {
     }
 
     // --- Helpers --------------------------------------------------------------------------------
+
+    private fun JobEntity.withoutSyncMetadata() = copy(syncId = "", updatedAt = 0)
 
     private suspend fun seededDb(): ShiftDatabase = newDb().also { db ->
         db.jobDao().upsert(Job(id = 7, name = "Kawiarnia", hourlyRateGrosze = 3050, color = 3).toEntity())

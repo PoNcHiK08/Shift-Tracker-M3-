@@ -37,7 +37,7 @@ class ImportIcsViewModelTest {
         return ImportIcsViewModel(
             SavedStateHandle(mapOf("uri" to Uri.fromFile(file).toString())),
             DocumentIo(context),
-            RoomShiftRepository(db.shiftDao(), JobDetailsSource(db.paySettingsDao())),
+            RoomShiftRepository(db, db.shiftDao(), JobDetailsSource(db.paySettingsDao())),
             RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), JobDetailsSource(db.paySettingsDao())),
         )
     }

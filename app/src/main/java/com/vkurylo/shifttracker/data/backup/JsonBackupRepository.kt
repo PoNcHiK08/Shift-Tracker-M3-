@@ -8,6 +8,8 @@ import com.vkurylo.shifttracker.data.local.monthKeyToYearMonth
 import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.ShiftEntity
+import com.vkurylo.shifttracker.data.local.WallClock
+import com.vkurylo.shifttracker.data.local.stamped
 import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Currencies
@@ -106,6 +108,7 @@ data class BackupBonus(
 @Singleton
 class JsonBackupRepository @Inject constructor(
     private val db: ShiftDatabase,
+    private val clock: WallClock = WallClock.System,
 ) : BackupRepository {
 
     private val json = Json {
@@ -191,15 +194,17 @@ class JsonBackupRepository @Inject constructor(
         val bonuses = convert("bonuses") { file.bonuses.map { toBonus(it, digitsByJob) } }
 
         // If any write fails, the transaction rolls back and the old data stays.
+        // Every imported record is new here (fresh sync id, changed now).
+        val now = clock.nowMillis()
         db.withTransaction {
             db.bonusDao().deleteAll()
             db.shiftDao().deleteAll()
             db.paySettingsDao().deleteAll()
             db.jobDao().deleteAll()
-            db.jobDao().insertAll(jobs)
+            db.jobDao().insertAll(jobs.map { it.stamped(null, now) })
             db.paySettingsDao().insertAll(payHistory)
-            db.shiftDao().insertAll(shifts)
-            db.bonusDao().insertAll(bonuses)
+            db.shiftDao().insertAll(shifts.map { it.stamped(null, now) })
+            db.bonusDao().insertAll(bonuses.map { it.stamped(null, now) })
         }
         return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)
     }

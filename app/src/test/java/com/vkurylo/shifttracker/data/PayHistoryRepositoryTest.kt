@@ -34,7 +34,7 @@ class PayHistoryRepositoryTest {
         .build()
     private val details = JobDetailsSource(db.paySettingsDao())
     private val jobs = RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), details)
-    private val shifts = RoomShiftRepository(db.shiftDao(), details)
+    private val shifts = RoomShiftRepository(db, db.shiftDao(), details)
 
     @After
     fun tearDown() = db.close()

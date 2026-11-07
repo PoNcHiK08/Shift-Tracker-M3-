@@ -18,7 +18,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 
-@Entity(tableName = "jobs")
+@Entity(tableName = "jobs", indices = [Index(value = ["sync_id"], unique = true)])
 data class JobEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -30,6 +30,14 @@ data class JobEntity(
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
     /** ISO 4217 code; amounts of the job, its shifts and bonuses are minor units of it. Added in DB version 4. */
     @ColumnInfo(defaultValue = "PLN") val currency: String = "PLN",
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 @Entity(
@@ -42,7 +50,7 @@ data class JobEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("job_id"), Index("date_epoch_day"), Index("external_uid")],
+    indices = [Index("job_id"), Index("date_epoch_day"), Index("external_uid"), Index(value = ["sync_id"], unique = true)],
 )
 data class ShiftEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -59,6 +67,14 @@ data class ShiftEntity(
     @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
     @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 data class ShiftWithJobRow(
@@ -133,7 +149,7 @@ fun ShiftWithJobRow.toDomain() = ShiftWithJob(shift = shift.toDomain(), job = jo
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("job_id"), Index("date_epoch_day")],
+    indices = [Index("job_id"), Index("date_epoch_day"), Index(value = ["sync_id"], unique = true)],
 )
 data class BonusEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -141,6 +157,14 @@ data class BonusEntity(
     @ColumnInfo(name = "date_epoch_day") val dateEpochDay: Long,
     @ColumnInfo(name = "amount_grosze") val amountGrosze: Long,
     val note: String?,
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 data class BonusWithJobRow(

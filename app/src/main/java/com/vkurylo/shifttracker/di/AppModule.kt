@@ -12,6 +12,7 @@ import com.vkurylo.shifttracker.data.local.PaySettingsDao
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
+import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.data.repository.AppCompatLanguageRepository
 import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
 import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
@@ -38,7 +39,12 @@ object DataModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): ShiftDatabase =
-        Room.databaseBuilder(context, ShiftDatabase::class.java, ShiftDatabase.NAME).build()
+        Room.databaseBuilder(context, ShiftDatabase::class.java, ShiftDatabase.NAME)
+            .addMigrations(ShiftDatabase.MIGRATION_6_7)
+            .build()
+
+    @Provides
+    fun provideWallClock(): WallClock = WallClock.System
 
     @Provides
     fun provideJobDao(db: ShiftDatabase): JobDao = db.jobDao()
