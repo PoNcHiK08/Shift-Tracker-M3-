@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
@@ -133,7 +134,7 @@ fun EditBonusScreen(
                 value = state.amount,
                 onValueChange = viewModel::setAmount,
                 label = { Text(stringResource(R.string.bonus_amount)) },
-                suffix = { Text("zł") },
+                suffix = { Text(Currencies.symbol(state.currency)) },
                 singleLine = true,
                 isError = state.showErrors && state.amountGrosze == null,
                 supportingText = if (state.showErrors && state.amountGrosze == null) {

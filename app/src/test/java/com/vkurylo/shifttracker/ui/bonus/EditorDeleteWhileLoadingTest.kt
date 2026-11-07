@@ -63,6 +63,9 @@ class EditorDeleteWhileLoadingTest {
             override suspend fun upsert(job: Job): Long = job.id
             override suspend fun delete(job: Job) = Unit
             override suspend fun shiftCount(jobId: Long): Int = 0
+            override suspend fun entryCount(jobId: Long): Int = 0
+            override suspend fun latestCurrency(): String? = null
+            override suspend fun save(job: Job, pay: com.vkurylo.shifttracker.domain.model.PaySettings): Long = job.id
         }
         val vm = EditBonusViewModel(SavedStateHandle(mapOf("bonusId" to 5L)), bonuses, jobs, CoroutineScope(Dispatchers.Unconfined))
         composeRule.setContent {

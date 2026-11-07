@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
@@ -15,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -23,6 +25,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 
@@ -30,18 +33,44 @@ import com.vkurylo.shifttracker.ui.util.currentLocale
 @Composable
 fun RollingMoney(
     grosze: Long,
+    currency: String,
     style: TextStyle,
     modifier: Modifier = Modifier,
     color: Color = Color.Unspecified,
     prefix: String = "",
 ) {
     RollingText(
-        text = prefix + Formatters.money(grosze, currentLocale()),
+        text = prefix + Formatters.money(grosze, currency, currentLocale()),
         value = grosze,
         style = style,
         modifier = modifier,
         color = color,
     )
+}
+
+/**
+ * Totals per currency, one rolling line each, the largest first. With a single currency this is
+ * exactly one [RollingMoney]; with none, zero in [fallbackCurrency].
+ */
+@Composable
+fun RollingAmounts(
+    amounts: Amounts,
+    fallbackCurrency: String,
+    style: TextStyle,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Unspecified,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+) {
+    val lines = amounts.sortedByValue().ifEmpty { listOf(fallbackCurrency to 0L) }
+    if (lines.size == 1) {
+        RollingMoney(grosze = lines[0].second, currency = lines[0].first, style = style, modifier = modifier, color = color)
+    } else {
+        Column(modifier, horizontalAlignment = horizontalAlignment) {
+            lines.forEach { (code, value) ->
+                key(code) { RollingMoney(grosze = value, currency = code, style = style, color = color) }
+            }
+        }
+    }
 }
 
 /**

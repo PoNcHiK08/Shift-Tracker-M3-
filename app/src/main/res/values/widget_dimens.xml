@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home-screen widget corners: 16 dp before Android 12, the launcher's own radii from 12 on (values-v31). -->
+    <dimen name="widget_radius">16dp</dimen>
+    <dimen name="widget_inner_radius">12dp</dimen>
+    <dimen name="widget_button_radius">22dp</dimen>
+    <!-- A calendar day: a circle (a radius above half the size rounds it fully). -->
+    <dimen name="widget_day_radius">50dp</dimen>
+</resources>

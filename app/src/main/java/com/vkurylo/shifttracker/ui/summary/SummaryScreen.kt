@@ -52,12 +52,14 @@ import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
-import com.vkurylo.shifttracker.ui.components.RollingMoney
+import com.vkurylo.shifttracker.ui.components.RollingAmounts
 import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.SectionHeader
 import com.vkurylo.shifttracker.ui.components.SegmentedItem
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.composeColor
+import com.vkurylo.shifttracker.domain.model.Amounts
+import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
@@ -112,7 +114,17 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
             }
             item(key = "hero") {
                 // One card that stays put: switching week/month/year or paging rolls its numbers.
-                TotalsCard(range.period, state.summary, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                TotalsCard(range.period, state.summary, state.defaultCurrency, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            }
+            if (range.period == SummaryPeriod.WEEK && state.summary.fixedPayShiftCount > 0) {
+                item(key = "fixed-pay-note") {
+                    Text(
+                        stringResource(R.string.week_fixed_pay_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                    )
+                }
             }
             if (!state.loading && state.summary.isEmpty) {
                 item(key = "empty") {
@@ -129,7 +141,7 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                     itemsIndexed(jobs, key = { _, it -> "job-${it.job.id}" }) { index, jobSummary ->
                         JobSummaryItem(
                             summary = jobSummary,
-                            totalEarnings = state.summary.totalEarningsGrosze,
+                            totalEarnings = state.summary.totalEarnings[jobSummary.currency],
                             index = index,
                             count = jobs.size,
                             modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
@@ -141,13 +153,19 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                         SectionHeader(stringResource(if (range.period == SummaryPeriod.WEEK) R.string.by_day else R.string.by_month))
                     }
                     val entries = state.breakdown
-                    val max = entries.maxOf { it.earningsGrosze }.coerceAtLeast(1)
+                    // Bars compare earnings; amounts in different currencies can't share one scale, so
+                    // with several currencies in the period the bars compare hours instead.
+                    val currencies = entries.flatMap { it.earnings.currencies }.toSet()
+                    val barOf: (BreakdownEntry) -> Long =
+                        if (currencies.size <= 1) { e -> e.earnings.byCurrency.values.sum() } else { e -> e.paidMinutes }
+                    val max = entries.maxOf(barOf).coerceAtLeast(1)
                     // Keyed by position: paging keeps the rows in place (only values and bars change),
                     // so old and new rows never fade over each other.
                     itemsIndexed(entries, key = { index, _ -> "breakdown-$index" }) { index, entry ->
                         BreakdownItem(
                             period = range.period,
                             entry = entry,
+                            bar = barOf(entry),
                             max = max,
                             index = index,
                             count = entries.size,
@@ -196,11 +214,14 @@ private fun periodLabel(range: PeriodRange): String {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: Modifier = Modifier) {
+private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurrency: String, modifier: Modifier = Modifier) {
     val locale = currentLocale()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val onColor = MaterialTheme.colorScheme.onPrimaryContainer
-    val average = summary.averageRateGrosze
+    // An average hourly rate only where there was hourly-paid time (a salaried job has none).
+    val rated = summary.perJob.filter { it.hourlyPaidMinutes > 0 }.map { it.currency }.distinct()
+    val currencies = rated.ifEmpty { listOf(summary.currencies.firstOrNull() ?: defaultCurrency) }
+    val averageText = currencies.joinToString(" · ") { Formatters.money(summary.averageRate(it), it, locale) }
     val title = when (period) {
         SummaryPeriod.WEEK -> R.string.earnings_week
         SummaryPeriod.MONTH -> R.string.earnings_month
@@ -217,16 +238,22 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
                 transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
                 label = "totalsTitle",
             ) { res ->
-                Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
+                    // Gross or net, whenever jobs have deductions.
+                    EarningsModeTag(Modifier.padding(start = 8.dp), color = onColor)
+                }
             }
-            RollingMoney(
-                grosze = summary.totalEarningsGrosze,
+            RollingAmounts(
+                amounts = summary.totalEarnings,
+                fallbackCurrency = defaultCurrency,
                 style = MaterialTheme.typography.displaySmallEmphasized,
                 color = onColor,
             )
-            if (summary.bonusGrosze > 0) {
+            val bonuses = summary.bonuses.byCurrency.filterValues { it > 0 }
+            if (bonuses.isNotEmpty()) {
                 Text(
-                    stringResource(R.string.including_bonuses, Formatters.money(summary.bonusGrosze, locale)),
+                    stringResource(R.string.including_bonuses, Formatters.amounts(Amounts(bonuses), locale)),
                     style = MaterialTheme.typography.bodyMedium,
                     color = onColor.copy(alpha = 0.8f),
                 )
@@ -249,8 +276,8 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, modifier: M
                 )
                 RollingStat(
                     label = stringResource(R.string.average_rate),
-                    text = Formatters.money(average, locale),
-                    value = average,
+                    text = averageText,
+                    value = summary.averageRate(currencies.first()),
                     color = onColor,
                     modifier = Modifier.weight(1.3f),
                 )
@@ -277,8 +304,11 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                             add(hoursLabel(summary.paidMinutes))
                             add(shiftsCountLabel(summary.shiftCount))
                         }
+                        if (summary.salaryMinor > 0) {
+                            add(stringResource(R.string.salary_value, Formatters.money(summary.salaryMinor, summary.currency, locale)))
+                        }
                         if (summary.bonusGrosze > 0) {
-                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, locale)))
+                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, summary.currency, locale)))
                         }
                     }
                     Text(
@@ -287,7 +317,7 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(Formatters.money(summary.earningsGrosze, locale), style = MaterialTheme.typography.titleMedium)
+                Text(Formatters.money(summary.earningsGrosze, summary.currency, locale), style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(14.dp))
             val percent = (share * 100).toInt()
@@ -309,6 +339,7 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
 private fun BreakdownItem(
     period: SummaryPeriod,
     entry: BreakdownEntry,
+    bar: Long,
     max: Long,
     index: Int,
     count: Int,
@@ -325,7 +356,7 @@ private fun BreakdownItem(
         else -> Formatters.monthName(YearMonth.from(entry.date), locale)
     }
     val empty = entry.isEmpty
-    val valueText = Formatters.money(entry.earningsGrosze, locale)
+    val valueText = Formatters.amounts(entry.earnings, locale)
     val hoursText = hoursLabel(entry.paidMinutes)
     SegmentedItem(
         index = index,
@@ -359,7 +390,7 @@ private fun BreakdownItem(
             if (!empty) {
                 Spacer(Modifier.height(8.dp))
                 val progress by animateFloatAsState(
-                    targetValue = entry.earningsGrosze.toFloat() / max,
+                    targetValue = bar.toFloat() / max,
                     animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                     label = "breakdown",
                 )

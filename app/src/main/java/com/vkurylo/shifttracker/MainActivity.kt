@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
@@ -21,21 +22,32 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.ui.components.CrashReportDialog
 import com.vkurylo.shifttracker.ui.navigation.ShiftTrackerNavHost
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
+import androidx.compose.runtime.CompositionLocalProvider
 import com.vkurylo.shifttracker.ui.theme.isDark
+import com.vkurylo.shifttracker.widget.LaunchRequest
+import com.vkurylo.shifttracker.widget.WidgetLaunch
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    /** A widget tap waiting for the navigation graph (see [ShiftTrackerNavHost]). */
+    private val launchRequests = MutableStateFlow<LaunchRequest?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // A recreated activity (rotation, process restore) must not replay the tap that opened it.
+        if (savedInstanceState == null) consumeLaunch(intent)
 
         setContent {
             val preferences by viewModel.preferences.collectAsStateWithLifecycle()
             val prefs = preferences ?: return@setContent // DataStore loads in a few ms
+            val earningsDisplay by viewModel.earningsDisplay.collectAsStateWithLifecycle()
             val darkTheme = prefs.themeMode.isDark()
 
             // Keep status/navigation bar icons readable when the app theme differs from the system one.
@@ -48,14 +60,33 @@ class MainActivity : AppCompatActivity() {
             }
 
             ShiftTrackerTheme(darkTheme = darkTheme, dynamicColor = prefs.useDynamicColor) {
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                    ShiftTrackerNavHost()
+                CompositionLocalProvider(LocalEarningsDisplay provides earningsDisplay) {
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        val launch by launchRequests.collectAsStateWithLifecycle()
+                        ShiftTrackerNavHost(launchRequest = launch, onLaunchHandled = { launchRequests.value = null })
+                    }
                 }
                 // A crash/unexpected close last time? Show it so it can be copied and sent.
                 var crashReport by remember { mutableStateOf(CrashReporter.consume(this@MainActivity)) }
                 crashReport?.let { report -> CrashReportDialog(report, onDismiss = { crashReport = null }) }
             }
         }
+    }
+
+    // singleTop: a widget tap while the app is open arrives here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        consumeLaunch(intent)
+    }
+
+    /**
+     * Takes a widget request out of [intent] and clears it from the activity, so neither a recreation
+     * nor a relaunch from Recents opens the same screen again (those are also ignored by [WidgetLaunch.parse]).
+     */
+    private fun consumeLaunch(intent: Intent?) {
+        if (intent?.action != WidgetLaunch.ACTION) return
+        WidgetLaunch.parse(intent)?.let { launchRequests.value = it }
+        setIntent(Intent(this, MainActivity::class.java).setAction(Intent.ACTION_MAIN))
     }
 
     override fun finish() {

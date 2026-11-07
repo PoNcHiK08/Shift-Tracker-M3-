@@ -242,4 +242,37 @@
         <item quantity="many">Імпортовано %1$d змін</item>
         <item quantity="other">Імпортовано %1$d зміни</item>
     </plurals>
+    <string name="currency">Валюта</string>
+    <string name="currency_pick_title">Валюта роботи</string>
+    <string name="currency_search">Пошук: код або назва</string>
+    <string name="currency_locked">Валюту не можна змінити, коли вже є зміни чи бонуси. Для іншої валюти створіть нову роботу.</string>
+    <string name="pay_type">Оплата</string>
+    <string name="pay_type_hourly">Погодинна</string>
+    <string name="pay_type_fixed_monthly">Оклад за місяць</string>
+    <string name="monthly_amount">Оклад за місяць</string>
+    <string name="pay_applies_from">Діє з</string>
+    <string name="pay_applies_from_hint">Попередні місяці лишаються як були.</string>
+    <string name="fixed_salary">Оклад</string>
+    <string name="fixed_salary_per_month">Оклад %1$s/міс.</string>
+    <string name="salary_value">оклад %1$s</string>
+    <string name="fixed_salary_shift_hint">Ця зміна рахується в години: роботі платять місячний оклад.</string>
+    <string name="week_fixed_pay_note">Роботи з окладом рахуються помісячно, тож за тиждень тут лише їхні години.</string>
+    <string name="earnings_gross">Брутто</string>
+    <string name="earnings_net">Нетто</string>
+    <string name="earnings_mode">Заробіток показувати</string>
+    <string name="earnings_mode_summary">Нетто = брутто мінус відсоток утримань кожної роботи.</string>
+    <string name="deduction_percent">Утримання</string>
+    <string name="deduction_hint">0 — без утримань. Ваш власний відсоток (податки, внески); програма не рахує податки сама.</string>
+    <string name="error_percent_invalid">Від 0 до 100, не більше двох знаків після коми</string>
+    <string name="deduction_value">утримання %1$s %%</string>
+    <string name="widget_description">Календар змін і наступна зміна</string>
+    <string name="widget_add_shift">+ Зміна</string>
+    <string name="widget_add_first_job">Додайте першу роботу</string>
+    <string name="widget_no_upcoming">Немає найближчих змін</string>
+    <string name="widget_today">Сьогодні</string>
+    <string name="widget_tomorrow">Завтра</string>
+    <string name="widget_until">До %1$s</string>
+    <string name="widget_preview_month">Листопад</string>
+    <string name="widget_preview_calendar">"Пн Вт Ср Чт Пт Сб Нд\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30"</string>
+    <string name="widget_preview_when">Завтра · 18:30–01:30</string>
 </resources>

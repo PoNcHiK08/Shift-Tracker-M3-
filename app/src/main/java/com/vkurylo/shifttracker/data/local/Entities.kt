@@ -9,11 +9,14 @@ import androidx.room.PrimaryKey
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 
 @Entity(tableName = "jobs")
 data class JobEntity(
@@ -25,6 +28,8 @@ data class JobEntity(
     @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
     @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
+    /** ISO 4217 code; amounts of the job, its shifts and bonuses are minor units of it. Added in DB version 4. */
+    @ColumnInfo(defaultValue = "PLN") val currency: String = "PLN",
 )
 
 @Entity(
@@ -73,6 +78,7 @@ fun JobEntity.toDomain() = Job(
     hourlyRateGrosze = hourlyRateGrosze,
     color = color,
     secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
+    currency = currency,
 )
 
 fun Job.toEntity() = JobEntity(
@@ -83,6 +89,7 @@ fun Job.toEntity() = JobEntity(
     secondRateGrosze = secondRate?.rateGrosze,
     secondRateFromMinute = (secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toMinute(),
     secondRateToMinute = (secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toMinute(),
+    currency = currency,
 )
 
 fun ShiftEntity.toDomain() = Shift(
@@ -158,3 +165,56 @@ fun Bonus.toEntity() = BonusEntity(
 )
 
 fun BonusWithJobRow.toDomain() = BonusWithJob(bonus = bonus.toDomain(), job = job.toDomain())
+
+/**
+ * One entry of a job's pay settings history (see [PaySettings]). Added in DB version 5.
+ * [fromMonth] is yyyymm (202611), or 0 for "from the very beginning".
+ */
+@Entity(
+    tableName = "job_pay_settings",
+    foreignKeys = [
+        ForeignKey(
+            entity = JobEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["job_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index(value = ["job_id", "from_month"], unique = true)],
+)
+data class JobPaySettingsEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    @ColumnInfo(name = "from_month") val fromMonth: Int,
+    @ColumnInfo(name = "pay_type") val payType: String,
+    /** Minor units of the job's currency. */
+    @ColumnInfo(name = "monthly_amount_minor") val monthlyAmountMinor: Long,
+    /** Deductions in basis points (13.71 % = 1371). Added in DB version 6. */
+    @ColumnInfo(name = "deduction_bp", defaultValue = "0") val deductionBp: Int = 0,
+)
+
+/** First and last date (epoch day) with any shift or bonus of a job. */
+data class JobActivityRow(
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    @ColumnInfo(name = "first_day") val firstDay: Long,
+    @ColumnInfo(name = "last_day") val lastDay: Long,
+)
+
+fun YearMonth?.toMonthKey(): Int = this?.let { it.year * 100 + it.monthValue } ?: 0
+internal fun monthKeyToYearMonth(key: Int): YearMonth? = if (key == 0) null else YearMonth.of(key / 100, key % 100)
+
+fun JobPaySettingsEntity.toDomain() = PaySettings(
+    from = monthKeyToYearMonth(fromMonth),
+    // An unknown type (written by a newer app version) reads as hourly rather than crashing.
+    payType = PayType.entries.firstOrNull { it.name == payType } ?: PayType.HOURLY,
+    monthlyAmountMinor = monthlyAmountMinor,
+    deductionBp = deductionBp,
+)
+
+fun PaySettings.toEntity(jobId: Long) = JobPaySettingsEntity(
+    jobId = jobId,
+    fromMonth = from.toMonthKey(),
+    payType = payType.name,
+    monthlyAmountMinor = monthlyAmountMinor,
+    deductionBp = deductionBp,
+)

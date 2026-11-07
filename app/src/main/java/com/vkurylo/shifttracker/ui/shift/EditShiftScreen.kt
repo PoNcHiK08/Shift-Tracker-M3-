@@ -68,7 +68,9 @@ import com.vkurylo.shifttracker.ui.components.RollingText
 import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.jobs.jobRatesLabel
+import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.Formatters
+import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
 import java.time.ZoneOffset
@@ -309,12 +311,22 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             // Live "drum" counters: change a time or the break and the numbers roll.
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
-                    RollingMoney(
-                        grosze = pay.earningsGrosze,
-                        style = MaterialTheme.typography.headlineMediumEmphasized,
-                        color = onColor,
-                    )
+                    if (state.fixedPay) {
+                        // A salaried job: no per-shift earnings, rate or "use current rate".
+                        Text(stringResource(R.string.pay_type), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                        Text(stringResource(R.string.fixed_salary), style = MaterialTheme.typography.headlineMediumEmphasized, color = onColor)
+                    } else {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.earnings), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
+                            EarningsModeTag(Modifier.padding(start = 6.dp), color = onColor)
+                        }
+                        RollingMoney(
+                            grosze = state.earningsIn(LocalEarningsDisplay.current.mode),
+                            currency = state.currency,
+                            style = MaterialTheme.typography.headlineMediumEmphasized,
+                            color = onColor,
+                        )
+                    }
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text(stringResource(R.string.paid_hours), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
@@ -328,9 +340,11 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
             }
             Spacer(Modifier.height(12.dp))
             val second = state.secondRate
-            if (second == null) {
+            if (state.fixedPay) {
+                Text(stringResource(R.string.fixed_salary_shift_hint), style = MaterialTheme.typography.bodyMedium)
+            } else if (second == null) {
                 Text(
-                    stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, locale)),
+                    stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, state.currency, locale)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
@@ -338,7 +352,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                 Text(
                     stringResource(
                         R.string.rate_line_base,
-                        Formatters.rate(state.rateGrosze, locale),
+                        Formatters.rate(state.rateGrosze, state.currency, locale),
                         Formatters.hoursMinutes(pay.baseRateMinutes),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
@@ -348,7 +362,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                         R.string.rate_line_second,
                         Formatters.time(second.from),
                         Formatters.time(second.to),
-                        Formatters.rate(second.rateGrosze, locale),
+                        Formatters.rate(second.rateGrosze, state.currency, locale),
                         Formatters.hoursMinutes(pay.secondRateMinutes),
                     ),
                     style = MaterialTheme.typography.bodyMedium,

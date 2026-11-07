@@ -6,6 +6,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.domain.model.Amounts
+import com.vkurylo.shifttracker.domain.model.Currencies
+import java.math.BigDecimal
+import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -24,15 +28,43 @@ val WeekDays: List<DayOfWeek> = DayOfWeek.entries
 fun currentLocale(): Locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
 
 object Formatters {
-    fun money(grosze: Long, locale: Locale): String {
-        val format = NumberFormat.getNumberInstance(locale).apply {
-            minimumFractionDigits = 2
-            maximumFractionDigits = 2
+    /**
+     * [minor] units of [currency] with the currency's decimals (0 for JPY, 3 for KWD). A symbol made
+     * of letters ("zł", "Kč", "kr", "CHF") always follows the number after a no-break space, as PLN
+     * always has; a sign ("€", "$", "₴") is placed the way the reader's [locale] places it
+     * ("€241.00" in English, "241,00 €" in Ukrainian).
+     */
+    fun money(minor: Long, currency: String, locale: Locale): String {
+        val digits = Currencies.fractionDigits(currency)
+        val symbol = Currencies.symbol(currency)
+        val value = BigDecimal.valueOf(minor, digits)
+        if (symbol.all { it.isLetter() }) {
+            val format = NumberFormat.getNumberInstance(locale).apply {
+                minimumFractionDigits = digits
+                maximumFractionDigits = digits
+            }
+            return format.format(value) + "\u00A0" + symbol
         }
-        return format.format(grosze / 100.0) + " zł"
+        val format = (NumberFormat.getCurrencyInstance(locale) as DecimalFormat).apply {
+            decimalFormatSymbols = decimalFormatSymbols.apply { currencySymbol = symbol }
+            minimumFractionDigits = digits
+            maximumFractionDigits = digits
+        }
+        return format.format(value)
     }
 
-    fun rate(grosze: Long, locale: Locale): String = money(grosze, locale) + "/h"
+    /** PLN, as everything was before currencies per job (tests and previews). */
+    fun money(grosze: Long, locale: Locale): String = money(grosze, Currencies.DEFAULT, locale)
+
+    fun rate(minor: Long, currency: String, locale: Locale): String = money(minor, currency, locale) + "/h"
+
+    /** A rate field's suffix: "zł/h", "€/h". */
+    fun rateSuffix(currency: String): String = Currencies.symbol(currency) + "/h"
+
+    /** Several currencies' totals, largest first: "1 477,00 zł · 200,00 €". */
+    fun amounts(amounts: Amounts, locale: Locale, fallbackCurrency: String = Currencies.DEFAULT): String =
+        if (amounts.isEmpty) money(0, fallbackCurrency, locale)
+        else amounts.sortedByValue().joinToString(" · ") { (code, value) -> money(value, code, locale) }
 
     /** 450 -> "7:30" (hours:minutes). */
     fun hoursMinutes(minutes: Long): String = "%d:%02d".format(minutes / 60, minutes % 60)

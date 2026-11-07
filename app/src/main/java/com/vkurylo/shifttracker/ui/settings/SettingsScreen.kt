@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.WorkOutline
@@ -49,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.BuildConfig
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.AppLanguage
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -105,7 +107,7 @@ fun SettingsScreen(
             // Android 16 style: every section is one segmented group of rows.
             item { SectionHeader(stringResource(R.string.section_work)) }
             item {
-                SettingsRow(index = 0, count = 2, onClick = onManageJobs) {
+                SettingsRow(index = 0, count = 3, onClick = onManageJobs) {
                     ListItem(
                         modifier = it,
                         colors = TransparentListItem,
@@ -119,7 +121,7 @@ fun SettingsScreen(
             item {
                 SettingsRow(
                     index = 1,
-                    count = 2,
+                    count = 3,
                     onClick = {
                         pickIcs.launch(arrayOf("text/calendar", "text/x-vcalendar", "application/ics", "application/octet-stream", "text/plain"))
                     },
@@ -130,6 +132,32 @@ fun SettingsScreen(
                         leadingContent = { Icon(Icons.Filled.CalendarMonth, contentDescription = null) },
                         headlineContent = { Text(stringResource(R.string.import_schedule)) },
                         supportingContent = { Text(stringResource(R.string.import_schedule_summary)) },
+                    )
+                }
+            }
+            item {
+                // Gross / Net for every earnings figure (calendar, day panel, summary).
+                SettingsRow(index = 2, count = 3) {
+                    ListItem(
+                        modifier = it,
+                        colors = TransparentListItem,
+                        leadingContent = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                        headlineContent = { Text(stringResource(R.string.earnings_mode)) },
+                        supportingContent = {
+                            Column {
+                                Text(stringResource(R.string.earnings_mode_summary))
+                                ChoiceButtonGroup(
+                                    options = EarningsMode.entries,
+                                    selected = state.preferences.earningsMode,
+                                    onSelect = viewModel::setEarningsMode,
+                                    label = { mode ->
+                                        stringResource(if (mode == EarningsMode.NET) R.string.earnings_net else R.string.earnings_gross)
+                                    },
+                                    height = 40.dp,
+                                    modifier = Modifier.padding(top = 8.dp),
+                                )
+                            }
+                        },
                     )
                 }
             }

@@ -32,6 +32,13 @@ interface JobDao {
 
     @Query("SELECT COUNT(*) FROM shifts WHERE job_id = :jobId")
     suspend fun shiftCount(jobId: Long): Int
+
+    @Query("SELECT (SELECT COUNT(*) FROM shifts WHERE job_id = :jobId) + (SELECT COUNT(*) FROM bonuses WHERE job_id = :jobId)")
+    suspend fun entryCount(jobId: Long): Int
+
+    /** The currency of the most recently created job (highest id), for a new job's default. */
+    @Query("SELECT currency FROM jobs ORDER BY id DESC LIMIT 1")
+    suspend fun latestCurrency(): String?
 }
 
 @Dao
@@ -42,7 +49,8 @@ interface ShiftDao {
                j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color,
                j.second_rate_grosze AS j_second_rate_grosze,
                j.second_rate_from_minute AS j_second_rate_from_minute,
-               j.second_rate_to_minute AS j_second_rate_to_minute
+               j.second_rate_to_minute AS j_second_rate_to_minute,
+               j.currency AS j_currency
         FROM shifts s INNER JOIN jobs j ON j.id = s.job_id
         WHERE s.date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
         ORDER BY s.date_epoch_day, s.start_minute
@@ -77,7 +85,8 @@ interface BonusDao {
                j.hourly_rate_grosze AS j_hourly_rate_grosze, j.color AS j_color,
                j.second_rate_grosze AS j_second_rate_grosze,
                j.second_rate_from_minute AS j_second_rate_from_minute,
-               j.second_rate_to_minute AS j_second_rate_to_minute
+               j.second_rate_to_minute AS j_second_rate_to_minute,
+               j.currency AS j_currency
         FROM bonuses b INNER JOIN jobs j ON j.id = b.job_id
         WHERE b.date_epoch_day BETWEEN :fromEpochDay AND :toEpochDay
         ORDER BY b.date_epoch_day, b.id
@@ -102,4 +111,54 @@ interface BonusDao {
 
     @Query("DELETE FROM bonuses")
     suspend fun deleteAll()
+}
+
+@Dao
+interface PaySettingsDao {
+    @Query("SELECT * FROM job_pay_settings ORDER BY job_id, from_month")
+    fun observeAll(): Flow<List<JobPaySettingsEntity>>
+
+    @Query("SELECT * FROM job_pay_settings ORDER BY job_id, from_month")
+    suspend fun getAll(): List<JobPaySettingsEntity>
+
+    @Query("SELECT * FROM job_pay_settings WHERE job_id = :jobId ORDER BY from_month")
+    suspend fun forJob(jobId: Long): List<JobPaySettingsEntity>
+
+    @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId")
+    suspend fun deleteForJob(jobId: Long)
+
+    @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId AND from_month = :fromMonth")
+    suspend fun deleteEntry(jobId: Long, fromMonth: Int)
+
+    @Insert
+    suspend fun insert(entry: JobPaySettingsEntity)
+
+    @Insert
+    suspend fun insertAll(entries: List<JobPaySettingsEntity>)
+
+    @Query("DELETE FROM job_pay_settings")
+    suspend fun deleteAll()
+
+    /** Each job's first and last day with a shift or bonus. */
+    @Query(
+        """
+        SELECT job_id, MIN(day) AS first_day, MAX(day) AS last_day FROM (
+            SELECT job_id, date_epoch_day AS day FROM shifts
+            UNION ALL
+            SELECT job_id, date_epoch_day AS day FROM bonuses
+        ) GROUP BY job_id
+        """,
+    )
+    fun observeActivity(): Flow<List<JobActivityRow>>
+
+    @Query(
+        """
+        SELECT job_id, MIN(day) AS first_day, MAX(day) AS last_day FROM (
+            SELECT job_id, date_epoch_day AS day FROM shifts
+            UNION ALL
+            SELECT job_id, date_epoch_day AS day FROM bonuses
+        ) GROUP BY job_id
+        """,
+    )
+    suspend fun getActivity(): List<JobActivityRow>
 }

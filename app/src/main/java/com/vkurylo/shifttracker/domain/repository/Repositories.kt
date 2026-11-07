@@ -3,7 +3,9 @@ package com.vkurylo.shifttracker.domain.repository
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
@@ -16,8 +18,21 @@ interface JobRepository {
     fun observeJobs(): Flow<List<Job>>
     suspend fun getJob(id: Long): Job?
     suspend fun upsert(job: Job): Long
+
+    /**
+     * Saves [job] and its [pay] settings in one transaction. With `pay.from == null` the settings apply
+     * from the beginning and replace the whole history (a job without entries); otherwise they replace
+     * only the entry of that month, so other months keep theirs.
+     */
+    suspend fun save(job: Job, pay: PaySettings): Long
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
+
+    /** Shifts + bonuses of the job; a job with entries keeps its currency. */
+    suspend fun entryCount(jobId: Long): Int
+
+    /** Currency of the most recently created job, or null when there is none. */
+    suspend fun latestCurrency(): String?
 }
 
 interface ShiftRepository {
@@ -44,6 +59,7 @@ interface PreferencesRepository {
     val preferences: Flow<UserPreferences>
     suspend fun setThemeMode(mode: ThemeMode)
     suspend fun setDynamicColor(enabled: Boolean)
+    suspend fun setEarningsMode(mode: EarningsMode)
 }
 
 /** Per-app UI language (stored by the platform / AppCompat, not by us). */
@@ -52,6 +68,17 @@ interface LanguageRepository {
     fun set(language: AppLanguage)
     /** Applies Ukrainian on the very first launch, as it is the app's default language. */
     suspend fun applyDefaultOnFirstLaunch()
+
+    /**
+     * The app language for places outside activities (the home-screen widget). On Android 13+ the
+     * platform's per-app locale (also changed from system Settings); before that, the tag this app
+     * stored when the language was set, as AppCompat only restores its locale when an activity starts.
+     * Null: follow the system.
+     */
+    suspend fun appLocale(): java.util.Locale?
+
+    /** Emits whenever the app language is set from the app (a trigger for the widget). */
+    val changes: kotlinx.coroutines.flow.Flow<String?>
 }
 
 /** JSON export/import of all jobs, shifts and bonuses. */

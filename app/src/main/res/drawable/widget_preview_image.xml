@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Picker preview before Android 12: the widget's two tiles. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/widget_preview_background" android:width="250dp" android:height="110dp" />
+    <item android:drawable="@drawable/widget_preview_tile" android:left="10dp" android:top="10dp" android:width="111dp" android:height="90dp" />
+    <item android:drawable="@drawable/widget_preview_tile2" android:left="129dp" android:top="10dp" android:width="111dp" android:height="48dp" />
+</layer-list>

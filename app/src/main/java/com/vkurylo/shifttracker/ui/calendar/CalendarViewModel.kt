@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -31,6 +33,8 @@ data class CalendarUiState(
     val bonusesByDate: Map<LocalDate, List<BonusWithJob>> = emptyMap(),
     val monthSummary: MonthSummary = MonthSummary.EMPTY,
     val jobs: List<Job> = emptyList(),
+    /** Shown for zero totals (no entries): the latest job's currency. */
+    val defaultCurrency: String = Currencies.DEFAULT,
     /** The day shown in the panel under the grid; always inside [month]. */
     val selectedDate: LocalDate = LocalDate.now(),
     val loading: Boolean = true,
@@ -43,6 +47,7 @@ class CalendarViewModel @Inject constructor(
     shiftRepository: ShiftRepository,
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
+    preferencesRepository: PreferencesRepository,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(YearMonth.now())
@@ -63,7 +68,8 @@ class CalendarViewModel @Inject constructor(
         around,
         jobRepository.observeJobs(),
         selectedDate.map(LocalDate::ofEpochDay),
-    ) { window, jobs, selected ->
+        preferencesRepository.preferences.map { it.earningsMode },
+    ) { window, jobs, selected, mode ->
         val m = window.month
         val monthShifts = window.shifts.filter { YearMonth.from(it.shift.date) == m }
         val monthBonuses = window.bonuses.filter { YearMonth.from(it.bonus.date) == m }
@@ -71,8 +77,9 @@ class CalendarViewModel @Inject constructor(
             month = m,
             shiftsByDate = window.shifts.groupBy { it.shift.date },
             bonusesByDate = window.bonuses.groupBy { it.bonus.date },
-            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses),
+            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m), mode),
             jobs = jobs,
+            defaultCurrency = Currencies.defaultFor(jobs),
             selectedDate = selected,
             loading = false,
         )

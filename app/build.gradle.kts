@@ -176,8 +176,14 @@ dependencies {
     implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
 
     implementation(libs.androidx.datastore.preferences)
+    // Home-screen widget.
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
+    // Glance itself only asks for WorkManager 2.7.1 (2021), older than Android 14-16's job rules; use a current one.
+    implementation(libs.androidx.work.runtime)
 
     testImplementation(libs.junit)
+    testImplementation(libs.androidx.work.testing)
     // UI smoke test on the JVM (Robolectric) — exercises the real Room/Hilt/Compose stack.
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)

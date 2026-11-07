@@ -6,10 +6,14 @@ import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import com.vkurylo.shifttracker.di.ApplicationScope
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.payFor
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.TimedRate
+import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import com.vkurylo.shifttracker.ui.navigation.EditShiftRoute
@@ -44,17 +48,27 @@ data class EditShiftUiState(
     val confirmDelete: Boolean = false,
 ) {
     val selectedJob: Job? get() = jobs.firstOrNull { it.id == jobId }
+
+    /** The shift's currency: its job's. */
+    val currency: String get() = selectedJob?.currency ?: Currencies.DEFAULT
+
+    /** The job is paid a monthly salary in the shift's month: the shift only logs hours. */
+    val fixedPay: Boolean get() = selectedJob?.paysHourly(date) == false
     val breakValue: Int? get() = breakMinutes.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..1440 }
     val durationMinutes: Long get() = ShiftCalculator.durationMinutes(start, end)
     val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)
     val paidMinutes: Long get() = pay.paidMinutes
     val earningsGrosze: Long get() = pay.earningsGrosze
+
+    /** The preview's earnings, gross or after the job's deductions in the shift's month. */
+    fun earningsIn(mode: EarningsMode): Long =
+        if (mode == EarningsMode.NET) ShiftCalculator.net(earningsGrosze, selectedJob?.payFor(date)?.deductionBp ?: 0) else earningsGrosze
     val isOvernight: Boolean get() = ShiftCalculator.isOvernight(start, end)
     val breakTooLong: Boolean get() = (breakValue ?: 0) >= durationMinutes
     val jobMissing: Boolean get() = selectedJob == null
     /** The job's current rate differs from the snapshot stored on an existing shift. */
     val rateOutdated: Boolean
-        get() = !isNew && selectedJob != null &&
+        get() = !isNew && selectedJob != null && !fixedPay &&
             (selectedJob!!.hourlyRateGrosze != rateGrosze || selectedJob!!.secondRate != secondRate)
     val canSave: Boolean get() = !jobMissing && breakValue != null && !breakTooLong
 }

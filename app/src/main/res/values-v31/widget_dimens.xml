@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="widget_radius">@android:dimen/system_app_widget_background_radius</dimen>
+    <dimen name="widget_inner_radius">@android:dimen/system_app_widget_inner_radius</dimen>
+    <dimen name="widget_button_radius">22dp</dimen>
+    <!-- A calendar day: a circle (a radius above half the size rounds it fully). -->
+    <dimen name="widget_day_radius">50dp</dimen>
+</resources>

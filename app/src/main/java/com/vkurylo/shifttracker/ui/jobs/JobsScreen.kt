@@ -28,10 +28,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.NightsStay
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
@@ -55,6 +58,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -77,9 +81,14 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
+import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.payFor
 import com.vkurylo.shifttracker.domain.model.JobPalette
 import com.vkurylo.shifttracker.domain.model.TimedRate
+import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.PickerField
@@ -90,6 +99,7 @@ import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.LocalTime
+import java.time.YearMonth
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -169,6 +179,7 @@ fun JobsScreen(
     state.editing?.let { job ->
         JobEditorSheet(
             job = job,
+            currencyLocked = state.currencyLocked,
             onDismiss = viewModel::dismissEditor,
             onSave = viewModel::save,
             onDelete = { viewModel.requestDelete(job) },
@@ -200,18 +211,23 @@ fun JobsScreen(
 @Composable
 private fun JobEditorSheet(
     job: Job,
+    currencyLocked: Boolean,
     onDismiss: () -> Unit,
-    onSave: (Job) -> Unit,
+    onSave: (Job, PaySettings) -> Unit,
     onDelete: () -> Unit,
 ) {
     val isNew = job.id == 0L
     var name by rememberSaveable(job.id) { mutableStateOf(job.name) }
-    var rate by rememberSaveable(job.id) { mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze)) }
+    var currency by rememberSaveable(job.id) { mutableStateOf(job.currency) }
+    val digits = Currencies.fractionDigits(currency)
+    var rate by rememberSaveable(job.id) {
+        mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze, Currencies.fractionDigits(job.currency)))
+    }
     var color by rememberSaveable(job.id) { mutableIntStateOf(job.color) }
     var showErrors by rememberSaveable(job.id) { mutableStateOf(false) }
     var secondEnabled by rememberSaveable(job.id) { mutableStateOf(job.secondRate != null) }
     var secondRate by rememberSaveable(job.id) {
-        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze) } ?: "")
+        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze, Currencies.fractionDigits(job.currency)) } ?: "")
     }
     var secondFrom by rememberSaveable(job.id) {
         mutableIntStateOf((job.secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toSecondOfDay() / 60)
@@ -221,13 +237,36 @@ private fun JobEditorSheet(
     }
     var pickingFrom by rememberSaveable { mutableStateOf(false) }
     var pickingTo by rememberSaveable { mutableStateOf(false) }
+    var pickingCurrency by rememberSaveable { mutableStateOf(false) }
+    // Pay type and salary. A job with entries changes them from a month on (default: this month);
+    // a job without entries simply has one setting for all time.
+    val hasEntries = currencyLocked
+    var payFromKey by rememberSaveable(job.id) { mutableIntStateOf(YearMonth.now().let { it.year * 12 + it.monthValue - 1 }) }
+    val payFrom = YearMonth.of(payFromKey / 12, payFromKey % 12 + 1)
+    val initialPay = remember(job.id) { job.payFor(YearMonth.now()) }
+    var payType by rememberSaveable(job.id) { mutableStateOf(initialPay.payType) }
+    var monthlyAmount by rememberSaveable(job.id) {
+        mutableStateOf(
+            if (initialPay.payType == PayType.FIXED_MONTHLY) MoneyParser.toInput(initialPay.monthlyAmountMinor, Currencies.fractionDigits(job.currency)) else "",
+        )
+    }
 
-    val rateGrosze = MoneyParser.parseGrosze(rate)
-    val secondRateGrosze = MoneyParser.parseGrosze(secondRate)
+    // Decimals and limits follow the job's currency (0 decimals for JPY, 3 for KWD).
+    val rateGrosze = MoneyParser.parseMinor(rate, digits)
+    val secondRateGrosze = MoneyParser.parseMinor(secondRate, digits)
+    var deduction by rememberSaveable(job.id) {
+        mutableStateOf(if (initialPay.deductionBp == 0) "" else MoneyParser.toInput(initialPay.deductionBp.toLong(), 2))
+    }
+    val monthlyMinor = MoneyParser.parseMinor(monthlyAmount, digits, MoneyParser.AMOUNT_WHOLE_DIGITS)
+    // 13,71 % -> 1371 basis points; empty means none.
+    val deductionBp = if (deduction.isBlank()) 0 else MoneyParser.parseMinor(deduction, 2, wholeDigits = 3)?.takeIf { it <= 10_000 }?.toInt()
+    val deductionError = deductionBp == null
+    val hourly = payType == PayType.HOURLY
     val nameError = name.isBlank()
-    val rateError = rateGrosze == null
-    val secondRateError = secondEnabled && secondRateGrosze == null
-    val windowError = secondEnabled && secondFrom == secondTo
+    val rateError = hourly && rateGrosze == null
+    val secondRateError = hourly && secondEnabled && secondRateGrosze == null
+    val windowError = hourly && secondEnabled && secondFrom == secondTo
+    val monthlyError = !hourly && monthlyMinor == null
     val fromTime = LocalTime.of(secondFrom / 60, secondFrom % 60)
     val toTime = LocalTime.of(secondTo / 60, secondTo % 60)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -264,72 +303,146 @@ private fun JobEditorSheet(
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
-            OutlinedTextField(
-                value = rate,
-                onValueChange = { rate = it },
-                label = { Text(stringResource(if (secondEnabled) R.string.base_rate else R.string.hourly_rate)) },
-                suffix = { Text("zł/h") },
-                singleLine = true,
-                isError = showErrors && rateError,
-                supportingText = if (showErrors && rateError) {
-                    { Text(stringResource(R.string.error_rate_invalid)) }
-                } else null,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-                modifier = Modifier.fillMaxWidth(),
+            if (currencyLocked) {
+                OutlinedTextField(
+                    value = currencyLabel(currency),
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = false,
+                    label = { Text(stringResource(R.string.currency)) },
+                    supportingText = { Text(stringResource(R.string.currency_locked)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                PickerField(
+                    label = stringResource(R.string.currency),
+                    value = currencyLabel(currency),
+                    icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                    onClick = { pickingCurrency = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(stringResource(R.string.pay_type), style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(8.dp))
+            ChoiceButtonGroup(
+                options = PayType.entries,
+                selected = payType,
+                onSelect = { payType = it },
+                label = { type ->
+                    stringResource(
+                        when (type) {
+                            PayType.HOURLY -> R.string.pay_type_hourly
+                            PayType.FIXED_MONTHLY -> R.string.pay_type_fixed_monthly
+                        },
+                    )
+                },
             )
-
-            // Optional second rate inside a daily time window (e.g. night rate 23:00–06:00).
-            ListItem(
-                modifier = Modifier
-                    .clip(MaterialTheme.shapes.medium)
-                    .toggleable(value = secondEnabled, role = Role.Switch, onValueChange = { secondEnabled = it }),
-                colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-                headlineContent = { Text(stringResource(R.string.second_rate_toggle)) },
-                supportingContent = { Text(stringResource(R.string.second_rate_toggle_summary)) },
-                trailingContent = { Switch(checked = secondEnabled, onCheckedChange = null) },
-            )
-            AnimatedVisibility(secondEnabled) {
+            if (hasEntries) {
+                Spacer(Modifier.height(8.dp))
+                AppliesFromField(month = payFrom, onChange = { payFromKey = it.year * 12 + it.monthValue - 1 })
+            }
+            Spacer(Modifier.height(8.dp))
+            AnimatedVisibility(!hourly) {
+                OutlinedTextField(
+                    value = monthlyAmount,
+                    onValueChange = { monthlyAmount = it },
+                    label = { Text(stringResource(R.string.monthly_amount)) },
+                    suffix = { Text(Currencies.symbol(currency)) },
+                    singleLine = true,
+                    isError = showErrors && monthlyError,
+                    supportingText = if (showErrors && monthlyError) {
+                        { Text(stringResource(R.string.error_amount_invalid)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            AnimatedVisibility(hourly) {
                 Column {
                     OutlinedTextField(
-                        value = secondRate,
-                        onValueChange = { secondRate = it },
-                        label = { Text(stringResource(R.string.second_rate)) },
-                        suffix = { Text("zł/h") },
+                        value = rate,
+                        onValueChange = { rate = it },
+                        label = { Text(stringResource(if (secondEnabled) R.string.base_rate else R.string.hourly_rate)) },
+                        suffix = { Text(Formatters.rateSuffix(currency)) },
                         singleLine = true,
-                        isError = showErrors && secondRateError,
-                        supportingText = if (showErrors && secondRateError) {
+                        isError = showErrors && rateError,
+                        supportingText = if (showErrors && rateError) {
                             { Text(stringResource(R.string.error_rate_invalid)) }
                         } else null,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        PickerField(
-                            label = stringResource(R.string.second_rate_from),
-                            value = Formatters.time(fromTime),
-                            icon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
-                            onClick = { pickingFrom = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                        PickerField(
-                            label = stringResource(R.string.second_rate_to),
-                            value = Formatters.time(toTime),
-                            icon = { Icon(Icons.Filled.NightsStay, contentDescription = null) },
-                            onClick = { pickingTo = true },
-                            modifier = Modifier.weight(1f),
-                        )
-                    }
-                    if (windowError) {
-                        Text(
-                            stringResource(R.string.error_window_empty),
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
+
+                    // Optional second rate inside a daily time window (e.g. night rate 23:00–06:00).
+                    ListItem(
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.medium)
+                            .toggleable(value = secondEnabled, role = Role.Switch, onValueChange = { secondEnabled = it }),
+                        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                        headlineContent = { Text(stringResource(R.string.second_rate_toggle)) },
+                        supportingContent = { Text(stringResource(R.string.second_rate_toggle_summary)) },
+                        trailingContent = { Switch(checked = secondEnabled, onCheckedChange = null) },
+                    )
+                    AnimatedVisibility(secondEnabled) {
+                        Column {
+                            OutlinedTextField(
+                                value = secondRate,
+                                onValueChange = { secondRate = it },
+                                label = { Text(stringResource(R.string.second_rate)) },
+                                suffix = { Text(Formatters.rateSuffix(currency)) },
+                                singleLine = true,
+                                isError = showErrors && secondRateError,
+                                supportingText = if (showErrors && secondRateError) {
+                                    { Text(stringResource(R.string.error_rate_invalid)) }
+                                } else null,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                PickerField(
+                                    label = stringResource(R.string.second_rate_from),
+                                    value = Formatters.time(fromTime),
+                                    icon = { Icon(Icons.Filled.Schedule, contentDescription = null) },
+                                    onClick = { pickingFrom = true },
+                                    modifier = Modifier.weight(1f),
+                                )
+                                PickerField(
+                                    label = stringResource(R.string.second_rate_to),
+                                    value = Formatters.time(toTime),
+                                    icon = { Icon(Icons.Filled.NightsStay, contentDescription = null) },
+                                    onClick = { pickingTo = true },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            }
+                            if (windowError) {
+                                Text(
+                                    stringResource(R.string.error_window_empty),
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 4.dp),
+                                )
+                            }
+                        }
                     }
                 }
             }
+
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = deduction,
+                onValueChange = { deduction = it },
+                label = { Text(stringResource(R.string.deduction_percent)) },
+                placeholder = { Text("0") },
+                suffix = { Text("%") },
+                singleLine = true,
+                isError = showErrors && deductionError,
+                supportingText = { Text(stringResource(if (showErrors && deductionError) R.string.error_percent_invalid else R.string.deduction_hint)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                modifier = Modifier.fillMaxWidth(),
+            )
 
             Spacer(Modifier.height(16.dp))
             Text(stringResource(R.string.job_color), style = MaterialTheme.typography.titleSmall)
@@ -344,13 +457,29 @@ private fun JobEditorSheet(
                 }
                 Button(
                     onClick = {
-                        if (nameError || rateError || secondRateError || windowError) {
+                        if (nameError || rateError || secondRateError || windowError || monthlyError || deductionError) {
                             showErrors = true
                         } else {
-                            val second = if (secondEnabled && secondRateGrosze != null) {
+                            // A salaried job keeps its last hourly rate (shifts still snapshot one).
+                            val second = if (!hourly) job.secondRate else if (secondEnabled && secondRateGrosze != null) {
                                 TimedRate(secondRateGrosze, fromTime, toTime)
                             } else null
-                            onSave(job.copy(name = name, hourlyRateGrosze = rateGrosze, color = color, secondRate = second))
+                            val pay = PaySettings(
+                                from = if (hasEntries) payFrom else null,
+                                payType = payType,
+                                monthlyAmountMinor = if (hourly) 0 else monthlyMinor ?: 0,
+                                deductionBp = deductionBp ?: 0,
+                            )
+                            onSave(
+                                job.copy(
+                                    name = name,
+                                    hourlyRateGrosze = if (hourly) rateGrosze ?: 0 else job.hourlyRateGrosze,
+                                    color = color,
+                                    secondRate = second,
+                                    currency = currency,
+                                ),
+                                pay,
+                            )
                         }
                     },
                     modifier = Modifier.weight(1f).height(52.dp),
@@ -361,6 +490,13 @@ private fun JobEditorSheet(
         }
     }
 
+    if (pickingCurrency) {
+        CurrencyPickerDialog(
+            selected = currency,
+            onSelect = { currency = it; pickingCurrency = false },
+            onDismiss = { pickingCurrency = false },
+        )
+    }
     if (pickingFrom) {
         TimeDialog(
             title = stringResource(R.string.second_rate_from),
@@ -382,14 +518,26 @@ private fun JobEditorSheet(
 /** "33,00 zł/h · 23:00–06:00: 37,00 zł/h" */
 @Composable
 fun jobRatesLabel(job: Job): String {
+    val pay = job.payFor(YearMonth.now())
+    val deductions = if (pay.deductionBp > 0) {
+        " · " + stringResource(R.string.deduction_value, MoneyParser.toInput(pay.deductionBp.toLong(), 2, decimalSeparator(currentLocale())))
+    } else ""
+    return payLabel(job, pay) + deductions
+}
+
+@Composable
+private fun payLabel(job: Job, pay: PaySettings): String {
     val locale = currentLocale()
-    val base = Formatters.rate(job.hourlyRateGrosze, locale)
+    if (pay.payType == PayType.FIXED_MONTHLY) {
+        return stringResource(R.string.fixed_salary_per_month, Formatters.money(pay.monthlyAmountMinor, job.currency, locale))
+    }
+    val base = Formatters.rate(job.hourlyRateGrosze, job.currency, locale)
     val second = job.secondRate ?: return base
     return base + " · " + stringResource(
         R.string.second_rate_summary,
         Formatters.time(second.from),
         Formatters.time(second.to),
-        Formatters.rate(second.rateGrosze, locale),
+        Formatters.rate(second.rateGrosze, job.currency, locale),
     )
 }
 
@@ -422,3 +570,28 @@ private fun ColorPalette(selected: Int, onSelect: (Int) -> Unit) {
         }
     }
 }
+
+/** "Applies from  ‹ November 2026 ›": the month a pay change takes effect from (any month). */
+@Composable
+private fun AppliesFromField(month: YearMonth, onChange: (YearMonth) -> Unit) {
+    val locale = currentLocale()
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(R.string.pay_applies_from), style = MaterialTheme.typography.labelLarge)
+            Text(
+                stringResource(R.string.pay_applies_from_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        IconButton(onClick = { onChange(month.minusMonths(1)) }) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.previous_month))
+        }
+        Text(Formatters.monthYear(month, locale), style = MaterialTheme.typography.titleSmall)
+        IconButton(onClick = { onChange(month.plusMonths(1)) }) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.next_month))
+        }
+    }
+}
+
+private fun decimalSeparator(locale: java.util.Locale): Char = java.text.DecimalFormatSymbols.getInstance(locale).decimalSeparator
