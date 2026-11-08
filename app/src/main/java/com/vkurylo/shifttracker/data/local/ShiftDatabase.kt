@@ -29,6 +29,7 @@ abstract class ShiftDatabase : RoomDatabase() {
     abstract fun shiftDao(): ShiftDao
     abstract fun bonusDao(): BonusDao
     abstract fun paySettingsDao(): PaySettingsDao
+    abstract fun syncDao(): SyncDao
 
     companion object {
         const val NAME = "shift_tracker.db"
