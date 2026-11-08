@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.data.local
 
+import androidx.room.ColumnInfo
 import java.util.UUID
 
 /*
@@ -14,6 +15,13 @@ import java.util.UUID
  * - `dirty`: changed here since it was last uploaded. Every local write sets it; only the sync layer
  *   clears it.
  */
+
+/** A row's local id, sync id and change time. */
+data class SyncKey(
+    val id: Long,
+    @ColumnInfo(name = "sync_id") val syncId: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
 
 /** Wall clock for `updated_at`, replaceable in tests. */
 fun interface WallClock {

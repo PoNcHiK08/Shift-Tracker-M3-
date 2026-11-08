@@ -52,11 +52,14 @@ UI in **Ukrainian** by default with **English** as an alternative.
   and on clock / time zone / locale changes (so a new day or a finished shift can take up to 30 min to show).
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
-  An import checks the whole file before touching anything (format versions 1–4; files older than 4 import as PLN,
+  Exports are format version 5 (every job, shift and bonus carries its sync id, so a backup restored on another phone
+  holds the same records rather than look-alike copies).
+  An import checks the whole file before touching anything (format versions 1–5; files older than 4 import as PLN,
   hourly, no deductions; currency codes, pay types, months, salaries and percentages are validated; a file from a newer app version
-  gets its own message; unique job IDs, amounts within what the editors accept, a break shorter than the shift, a
+  gets its own message; unique job IDs and sync ids, amounts within what the editors accept, a break shorter than the shift, a
   second-rate window that isn't empty, bonuses above zero) and replaces the data in one transaction, so a bad or
-  half-written file leaves the existing data exactly as it was.
+  half-written file leaves the existing data exactly as it was. Records the file doesn't have are kept as deleted
+  (tombstones), records it does have are updated in place, so the replacement can later reach other devices.
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
   Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;

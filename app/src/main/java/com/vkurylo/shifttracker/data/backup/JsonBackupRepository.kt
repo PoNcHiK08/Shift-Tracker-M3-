@@ -4,11 +4,14 @@ import androidx.room.withTransaction
 import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
+import com.vkurylo.shifttracker.data.local.ParentChildRule
 import com.vkurylo.shifttracker.data.local.monthKeyToYearMonth
 import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.data.local.WallClock
+import com.vkurylo.shifttracker.data.local.newSyncId
+import com.vkurylo.shifttracker.data.local.nextUpdatedAt
 import com.vkurylo.shifttracker.data.local.stamped
 import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
@@ -39,11 +42,12 @@ data class BackupFile(
 
         /**
          * Every exporter so far wrote its version explicitly: 1 (jobs + shifts), 2 (+ second rates),
-         * 3 (+ bonuses), 4 (+ a currency and a pay settings history with deductions per job). All of them decode into
-         * these classes (newer fields have defaults: an older file's jobs are PLN and hourly).
+         * 3 (+ bonuses), 4 (+ a currency and a pay settings history with deductions per job), 5 (+ a sync id
+         * per job, shift and bonus). All of them decode into these classes (newer fields have defaults: an
+         * older file's jobs are PLN and hourly, and its records get new sync ids when imported).
          */
         const val MIN_VERSION = 1
-        const val CURRENT_VERSION = 4
+        const val CURRENT_VERSION = 5
     }
 }
 
@@ -61,6 +65,8 @@ data class BackupJob(
     val currency: String = "PLN",
     /** Pay settings by month, oldest first; empty = hourly throughout. Added in backup version 4. */
     @SerialName("pay_history") val payHistory: List<BackupPaySettings> = emptyList(),
+    /** The record's id on every device (a UUID). Added in backup version 5; older files have none. */
+    @SerialName("sync_id") val syncId: String? = null,
 )
 
 /** One entry of a job's pay history: from month [from] ("2026-11"; null = from the beginning). */
@@ -94,6 +100,8 @@ data class BackupShift(
     val note: String? = null,
     @SerialName("external_uid") val externalUid: String? = null,
     @SerialName("second_rate") val secondRate: BackupTimedRate? = null,
+    /** The record's id on every device (a UUID). Added in backup version 5; older files have none. */
+    @SerialName("sync_id") val syncId: String? = null,
 )
 
 @Serializable
@@ -103,6 +111,8 @@ data class BackupBonus(
     val date: String,
     @SerialName("amount_grosze") val amountGrosze: Long,
     val note: String? = null,
+    /** The record's id on every device (a UUID). Added in backup version 5; older files have none. */
+    @SerialName("sync_id") val syncId: String? = null,
 )
 
 @Singleton
@@ -142,6 +152,7 @@ class JsonBackupRepository @Inject constructor(
                             deductionPercent = java.math.BigDecimal.valueOf(entry.deductionBp.toLong(), 2).stripTrailingZeros().toPlainString(),
                         )
                     },
+                    syncId = it.syncId,
                 )
             },
             shifts = shifts.map {
@@ -155,6 +166,7 @@ class JsonBackupRepository @Inject constructor(
                     note = it.note,
                     externalUid = it.externalUid,
                     secondRate = backupRate(it.secondRateGrosze, it.secondRateFromMinute, it.secondRateToMinute),
+                    syncId = it.syncId,
                 )
             },
             bonuses = bonuses.map {
@@ -163,6 +175,7 @@ class JsonBackupRepository @Inject constructor(
                     date = java.time.LocalDate.ofEpochDay(it.dateEpochDay).toString(),
                     amountGrosze = it.amountGrosze,
                     note = it.note,
+                    syncId = it.syncId,
                 )
             },
         )
@@ -193,20 +206,77 @@ class JsonBackupRepository @Inject constructor(
         val shifts = convert("shifts") { file.shifts.map { toShift(it, digitsByJob) } }
         val bonuses = convert("bonuses") { file.bonuses.map { toBonus(it, digitsByJob) } }
 
-        // If any write fails, the transaction rolls back and the old data stays.
-        // Every imported record is new here (fresh sync id, changed now).
-        val now = clock.nowMillis()
-        db.withTransaction {
-            db.bonusDao().deleteAll()
-            db.shiftDao().deleteAll()
-            db.paySettingsDao().deleteAll()
-            db.jobDao().deleteAll()
-            db.jobDao().insertAll(jobs.map { it.stamped(null, now) })
-            db.paySettingsDao().insertAll(payHistory)
-            db.shiftDao().insertAll(shifts.map { it.stamped(null, now) })
-            db.bonusDao().insertAll(bonuses.map { it.stamped(null, now) })
+        convert("sync ids") {
+            requireUniqueSyncIds("job", jobs.map { it.syncId })
+            requireUniqueSyncIds("shift", shifts.map { it.syncId })
+            requireUniqueSyncIds("bonus", bonuses.map { it.syncId })
         }
+
+        // If any write fails, the transaction rolls back and the old data stays.
+        db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, clock.nowMillis()) }
         return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)
+    }
+
+    /**
+     * Makes the database hold exactly the backup's records, in a way that syncs: every live record the
+     * file doesn't have becomes a tombstone (so the import replaces data on the other devices too, not
+     * only here), and every record of the file is written as changed now. A record whose sync id (backup
+     * version 5) is already in the database, live or deleted, is that same record: it is updated (and
+     * undeleted) in place. Anything else is a new row; the file's job ids are only references inside the
+     * file and are mapped to the rows' ids here.
+     */
+    private suspend fun replaceAll(
+        jobs: List<JobEntity>,
+        payHistory: List<JobPaySettingsEntity>,
+        shifts: List<ShiftEntity>,
+        bonuses: List<BonusEntity>,
+        now: Long,
+    ) {
+        val jobDao = db.jobDao()
+        val shiftDao = db.shiftDao()
+        val bonusDao = db.bonusDao()
+        val payDao = db.paySettingsDao()
+        val keepBonuses = bonuses.mapTo(HashSet()) { it.syncId }
+        val keepShifts = shifts.mapTo(HashSet()) { it.syncId }
+        val keepJobs = jobs.mapTo(HashSet()) { it.syncId }
+        bonusDao.liveKeys().filter { it.syncId !in keepBonuses }.forEach { bonusDao.markDeleted(it.id, now) }
+        shiftDao.liveKeys().filter { it.syncId !in keepShifts }.forEach { shiftDao.markDeleted(it.id, now) }
+        jobDao.liveKeys().filter { it.syncId !in keepJobs }.forEach { jobDao.markDeleted(it.id, nextUpdatedAt(it.updatedAt, now)) }
+
+        val rowIdByFileId = HashMap<Long, Long>()
+        for (job in jobs) {
+            val existing = jobDao.getBySyncId(job.syncId)
+            val rowId = jobDao.upsert(job.copy(id = existing?.id ?: 0).stamped(existing, now))
+            rowIdByFileId[job.id] = if (rowId == -1L) existing!!.id else rowId
+        }
+        rowIdByFileId.values.forEach { payDao.deleteForJob(it) }
+        payDao.insertAll(payHistory.map { it.copy(id = 0, jobId = rowIdByFileId.getValue(it.jobId)) })
+        for (shift in shifts) {
+            val existing = shiftDao.getBySyncId(shift.syncId)
+            shiftDao.upsert(shift.copy(id = existing?.id ?: 0, jobId = rowIdByFileId.getValue(shift.jobId)).stamped(existing, now))
+        }
+        for (bonus in bonuses) {
+            val existing = bonusDao.getBySyncId(bonus.syncId)
+            bonusDao.upsert(bonus.copy(id = existing?.id ?: 0, jobId = rowIdByFileId.getValue(bonus.jobId)).stamped(existing, now))
+        }
+        ParentChildRule.enforce(jobDao)
+    }
+
+    private fun requireUniqueSyncIds(what: String, ids: List<String>) {
+        val duplicates = ids.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        require(duplicates.isEmpty()) { "two of the ${what}s have the same sync id $duplicates" }
+    }
+
+    /**
+     * A version 5 sync id: a UUID, kept in the canonical lowercase form the app writes (ids are
+     * case-sensitive in the cloud, so a hand-edited uppercase one must not become a different record).
+     * Absent (older versions): a new id.
+     */
+    private fun syncIdOf(syncId: String?): String {
+        if (syncId == null) return newSyncId()
+        val canonical = runCatching { java.util.UUID.fromString(syncId).toString() }.getOrNull()
+        require(canonical != null && canonical.equals(syncId, ignoreCase = true)) { "sync id '$syncId' is not a UUID" }
+        return canonical
     }
 
     private inline fun <T> convert(what: String, block: () -> T): T = try {
@@ -236,6 +306,7 @@ class JsonBackupRepository @Inject constructor(
                 secondRateFromMinute = second?.from ?: DEFAULT_FROM,
                 secondRateToMinute = second?.to ?: DEFAULT_TO,
                 currency = it.currency,
+                syncId = syncIdOf(it.syncId),
             )
         }
     }
@@ -283,6 +354,7 @@ class JsonBackupRepository @Inject constructor(
             secondRateGrosze = second?.rate,
             secondRateFromMinute = second?.from ?: DEFAULT_FROM,
             secondRateToMinute = second?.to ?: DEFAULT_TO,
+            syncId = syncIdOf(shift.syncId),
         )
     }
 
@@ -295,6 +367,7 @@ class JsonBackupRepository @Inject constructor(
             dateEpochDay = java.time.LocalDate.parse(bonus.date).toEpochDay(),
             amountGrosze = bonus.amountGrosze,
             note = bonus.note,
+            syncId = syncIdOf(bonus.syncId),
         )
     }
 

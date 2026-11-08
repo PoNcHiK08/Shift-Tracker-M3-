@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 /*
  * Deleted jobs, shifts and bonuses stay in their tables as tombstones (`deleted = 1`, see SyncMetadata.kt).
  * Every read that feeds the app (screens, widget, export, .ics duplicate check, counts) filters them out;
- * only the `getAny` lookups, used to keep a row's sync metadata when it is written again, return them.
+ * only the `getAny` / `getBySyncId` lookups, used to keep a row's sync metadata when it is written again,
+ * return them.
  * Shift and bonus lists also hide entries of a deleted job (ParentChildRule keeps such pairs from lasting).
  */
 
@@ -34,9 +35,13 @@ interface JobDao {
     @Insert
     suspend fun insertAll(jobs: List<JobEntity>)
 
-    /** Removes every row, tombstones included. Only for the JSON import, which replaces all data. */
-    @Query("DELETE FROM jobs")
-    suspend fun deleteAll()
+    /** The record with this sync id, even when it is a tombstone. */
+    @Query("SELECT * FROM jobs WHERE sync_id = :syncId")
+    suspend fun getBySyncId(syncId: String): JobEntity?
+
+    /** Id, sync id and change time of every live row. */
+    @Query("SELECT id, sync_id, updated_at FROM jobs WHERE deleted = 0")
+    suspend fun liveKeys(): List<SyncKey>
 
     @Query("UPDATE jobs SET deleted = 1, dirty = 1, updated_at = :at WHERE id = :id")
     suspend fun markDeleted(id: Long, at: Long)
@@ -130,9 +135,13 @@ interface ShiftDao {
     @Query("UPDATE shifts SET deleted = 1, dirty = 1, updated_at = MAX(updated_at + 1, :now) WHERE id = :id AND deleted = 0")
     suspend fun markDeleted(id: Long, now: Long)
 
-    /** Removes every row, tombstones included. Only for the JSON import, which replaces all data. */
-    @Query("DELETE FROM shifts")
-    suspend fun deleteAll()
+    /** The record with this sync id, even when it is a tombstone. */
+    @Query("SELECT * FROM shifts WHERE sync_id = :syncId")
+    suspend fun getBySyncId(syncId: String): ShiftEntity?
+
+    /** Id, sync id and change time of every live row. */
+    @Query("SELECT id, sync_id, updated_at FROM shifts WHERE deleted = 0")
+    suspend fun liveKeys(): List<SyncKey>
 }
 
 @Dao
@@ -179,9 +188,13 @@ interface BonusDao {
     @Query("UPDATE bonuses SET deleted = 1, dirty = 1, updated_at = MAX(updated_at + 1, :now) WHERE id = :id AND deleted = 0")
     suspend fun markDeleted(id: Long, now: Long)
 
-    /** Removes every row, tombstones included. Only for the JSON import, which replaces all data. */
-    @Query("DELETE FROM bonuses")
-    suspend fun deleteAll()
+    /** The record with this sync id, even when it is a tombstone. */
+    @Query("SELECT * FROM bonuses WHERE sync_id = :syncId")
+    suspend fun getBySyncId(syncId: String): BonusEntity?
+
+    /** Id, sync id and change time of every live row. */
+    @Query("SELECT id, sync_id, updated_at FROM bonuses WHERE deleted = 0")
+    suspend fun liveKeys(): List<SyncKey>
 }
 
 @Dao
@@ -206,9 +219,6 @@ interface PaySettingsDao {
 
     @Insert
     suspend fun insertAll(entries: List<JobPaySettingsEntity>)
-
-    @Query("DELETE FROM job_pay_settings")
-    suspend fun deleteAll()
 
     /** Each job's first and last day with a (not deleted) shift or bonus. */
     @Query(
