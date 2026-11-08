@@ -1,0 +1,148 @@
+rules_version = '2';
+
+// Security rules for Shift Tracker's cloud sync (Cloud Firestore).
+//
+// BEFORE PUBLISHING: replace YOUR_EMAIL_HERE below with the address of the Google account you sign in with,
+// in the Firebase console (Firestore Database -> Rules), then Publish. Do not commit your real address: this
+// repository is public. As committed, these rules let nobody in.
+//
+// Who: only the signed-in owner of users/{uid}, signed in with Google, with that verified email.
+// What: only the documents the app writes, field by field (layout: app/src/main/java/com/vkurylo/shifttracker/
+// data/sync/firebase/FirestoreDocuments.kt), and a record only ever replaced by a later version of it.
+// Everything else is refused. Tests: firebase/rules-test.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function allowedEmail() {
+      return 'YOUR_EMAIL_HERE';
+    }
+
+    function isOwner(uid) {
+      return allowedEmail().matches('[^@ ]+@[^@ ]+')
+        && request.auth != null
+        && request.auth.uid == uid
+        && request.auth.token.firebase.sign_in_provider == 'google.com'
+        && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == allowedEmail().lower();
+    }
+
+    // The marker of the account's cloud data (CloudMeta): created once, never changed; deleted by
+    // "Delete my cloud data".
+    match /users/{uid} {
+      allow get, delete: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && hasExactly(request.resource.data, ['epoch', 'createdAt'])
+        && request.resource.data.epoch is string
+        && request.resource.data.epoch.size() > 0
+        && request.resource.data.epoch.size() <= 64
+        && request.resource.data.createdAt == request.time;
+
+      match /jobs/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isLater() && isJob(request.resource.data);
+      }
+
+      match /shifts/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isLater() && isShift(request.resource.data);
+      }
+
+      match /bonuses/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isLater() && isBonus(request.resource.data);
+      }
+    }
+
+    // --- Records -------------------------------------------------------------------------------------
+
+    // Last write wins (LastWriteWins.kt): a record is only replaced by a later version, so no phone can
+    // overwrite a newer change with an older one, even one that arrived while it was uploading.
+    function isLater() {
+      return resource == null || request.resource.data.updatedAt > resource.data.updatedAt;
+    }
+
+    // Fields every record has. updatedAt is the phone's clock (it decides conflicts); one running more than
+    // 10 minutes ahead of the server is refused, so a wrong clock can't make its changes win for long.
+    // serverUpdatedAt must be the server's own time of this write (the app uses it to find changes).
+    function isRecord(d) {
+      return d.v is int && d.v >= 1
+        && d.updatedAt is int && d.updatedAt >= 0
+        && d.updatedAt <= request.time.toMillis() + 10 * 60 * 1000
+        && d.deleted is bool
+        && d.serverUpdatedAt == request.time;
+    }
+
+    function isJob(d) {
+      return hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'name', 'hourlyRateGrosze', 'color',
+          'secondRate', 'currency', 'payHistory'])
+        && isRecord(d)
+        && isText(d.name)
+        && isAmount(d.hourlyRateGrosze)
+        && d.color is int
+        && isTimedRate(d.secondRate)
+        && d.currency is string && d.currency.size() <= 8
+        && d.payHistory is list && d.payHistory.size() <= 1200;
+    }
+
+    function isShift(d) {
+      return hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'dateEpochDay', 'startMinute',
+          'endMinute', 'unpaidBreakMinutes', 'hourlyRateGrosze', 'note', 'externalUid', 'secondRate'])
+        && isRecord(d)
+        && isId(d.jobId)
+        && d.dateEpochDay is int
+        && isMinute(d.startMinute)
+        && isMinute(d.endMinute)
+        && isMinute(d.unpaidBreakMinutes)
+        && isAmount(d.hourlyRateGrosze)
+        && isOptionalText(d.note)
+        && isOptionalText(d.externalUid)
+        && isTimedRate(d.secondRate);
+    }
+
+    function isBonus(d) {
+      return hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'dateEpochDay', 'amountGrosze', 'note'])
+        && isRecord(d)
+        && isId(d.jobId)
+        && d.dateEpochDay is int
+        && isAmount(d.amountGrosze)
+        && isOptionalText(d.note);
+    }
+
+    // --- Values --------------------------------------------------------------------------------------
+
+    function hasExactly(d, keys) {
+      return d.keys().hasAll(keys) && d.keys().hasOnly(keys);
+    }
+
+    // A sync id: a lowercase UUID.
+    function isId(value) {
+      return value is string && value.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
+    }
+
+    // Money: whole minor units (grosze), never a fraction.
+    function isAmount(value) {
+      return value is int && value >= 0;
+    }
+
+    function isMinute(value) {
+      return value is int && value >= 0 && value < 24 * 60;
+    }
+
+    // The app's own limit for names and notes (MAX_TEXT in SyncMapping.kt).
+    function isText(value) {
+      return value is string && value.size() <= 20000;
+    }
+
+    function isOptionalText(value) {
+      return value == null || isText(value);
+    }
+
+    function isTimedRate(value) {
+      return value == null || (value is map
+        && hasExactly(value, ['rateGrosze', 'fromMinute', 'toMinute'])
+        && isAmount(value.rateGrosze)
+        && isMinute(value.fromMinute)
+        && isMinute(value.toMinute));
+    }
+  }
+}
