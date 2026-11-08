@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
+    alias(libs.plugins.google.services)
 }
 
 // Release signing policy (see README, "Signing"):
@@ -105,6 +106,13 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+// Cloud sync is optional. app/google-services.json (Firebase) is never committed: CI writes it from the
+// GOOGLE_SERVICES_JSON secret, a local build reads your own copy. Without it the app builds and works as
+// before, and Settings says cloud sync isn't available in this build.
+googleServices {
+    missingGoogleServicesStrategy = com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy.WARN
+}
+
 // Runs whenever a release is about to be signed (APK or bundle), never for debug builds or tests.
 // Runs on every such build (no outputs), so the warning shows even when the configuration is cached.
 val checkReleaseSigning = tasks.register("checkReleaseSigning") {
@@ -181,6 +189,15 @@ dependencies {
     implementation(libs.androidx.glance.material3)
     // Glance itself only asks for WorkManager 2.7.1 (2021), older than Android 14-16's job rules; use a current one.
     implementation(libs.androidx.work.runtime)
+
+    // Optional cloud sync: Firebase Auth + Firestore, Google sign-in through Credential Manager.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.firestore)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.googleid)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.work.testing)

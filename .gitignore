@@ -11,3 +11,8 @@
 .cxx/
 *.apk
 *.aab
+
+# Firebase config for cloud sync: never commit it (CI writes it from the GOOGLE_SERVICES_JSON secret).
+google-services.json
+# Firestore rules tests (firebase/rules-test)
+node_modules/

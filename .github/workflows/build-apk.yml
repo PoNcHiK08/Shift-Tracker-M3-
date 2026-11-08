@@ -35,6 +35,35 @@ jobs:
       - name: Unit tests (calculator, .ics parser, UI smoke test)
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # Cloud sync: app/google-services.json (never committed) comes from the GOOGLE_SERVICES_JSON secret,
+      # the file's content as it is or base64-encoded. Written after the tests, so they never depend on it.
+      # Without the secret (e.g. a pull request from a fork) the APKs build without cloud sync.
+      - name: Add Firebase config from the secret
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+            echo "::warning::The GOOGLE_SERVICES_JSON secret is not set: these APKs have no cloud sync."
+            exit 0
+          fi
+          if printf '%s' "$GOOGLE_SERVICES_JSON" | jq -e . > /dev/null 2>&1; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+          elif ! printf '%s' "$GOOGLE_SERVICES_JSON" | base64 --decode > app/google-services.json 2> /dev/null \
+              || ! jq -e . app/google-services.json > /dev/null 2>&1; then
+            echo "::error::GOOGLE_SERVICES_JSON is neither the JSON of google-services.json nor that JSON base64-encoded."
+            exit 1
+          fi
+          # Both apps (release and .debug) must be in it, and Google sign-in (a Web client) must have been
+          # enabled before it was downloaded.
+          for package in com.vkurylo.shifttracker com.vkurylo.shifttracker.debug; do
+            jq -e --arg p "$package" 'any(.client[]; .client_info.android_client_info.package_name == $p)' \
+              app/google-services.json > /dev/null \
+              || { echo "::error::google-services.json has no Android app $package. Add it in Firebase and download the file again."; exit 1; }
+          done
+          jq -e 'any(.client[].oauth_client[]?; .client_type == 3)' app/google-services.json > /dev/null \
+            || { echo "::error::google-services.json has no Web client: enable Google sign-in in Firebase Authentication, then download the file again."; exit 1; }
+          echo "Firebase config added: these APKs have cloud sync."
+
       # The GitHub builds are signed with the public dev key on purpose, so each one installs
       # over the previous one. The release build refuses that key unless it is allowed here.
       - name: Build APKs

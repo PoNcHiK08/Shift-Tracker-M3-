@@ -3,11 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!--
-        Glance renders widgets through WorkManager, whose manifest adds these permissions. The widget
-        needs none of them (no network constraints, no foreground work, nothing to reschedule after a
-        reboot), so they are dropped. WAKE_LOCK stays: WorkManager may hold one while it runs a session.
+        Glance renders widgets through WorkManager, whose manifest adds these permissions. The app needs
+        none of them (no foreground work, nothing to reschedule after a reboot), so they are dropped.
+        WAKE_LOCK stays: WorkManager may hold one while it runs a session. ACCESS_NETWORK_STATE (from the
+        same manifests) stays too: cloud sync (Firebase) watches the connection.
     -->
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" tools:node="remove" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" tools:node="remove" />
 
