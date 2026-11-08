@@ -16,3 +16,5 @@
 google-services.json
 # Firestore rules tests (firebase/rules-test)
 node_modules/
+# Firebase emulator logs
+*-debug.log

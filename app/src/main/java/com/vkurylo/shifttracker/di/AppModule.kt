@@ -18,6 +18,8 @@ import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
 import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
+import com.vkurylo.shifttracker.data.sync.RemoteStore
+import com.vkurylo.shifttracker.data.sync.firebase.FirestoreRemoteStore
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
@@ -73,6 +75,7 @@ abstract class RepositoryModule {
     @Binds abstract fun bindPreferencesRepository(impl: DataStorePreferencesRepository): PreferencesRepository
     @Binds abstract fun bindLanguageRepository(impl: AppCompatLanguageRepository): LanguageRepository
     @Binds abstract fun bindBackupRepository(impl: JsonBackupRepository): BackupRepository
+    @Binds abstract fun bindRemoteStore(impl: FirestoreRemoteStore): RemoteStore
 }
 
 @javax.inject.Qualifier

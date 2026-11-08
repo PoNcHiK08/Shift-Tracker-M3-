@@ -120,7 +120,11 @@ fun RemoteRecord.sameContentAs(other: RemoteRecord): Boolean = when {
  * is skipped and counted, never written into the database.
  */
 
-private const val MAX_TEXT = 1_000
+/**
+ * Names and notes have no length limit in the editors; this one only keeps out absurd values. firestore.rules
+ * allows the same length, so whatever one phone may upload, the others can apply.
+ */
+private const val MAX_TEXT = 20_000
 private const val DAY_MINUTES = 24 * 60
 
 /** 0001-01-01 .. 9999-12-31, so LocalDate.ofEpochDay never throws. */
