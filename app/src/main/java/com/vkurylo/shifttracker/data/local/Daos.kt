@@ -57,6 +57,20 @@ interface JobDao {
     @Query("UPDATE bonuses SET deleted = 1, dirty = 1, updated_at = MAX(updated_at + 1, :at) WHERE job_id = :jobId AND deleted = 0")
     suspend fun deleteLiveBonusesOf(jobId: Long, at: Long)
 
+    /** For [ParentChildRule]: deletes the job's live shifts not changed after [jobDeletedAt]. */
+    @Query(
+        "UPDATE shifts SET deleted = 1, dirty = 1, updated_at = MAX(updated_at + 1, :jobDeletedAt) " +
+            "WHERE job_id = :jobId AND deleted = 0 AND updated_at <= :jobDeletedAt",
+    )
+    suspend fun deleteLiveShiftsNotNewerThan(jobId: Long, jobDeletedAt: Long)
+
+    /** For [ParentChildRule]: deletes the job's live bonuses not changed after [jobDeletedAt]. */
+    @Query(
+        "UPDATE bonuses SET deleted = 1, dirty = 1, updated_at = MAX(updated_at + 1, :jobDeletedAt) " +
+            "WHERE job_id = :jobId AND deleted = 0 AND updated_at <= :jobDeletedAt",
+    )
+    suspend fun deleteLiveBonusesNotNewerThan(jobId: Long, jobDeletedAt: Long)
+
     /** Deleted jobs that still have a live shift or bonus (see [ParentChildRule]). */
     @Query(
         """

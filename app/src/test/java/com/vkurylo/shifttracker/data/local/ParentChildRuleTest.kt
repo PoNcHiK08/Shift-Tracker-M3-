@@ -20,9 +20,9 @@ class ParentChildRuleTest {
     @Test
     fun `an entry changed after the deletion revives the job at that entry's time`() {
         // Phone A deleted the job at 100; offline phone B added a shift at 150.
-        assertEquals(Resolution.ReviveJob(150), ParentChildRule.resolve(jobDeleted = true, jobUpdatedAt = 100, liveEntryUpdatedAts = listOf(150)))
-        // An older live entry doesn't stop the revival; the newest one decides.
-        assertEquals(Resolution.ReviveJob(150), ParentChildRule.resolve(jobDeleted = true, jobUpdatedAt = 100, liveEntryUpdatedAts = listOf(40, 150, 90)))
+        assertEquals(Resolution.ReviveJob(updatedAt = 150, jobDeletedAt = 100), ParentChildRule.resolve(jobDeleted = true, jobUpdatedAt = 100, liveEntryUpdatedAts = listOf(150)))
+        // The newest entry decides the revival; the older ones (40, 90) are still deleted with the job.
+        assertEquals(Resolution.ReviveJob(updatedAt = 150, jobDeletedAt = 100), ParentChildRule.resolve(jobDeleted = true, jobUpdatedAt = 100, liveEntryUpdatedAts = listOf(40, 150, 90)))
     }
 
     @Test
