@@ -84,22 +84,44 @@ class CalendarImportSyncIdTest {
         assertEquals(3, a.toSet().size)
     }
 
+    /** Ticking a duplicate in the preview: the shift gets the calendar's times, the user's edits stay. */
     @Test
-    fun importingAnEventAgainUpdatesItsShiftInsteadOfAddingOne() = runBlocking {
+    fun importingAnEventAgainOnlyUpdatesTheTimesAndKeepsBreakAndNote() = runBlocking {
         val phone = phone()
         phone.import(schedule)
-        val before = phone.db.shiftDao().getAll().first()
+        val imported = phone.shifts.getAllShifts().first()
+        // The user's own edits after the import.
+        phone.now += 1000
+        phone.shifts.upsert(imported.copy(unpaidBreakMinutes = 30, note = "Moja notatka"))
+        val before = phone.db.shiftDao().getAny(imported.id)!!
 
         phone.now += 1000
-        phone.import(listOf(event("a1@grafik", 9, 8, 18, summary = "Dłuższa zmiana"))) // same occurrence, ends later
+        phone.import(listOf(event("a1@grafik", 9, 8, 18, summary = "Zmiana z kalendarza"))) // same occurrence, ends later
 
         val shifts = phone.db.shiftDao().getAll()
-        assertEquals(3, shifts.size)
-        val after = shifts.first()
-        assertEquals(before.id to before.syncId, after.id to after.syncId)
-        assertEquals(18 * 60, after.endMinute)
-        assertEquals("Dłuższa zmiana", after.note)
-        assertEquals(phone.now, after.updatedAt)
+        assertEquals("no second shift", 3, shifts.size)
+        val after = phone.db.shiftDao().getAny(imported.id)!!
+        assertEquals(before.syncId, after.syncId)
+        assertEquals(8 * 60 to 18 * 60, after.startMinute to after.endMinute)
+        assertEquals(30, after.unpaidBreakMinutes)
+        assertEquals("Moja notatka", after.note)
+        // Everything else is as it was, apart from the change time.
+        assertEquals(before.copy(endMinute = 18 * 60, updatedAt = phone.now), after)
+    }
+
+    @Test
+    fun aKeptBreakIsCutDownWhenItNoLongerFitsTheNewTimes() = runBlocking {
+        val phone = phone()
+        phone.import(schedule)
+        val imported = phone.shifts.getAllShifts().first()
+        phone.shifts.upsert(imported.copy(unpaidBreakMinutes = 60, note = "Moja notatka"))
+
+        phone.import(listOf(event("a1@grafik", 9, 8, 8).copy(end = LocalDateTime.of(2026, 11, 9, 8, 45)))) // now 45 min long
+
+        val after = phone.db.shiftDao().getAny(imported.id)!!
+        assertEquals(8 * 60 + 45, after.endMinute)
+        assertEquals("still shorter than the shift, as the editor requires", 44, after.unpaidBreakMinutes)
+        assertEquals("Moja notatka", after.note)
     }
 
     @Test

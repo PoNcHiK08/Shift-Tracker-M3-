@@ -47,7 +47,9 @@ interface ShiftRepository {
     /**
      * Saves shifts imported from a calendar (.ics) file. Each one is identified by its calendar event
      * rather than at random, so the same event imported on two phones is one shift, and importing an
-     * event again updates (or undeletes) its shift instead of adding a second one.
+     * event again never adds a second one: a shift that exists only gets the event's start and end time
+     * (its job, rates, unpaid break and note are the user's and stay), and a deleted one comes back as the
+     * calendar has it.
      */
     suspend fun importFromCalendar(shifts: List<Shift>)
     suspend fun delete(shift: Shift)

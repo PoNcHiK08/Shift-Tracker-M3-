@@ -11,11 +11,13 @@ import com.vkurylo.shifttracker.data.local.nextUpdatedAt
 import com.vkurylo.shifttracker.data.local.stamped
 import com.vkurylo.shifttracker.data.local.PaySettingsDao
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
+import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.data.local.toMonthKey
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.data.local.toEntity
+import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
@@ -28,6 +30,7 @@ import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.LocalDate
+import java.time.LocalTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -124,9 +127,27 @@ class RoomShiftRepository @Inject constructor(
         for (shift in shifts) {
             val syncId = calendarSyncId(shift.externalUid, shift.date, shift.start, shift.end)
             val existing = dao.getBySyncId(syncId)
-            dao.upsert(shift.toEntity().copy(id = existing?.id ?: 0, syncId = syncId).stamped(existing, now))
+            val entity = if (existing != null && !existing.deleted) {
+                // A duplicate the user ticked in the preview: the calendar only brings new times. The job,
+                // rates, unpaid break and note are the user's own and stay.
+                existing.withTimes(shift.start, shift.end)
+            } else {
+                // New, or deleted earlier: the event as the calendar has it.
+                shift.toEntity().copy(id = existing?.id ?: 0, syncId = syncId)
+            }
+            dao.upsert(entity.stamped(existing, now))
         }
         ParentChildRule.enforce(db.jobDao())
+    }
+
+    /** New start/end; the break is kept, only cut down if it would no longer be shorter than the shift. */
+    private fun ShiftEntity.withTimes(start: LocalTime, end: LocalTime): ShiftEntity {
+        val duration = ShiftCalculator.durationMinutes(start, end).toInt()
+        return copy(
+            startMinute = start.hour * 60 + start.minute,
+            endMinute = end.hour * 60 + end.minute,
+            unpaidBreakMinutes = unpaidBreakMinutes.coerceAtMost(duration - 1),
+        )
     }
     override suspend fun delete(shift: Shift) = dao.markDeleted(shift.id, clock.nowMillis())
 }

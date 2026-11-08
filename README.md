@@ -66,7 +66,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
   picking a job (shift/bonus editors, schedule import) uses toggle buttons that morph from a squircle into a pill.
 - **Schedule import** — pick an `.ics` file, choose the job, preview the events (duplicates are detected and unchecked), confirm.
   An imported shift's id comes from its calendar event (UID + date + start, or the time slot when there is no UID), so
-  importing an event again updates or restores its shift, and two phones importing the same file get the same shifts.
+  two phones importing the same file get the same shifts, and importing an event again never adds a copy: ticking a
+  duplicate in the preview only moves its shift's start/end to the calendar's (your break and note stay; a break is
+  only cut down if it would no longer be shorter than the shift), and a deleted one comes back.
   Imported shifts take that job's rates, currency and pay settings.
   Handles folded lines, `TZID` / UTC / floating times, `DURATION`, Outlook time-zone names, and skips all-day/cancelled events.
   A broken event (an impossible date or duration) is skipped and counted instead of failing the whole file.
