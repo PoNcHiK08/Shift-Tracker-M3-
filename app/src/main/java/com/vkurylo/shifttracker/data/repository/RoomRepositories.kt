@@ -6,6 +6,7 @@ import com.vkurylo.shifttracker.data.local.JobActivityRow
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
 import com.vkurylo.shifttracker.data.local.ParentChildRule
 import com.vkurylo.shifttracker.data.local.WallClock
+import com.vkurylo.shifttracker.data.local.calendarSyncId
 import com.vkurylo.shifttracker.data.local.nextUpdatedAt
 import com.vkurylo.shifttracker.data.local.stamped
 import com.vkurylo.shifttracker.data.local.PaySettingsDao
@@ -118,9 +119,13 @@ class RoomShiftRepository @Inject constructor(
         ParentChildRule.enforce(db.jobDao())
         if (rowId == -1L) shift.id else rowId
     }
-    override suspend fun insertAll(shifts: List<Shift>) = db.withTransaction {
+    override suspend fun importFromCalendar(shifts: List<Shift>) = db.withTransaction {
         val now = clock.nowMillis()
-        dao.insertAll(shifts.map { it.toEntity().stamped(null, now) })
+        for (shift in shifts) {
+            val syncId = calendarSyncId(shift.externalUid, shift.date, shift.start, shift.end)
+            val existing = dao.getBySyncId(syncId)
+            dao.upsert(shift.toEntity().copy(id = existing?.id ?: 0, syncId = syncId).stamped(existing, now))
+        }
         ParentChildRule.enforce(db.jobDao())
     }
     override suspend fun delete(shift: Shift) = dao.markDeleted(shift.id, clock.nowMillis())

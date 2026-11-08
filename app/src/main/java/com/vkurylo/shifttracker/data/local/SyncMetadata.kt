@@ -1,12 +1,15 @@
 package com.vkurylo.shifttracker.data.local
 
 import androidx.room.ColumnInfo
+import java.time.LocalDate
+import java.time.LocalTime
 import java.util.UUID
 
 /*
  * Sync bookkeeping of jobs, shifts and bonuses (DB version 7). Every such row carries:
  *
- * - `sync_id`: a random UUID, fixed for the life of the record and the same on every device. The local
+ * - `sync_id`: a UUID (random, or for a shift imported from a calendar derived from the event, see
+ *   [calendarSyncId]), fixed for the life of the record and the same on every device. The local
  *   Long `id` stays the key for relations (job_id), navigation and the UI; only the sync layer uses
  *   `sync_id`.
  * - `updated_at`: wall-clock UTC millis of the row's last change, see [nextUpdatedAt].
@@ -33,6 +36,23 @@ fun interface WallClock {
 }
 
 fun newSyncId(): String = UUID.randomUUID().toString()
+
+/**
+ * Sync id of a shift imported from a calendar (.ics) event. It is derived from the event instead of being
+ * random, so the same event imported on two phones (before they have synced) becomes one record, not two;
+ * importing it again, on any phone, is that same record (updated, or undeleted if it was deleted).
+ *
+ * - With a UID: the UID plus the occurrence's date and start time. Date and time tell apart occurrences
+ *   that share a UID (the changed instances of a recurring event); a later end time is still the same
+ *   occurrence.
+ * - Without a UID: the date, start and end time, the same slot ImportPlanner treats as a duplicate.
+ *
+ * A name-based UUID (version 3), so it has the same form as every other sync id.
+ */
+fun calendarSyncId(externalUid: String?, date: LocalDate, start: LocalTime, end: LocalTime): String {
+    val name = if (externalUid != null) "ics-uid:$externalUid|$date|$start" else "ics-slot:$date|$start|$end"
+    return UUID.nameUUIDFromBytes(name.toByteArray(Charsets.UTF_8)).toString()
+}
 
 /**
  * `updated_at` for a change to a row whose current `updated_at` is [previous] (null: a new row).

@@ -76,7 +76,7 @@ class EarningsModeSwitchTest {
         override suspend fun getShift(id: Long): Shift? = null
         override suspend fun getAllShifts(): List<Shift> = emptyList()
         override suspend fun upsert(shift: Shift): Long = 0
-        override suspend fun insertAll(shifts: List<Shift>) = Unit
+        override suspend fun importFromCalendar(shifts: List<Shift>) = Unit
         override suspend fun delete(shift: Shift) = Unit
     }
     private val bonusRepository = object : BonusRepository {

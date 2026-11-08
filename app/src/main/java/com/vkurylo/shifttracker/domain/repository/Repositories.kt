@@ -43,7 +43,13 @@ interface ShiftRepository {
     suspend fun getShift(id: Long): Shift?
     suspend fun getAllShifts(): List<Shift>
     suspend fun upsert(shift: Shift): Long
-    suspend fun insertAll(shifts: List<Shift>)
+
+    /**
+     * Saves shifts imported from a calendar (.ics) file. Each one is identified by its calendar event
+     * rather than at random, so the same event imported on two phones is one shift, and importing an
+     * event again updates (or undeletes) its shift instead of adding a second one.
+     */
+    suspend fun importFromCalendar(shifts: List<Shift>)
     suspend fun delete(shift: Shift)
 }
 
