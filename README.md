@@ -118,6 +118,55 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 ./gradlew installDebug        # install a debug build on a connected phone
 ```
 
+## Cloud sync (optional, work in progress)
+
+Signing in with Google in **Settings → Account & sync** will keep the data of several phones in step through
+Cloud Firestore. The app keeps working exactly as before without it: Room on the phone stays the only data
+the app reads, and a build made without a Firebase config shows "Not available in this build". So far the
+app signs in and checks that it can reach the cloud; syncing itself comes in the next steps.
+
+### Setting up Firebase (once)
+
+1. [Firebase console](https://console.firebase.google.com) → create a project (Analytics not needed).
+2. **Authentication → Sign-in method → Google → Enable**.
+3. **Project settings → Your apps → Add app → Android**, twice: `com.vkurylo.shifttracker` and
+   `com.vkurylo.shifttracker.debug`. For each, add both fingerprints of the dev key that signs every build
+   (`app/signing/dev.keystore`):
+   - SHA-1 `0E:53:EF:F6:AF:70:26:32:27:B4:33:41:1E:A5:6A:38:B5:5E:7C:7B`
+   - SHA-256 `8F:6C:D8:05:54:CC:9A:71:5F:4C:94:5C:26:97:68:72:50:E7:F6:E0:51:AC:9A:1E:61:D5:28:24:A1:B6:11:27`
+4. Download `google-services.json` (after steps 2–3, so it has both apps and the Google sign-in client).
+   **Never commit it** (it is in `.gitignore`).
+   - GitHub builds: **Settings → Secrets and variables → Actions → New repository secret**, name
+     `GOOGLE_SERVICES_JSON`, value: the file's whole content (or the same base64-encoded). Without the secret
+     the workflow still builds, without cloud sync, and says so in a warning.
+   - Local builds: put the file at `app/google-services.json`.
+5. **Firestore Database → Create database**, production mode, a location near you (e.g. `europe-central2`,
+   Warsaw; it can't be changed later).
+6. **Publish the security rules** (below).
+
+### Security rules
+
+[`firebase/firestore.rules`](firebase/firestore.rules) lets only you in: the signed-in owner of
+`users/{uid}`, signed in with Google, whose verified email is the one in the rules. It also checks every
+field of every document, and lets a record be replaced only by a later version of it.
+
+The repository is public, so the committed file has the placeholder `YOUR_EMAIL_HERE`, and as committed it
+lets nobody in. To publish: **Firestore Database → Rules**, paste the whole file, replace `YOUR_EMAIL_HERE`
+with your Google account's address **there, in the console only**, then **Publish**. (With the Firebase CLI:
+deploy a local copy with your address in it, never a committed one.) Republish whenever the file changes.
+
+What protects your data is these rules, not the app's fingerprints: the dev key's password is public, so
+anyone can build an APK that Firebase accepts as this app, and the `google-services.json` values end up
+inside every APK anyway. With the rules, such an app can only sign in with the stranger's own Google
+account, which can't read or write anything.
+
+Tests (they need Node 20+ and Java 21, and run in GitHub Actions whenever the rules or the sync code change):
+
+```bash
+cd firebase/rules-test && npm ci && npm test   # the rules on the Firestore emulator
+firebase/run-emulator-tests.sh                 # the app's Firestore code and sync engine against the rules
+```
+
 ## Tech stack
 
 | Area | Choice |
@@ -127,6 +176,7 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
 | Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back: while you drag, the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts towards the swiping edge; when you let go it keeps going from that exact point (shrinks to 85 % and fades out within at most ~250 ms) instead of pausing first, and a cancelled swipe returns it to its place. An editor opened from a card is only held by the finger: it shrinks a little, rounds its corners and drifts, on a spring and up to a limit (rubber band), however far you drag, with the calendar visible behind it; it never morphs into the card under the finger. On release it flies into its card from where it was held (on a calm spring, ~5 % longer than a normal close) in plain view all the way: its content fades out early, the card's own look fades in on the shrinking container and lands exactly in the card's place. This happens on every back, however quick the flick (even one released before predictive back has started) and with the system back button; the editor's own close/save/delete buttons keep the normal container transform. Normal open/close keeps the container transform springs. Icon-only bottom bar built from M3 Expressive toggle buttons |
 | Storage | Room 2.8 (jobs, shifts, bonuses; exported schemas, auto-migrations up to v6 and a manual v6 → v7 that adds sync metadata: a UUID `sync_id`, `updated_at`, and deletions kept as hidden tombstones) + DataStore (settings); money stored as `Long` minor units of each job's currency (the `*_grosze` names predate other currencies); pay settings history per job |
+| Cloud sync (optional) | Firebase Auth (Google sign-in through Credential Manager) + Cloud Firestore; Room stays the source of truth |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
 | Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English) |
@@ -150,5 +200,7 @@ app/src/main/java/com/vkurylo/shifttracker/
                    (calendar, summary, settings, jobs, shift, importics)
 app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
                    import planner, DB migrations from v1 and v6, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
-                   time-dial haptics, predictive back frame by frame, and an end-to-end UI smoke test
+                   time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
+                   engine (last write wins, first sign-in, several phones) and its Firestore documents
+firebase/          firestore.rules, its tests (rules-test/) and the emulator test runner
 ```
