@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FileDownload
@@ -38,6 +42,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -59,6 +64,7 @@ import com.vkurylo.shifttracker.ui.components.SegmentedItem
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.theme.supportsDynamicColor
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +74,8 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val cloud by viewModel.cloud.collectAsStateWithLifecycle()
+    val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -239,6 +247,84 @@ fun SettingsScreen(
                             )
                         },
                     )
+                }
+            }
+
+            item { SectionHeader(stringResource(R.string.section_cloud)) }
+            val account = cloud.account
+            when {
+                !cloud.available -> item {
+                    SettingsRow(index = 0, count = 1, enabled = false) {
+                        ListItem(
+                            modifier = it,
+                            colors = TransparentListItem,
+                            leadingContent = { Icon(Icons.Filled.CloudOff, contentDescription = null) },
+                            headlineContent = { Text(stringResource(R.string.cloud_sync)) },
+                            supportingContent = { Text(stringResource(R.string.cloud_unavailable)) },
+                        )
+                    }
+                }
+                account == null -> item {
+                    SettingsRow(
+                        index = 0,
+                        count = 1,
+                        enabled = !cloud.signingIn,
+                        // The account sheet is shown over this Activity; signing in is cancelled with the screen.
+                        onClick = { scope.launch { viewModel.signIn(context) } },
+                    ) {
+                        ListItem(
+                            modifier = it,
+                            colors = TransparentListItem,
+                            leadingContent = { Icon(Icons.Filled.Cloud, contentDescription = null) },
+                            headlineContent = { Text(stringResource(R.string.cloud_sign_in)) },
+                            supportingContent = {
+                                Text(stringResource(if (cloud.signingIn) R.string.cloud_signing_in else R.string.cloud_sign_in_summary))
+                            },
+                        )
+                    }
+                }
+                else -> {
+                    item {
+                        SettingsRow(
+                            index = 0,
+                            count = 2,
+                            onClick = viewModel::retryCloudAccess.takeIf { cloud.access != CloudAccess.OK && cloud.access != CloudAccess.CHECKING },
+                        ) {
+                            ListItem(
+                                modifier = it,
+                                colors = TransparentListItem,
+                                leadingContent = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+                                headlineContent = { Text(account.email ?: stringResource(R.string.cloud_google_account)) },
+                                supportingContent = {
+                                    Text(
+                                        when (cloud.access) {
+                                            CloudAccess.OK -> stringResource(R.string.cloud_access_ok)
+                                            CloudAccess.DENIED -> stringResource(R.string.cloud_access_denied)
+                                            CloudAccess.OFFLINE -> stringResource(R.string.cloud_access_offline)
+                                            CloudAccess.ERROR -> stringResource(R.string.cloud_access_error, cloud.accessError.orEmpty())
+                                            CloudAccess.CHECKING, null -> stringResource(R.string.cloud_access_checking)
+                                        },
+                                        color = if (cloud.access == CloudAccess.DENIED || cloud.access == CloudAccess.ERROR) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            Color.Unspecified
+                                        },
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    item {
+                        SettingsRow(index = 1, count = 2, onClick = viewModel::signOut) {
+                            ListItem(
+                                modifier = it,
+                                colors = TransparentListItem,
+                                leadingContent = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null) },
+                                headlineContent = { Text(stringResource(R.string.cloud_sign_out)) },
+                                supportingContent = { Text(stringResource(R.string.cloud_sign_out_summary)) },
+                            )
+                        }
+                    }
                 }
             }
 

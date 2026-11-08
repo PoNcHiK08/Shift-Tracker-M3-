@@ -179,6 +179,27 @@
     <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Оновіть Shift Tracker і спробуйте ще раз. Поточні дані не змінено.</string>
     <string name="version">Версія %1$s</string>
 
+    <!-- Account & sync -->
+    <string name="section_cloud">Акаунт і синхронізація</string>
+    <string name="cloud_sync">Хмарна синхронізація</string>
+    <string name="cloud_unavailable">Недоступна в цій збірці</string>
+    <string name="cloud_sign_in">Увійти через Google</string>
+    <string name="cloud_sign_in_summary">Необов’язково. Без входу всі дані зберігаються лише на цьому телефоні.</string>
+    <string name="cloud_signing_in">Вхід…</string>
+    <string name="cloud_google_account">Акаунт Google</string>
+    <string name="cloud_access_checking">Перевірка доступу до хмари…</string>
+    <string name="cloud_access_ok">Хмара доступна</string>
+    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore. Торкнися, щоб спробувати ще раз.</string>
+    <string name="cloud_access_offline">Немає зв’язку з хмарою. Торкнися, щоб спробувати ще раз.</string>
+    <string name="cloud_access_error">Помилка хмари: %1$s</string>
+    <string name="cloud_sign_out">Вийти</string>
+    <string name="cloud_sign_out_summary">Дані на цьому телефоні залишаться</string>
+    <string name="cloud_signed_in">Вхід виконано: %1$s</string>
+    <string name="cloud_signed_out">Вихід виконано. Дані на телефоні залишилися.</string>
+    <string name="cloud_sign_in_no_account">На телефоні немає акаунта Google. Додай його в налаштуваннях Android і спробуй ще раз.</string>
+    <string name="cloud_sign_in_offline">Немає зв’язку. Спробуй ще раз, коли будеш онлайн.</string>
+    <string name="cloud_sign_in_failed">Не вдалося увійти: %1$s</string>
+
     <!-- .ics import -->
     <string name="import_schedule">Імпорт графіку (.ics)</string>
     <string name="import_schedule_summary">Додати зміни з файлу календаря</string>

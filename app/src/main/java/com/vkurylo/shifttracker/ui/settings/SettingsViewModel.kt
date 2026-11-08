@@ -1,10 +1,17 @@
 package com.vkurylo.shifttracker.ui.settings
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.data.DocumentIo
+import com.vkurylo.shifttracker.data.sync.CloudAccount
+import com.vkurylo.shifttracker.data.sync.RemoteStore
+import com.vkurylo.shifttracker.data.sync.firebase.CloudAuth
+import com.vkurylo.shifttracker.data.sync.firebase.CloudProblem
+import com.vkurylo.shifttracker.data.sync.firebase.SignInException
+import com.vkurylo.shifttracker.data.sync.firebase.cloudProblem
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.ThemeMode
@@ -19,6 +26,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -35,6 +44,20 @@ data class SettingsUiState(
     val pendingImport: Uri? = null,
 )
 
+/** Whether the signed-in account can reach its data in the cloud (firestore.rules let it in). */
+enum class CloudAccess { CHECKING, OK, DENIED, OFFLINE, ERROR }
+
+data class CloudUiState(
+    /** Cloud sync is set up in this build (it was made with google-services.json). */
+    val available: Boolean = false,
+    val account: CloudAccount? = null,
+    /** Null while signed out. */
+    val access: CloudAccess? = null,
+    /** What went wrong, for [CloudAccess.ERROR]. */
+    val accessError: String? = null,
+    val signingIn: Boolean = false,
+)
+
 /** A message for the snackbar: string resource + format args. */
 data class UiMessage(val resId: Int, val args: List<Any> = emptyList())
 
@@ -44,6 +67,8 @@ class SettingsViewModel @Inject constructor(
     private val languageRepository: LanguageRepository,
     private val backupRepository: BackupRepository,
     private val documentIo: DocumentIo,
+    private val cloudAuth: CloudAuth,
+    private val remoteStore: RemoteStore,
     jobRepository: JobRepository,
 ) : ViewModel() {
 
@@ -63,6 +88,69 @@ class SettingsViewModel @Inject constructor(
 
     private val _messages = Channel<UiMessage>(Channel.BUFFERED)
     val messages = _messages.receiveAsFlow()
+
+    private val cloudAccess = MutableStateFlow<Pair<CloudAccess, String?>?>(null)
+    private val signingIn = MutableStateFlow(false)
+
+    val cloud: StateFlow<CloudUiState> = combine(cloudAuth.account, cloudAccess, signingIn) { account, access, busy ->
+        val check = access.takeIf { account != null }
+        CloudUiState(cloudAuth.isAvailable, account, check?.first, check?.second, busy)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloudUiState(available = cloudAuth.isAvailable))
+
+    init {
+        // Whenever an account is signed in, check that the cloud lets it in (google-services.json, the app's
+        // fingerprints and firestore.rules all set up right).
+        viewModelScope.launch {
+            cloudAuth.account.collectLatest { account -> if (account != null) checkCloudAccess(account) else cloudAccess.update { null } }
+        }
+    }
+
+    /** Shows Google's account sheet over [activityContext] (the Activity) and signs in with the chosen account. */
+    suspend fun signIn(activityContext: Context) {
+        if (signingIn.value) return
+        signingIn.update { true }
+        try {
+            val account = cloudAuth.signIn(activityContext) ?: return // the user closed the sheet
+            _messages.send(UiMessage(R.string.cloud_signed_in, listOf(account.email.orEmpty())))
+        } catch (e: SignInException) {
+            _messages.send(
+                when (e.reason) {
+                    SignInException.Reason.NO_ACCOUNT -> UiMessage(R.string.cloud_sign_in_no_account)
+                    SignInException.Reason.NETWORK -> UiMessage(R.string.cloud_sign_in_offline)
+                    SignInException.Reason.OTHER -> UiMessage(R.string.cloud_sign_in_failed, listOf(e.message.orEmpty()))
+                },
+            )
+        } finally {
+            signingIn.update { false }
+        }
+    }
+
+    fun signOut() = viewModelScope.launch {
+        cloudAuth.signOut()
+        _messages.send(UiMessage(R.string.cloud_signed_out))
+    }
+
+    fun retryCloudAccess() {
+        val account = cloudAuth.currentAccount() ?: return
+        viewModelScope.launch { checkCloudAccess(account) }
+    }
+
+    private suspend fun checkCloudAccess(account: CloudAccount) {
+        cloudAccess.update { CloudAccess.CHECKING to null }
+        val result = try {
+            remoteStore.readMeta(account.uid)
+            CloudAccess.OK to null
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            when (e.cloudProblem()) {
+                CloudProblem.OFFLINE -> CloudAccess.OFFLINE to null
+                CloudProblem.ACCESS_DENIED -> CloudAccess.DENIED to null
+                CloudProblem.OTHER -> CloudAccess.ERROR to (e.message ?: e.javaClass.simpleName)
+            }
+        }
+        cloudAccess.update { result }
+    }
 
     fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { preferencesRepository.setThemeMode(mode) }
     fun setDynamicColor(enabled: Boolean) = viewModelScope.launch { preferencesRepository.setDynamicColor(enabled) }
