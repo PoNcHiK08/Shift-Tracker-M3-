@@ -87,7 +87,7 @@ Every push builds the app on GitHub Actions:
 
 All builds are signed with the same development key (`app/signing/dev.keystore`), so a new build installs
 as an update over the old one and keeps your data. Android will ask to allow installs from your browser /
-file manager the first time.
+file manager the first time. (Unless you give the workflow your own release key: see below.)
 
 ### Signing
 
@@ -97,9 +97,12 @@ file manager the first time.
 | `ALLOW_DEV_RELEASE_SIGNING=true` (env) or `-PallowDevReleaseSigning=true` | Signed with the public dev key, with a warning banner in the build log |
 | neither | The build stops before signing and explains both options |
 
-Debug builds always use the dev key. The GitHub workflow opts in explicitly for its builds. The dev key's
-password is in this repo, so anyone can sign an APK with it: fine for test builds, **not** for Google Play —
-generate your own key and pass it through the `SIGNING_*` variables (e.g. from GitHub Secrets).
+Debug builds always use the dev key. The GitHub workflow opts in explicitly for its builds, unless the
+`SIGNING_KEYSTORE_BASE64` secret (your own key) and its three `SIGNING_*` secrets are set: then its release APK
+is signed with your key. The dev key's password is in this repo, so anyone can sign an APK with it: fine for
+test builds, **not** for Google Play. Switching an installed app to your own key means reinstalling it; see
+[docs/cloud-sync.md](docs/cloud-sync.md#optional-your-own-release-key) for the steps and what happens to the
+data.
 
 ## Crash reports
 
@@ -118,12 +121,19 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 ./gradlew installDebug        # install a debug build on a connected phone
 ```
 
-## Cloud sync (optional, work in progress)
+## Cloud sync (optional)
 
 Signing in with Google in **Settings → Account & sync** and turning on **Sync** keeps the data of several
 phones in step through Cloud Firestore. The app keeps working exactly as before without it: Room on the
 phone stays the only data the app reads, and a build made without a Firebase config shows "Not available in
 this build".
+
+**[docs/cloud-sync.md](docs/cloud-sync.md)** has:
+- the limitations;
+- step-by-step tests on one phone (airplane mode) and on two phones;
+- **moving your everyday app to the sync version** (what the update does, what to do first, how to roll
+  back);
+- switching to your own release key.
 
 ### How sync behaves
 
@@ -142,6 +152,14 @@ this build".
   a day per phone, so a bug can't use the quota up; Sync now isn't limited. Records downloaded from the
   cloud are stored as already synced, so they never go back up. The status shows the writes of the last
   sync and today's total. `adb logcat -s CloudSync` logs every sync.
+- **Your data stays yours to manage:**
+  - **Delete my cloud data** (after a confirmation) turns sync off and deletes the account's data from the
+    cloud. The phone keeps its data; other phones stop and ask.
+  - With sync on, **Import data** warns that it replaces the data on all your devices.
+  - Every import first saves a safety backup of the data it replaces. **Settings → Data → Safety backups**
+    lists the newest 5; save one to a file or share it, and restore it with Import data.
+- **Names and notes stop at 20 000 characters**, the cloud's limit, with a counter near it. Longer older
+  text goes up cut instead of holding up sync.
 
 ### Setting up Firebase (once)
 
@@ -232,4 +250,5 @@ app/src/test/      calculator (incl. second rate), money parser, .ics parser (in
                    time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
                    engine (last write wins, first sign-in, several phones) and its Firestore documents
 firebase/          firestore.rules, its tests (rules-test/) and the emulator test runner
+docs/cloud-sync.md cloud sync's limitations, phone tests, moving the everyday app, your own release key
 ```
