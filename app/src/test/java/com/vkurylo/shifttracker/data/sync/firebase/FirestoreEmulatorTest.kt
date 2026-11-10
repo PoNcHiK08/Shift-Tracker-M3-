@@ -112,7 +112,7 @@ class FirestoreEmulatorTest {
         val jobId = id()
         store.push(account.uid, listOf(job(jobId, 1_000), shift(jobId, 1_000), RemoteBonus(id(), 1_000, false, jobId, 20_400, 5_000, null)))
         assertTrue(store.hasRecords(account.uid))
-        store.deleteAll(account.uid)
+        assertEquals("records deleted", 3, store.deleteAll(account.uid))
         assertNull(store.readMeta(account.uid))
         assertTrue(!store.hasRecords(account.uid))
     }
@@ -147,6 +147,10 @@ class FirestoreEmulatorTest {
         assertEquals(listOf(later), changes.shifts)
         assertTrue(changes.jobs.isEmpty())
         assertTrue(changes.newestServerTime!! > since)
+
+        // Deleting goes page by page too, and counts every record.
+        assertEquals(1 + 620 + 1, store.deleteAll(account.uid))
+        assertTrue(!store.hasRecords(account.uid))
     }
 
     @Test

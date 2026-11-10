@@ -178,6 +178,21 @@ class SyncController @Inject constructor(
         auth.signOut()
     }
 
+    /**
+     * "Delete my cloud data": turns sync off first (nothing scheduled can upload into the deletion), then deletes
+     * the signed-in account's records and marker from the cloud. This phone keeps its data; other phones that
+     * sync with the account stop and ask what to do. Turning sync on again uploads this phone's data afresh.
+     * Returns the number of records deleted; throws when the cloud can't be reached (deleting again finishes).
+     */
+    suspend fun deleteCloudData(): Int = withContext(Dispatchers.Default) {
+        val account = auth.currentAccount() ?: throw IllegalStateException("Not signed in")
+        disable()
+        val deleted = engine.deleteCloudData(account)
+        prefs.updateSettings { it.copy(cloudReset = false) }
+        Log.i(TAG, "Deleted the account's cloud data: $deleted records")
+        deleted
+    }
+
     // --- Syncing ----------------------------------------------------------------------------------------
 
     /** "Sync now": a sync right away, without the daily write limit. Null when sync isn't on (or must wait). */

@@ -150,12 +150,15 @@ class SyncEngine @Inject constructor(
         mutex.withLock { syncLocked(maxWrites, onWritten) }
 
     /**
-     * Deletes the account's records and its marker from the cloud and unlinks this phone. This phone's data
-     * stays. Other phones still linked to the account see [SyncResult.CloudWasReset] on their next sync.
+     * Deletes the account's records and its marker from the cloud, and unlinks this phone if it was linked to
+     * that account (a phone linked to another account stays linked to it). This phone's data stays. Other
+     * phones still linked to the account see [SyncResult.CloudWasReset] on their next sync. Returns the number
+     * of records deleted.
      */
-    suspend fun deleteCloudData(account: CloudAccount): Unit = mutex.withLock {
-        remote.deleteAll(account.uid)
-        state.update { SyncState(lastSyncedAt = it.lastSyncedAt) }
+    suspend fun deleteCloudData(account: CloudAccount): Int = mutex.withLock {
+        val deleted = remote.deleteAll(account.uid)
+        state.update { if (it.boundUid == account.uid) SyncState(lastSyncedAt = it.lastSyncedAt) else it }
+        deleted
     }
 
     /** Unlinks this phone's data from its account (it stays on the phone); the next sign-in starts afresh. */

@@ -81,7 +81,11 @@ data class CloudUiState(
     val switchingOn: Boolean = false,
     /** A question to answer before sync can go on. */
     val decision: SyncDecision? = null,
+    /** "Delete my cloud data": waiting for the confirmation, or deleting. */
+    val cloudDeletion: CloudDeletion = CloudDeletion.NONE,
 )
+
+enum class CloudDeletion { NONE, CONFIRMING, DELETING }
 
 /** A question to answer before sync can be turned on (or go on). */
 sealed interface SyncDecision {
@@ -132,14 +136,21 @@ class SettingsViewModel @Inject constructor(
     private val signInError = MutableStateFlow<UiMessage?>(null)
     private val switchingOn = MutableStateFlow(false)
     private val decision = MutableStateFlow<SyncDecision?>(null)
+    private val cloudDeletion = MutableStateFlow(CloudDeletion.NONE)
 
     private val account = combine(cloudAuth.account, cloudAccess, signingIn, signInError) { account, access, busy, error ->
         val check = access.takeIf { account != null }
         CloudUiState(cloudAuth.isAvailable, account, check?.first, check?.second, busy, error.takeIf { account == null })
     }
 
-    val cloud: StateFlow<CloudUiState> = combine(account, syncController.status, switchingOn, decision) { base, sync, switching, question ->
-        base.copy(sync = sync, syncLines = sync.describe(), switchingOn = switching, decision = question)
+    val cloud: StateFlow<CloudUiState> = combine(
+        account,
+        syncController.status,
+        switchingOn,
+        decision,
+        cloudDeletion,
+    ) { base, sync, switching, question, deletion ->
+        base.copy(sync = sync, syncLines = sync.describe(), switchingOn = switching, decision = question, cloudDeletion = deletion)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloudUiState(available = cloudAuth.isAvailable))
 
     init {
@@ -269,6 +280,34 @@ class SettingsViewModel @Inject constructor(
             if (problem == null || problem == SyncProblem.BUDGET) UiMessage(R.string.sync_turned_on)
             else UiMessage(R.string.sync_first_sync_failed, listOf(outcome.problemMessage(0)))
         )
+    }
+
+    // --- Delete my cloud data ------------------------------------------------------------------------------
+
+    fun requestDeleteCloudData() = cloudDeletion.update { if (it == CloudDeletion.NONE) CloudDeletion.CONFIRMING else it }
+
+    fun cancelDeleteCloudData() = cloudDeletion.update { if (it == CloudDeletion.CONFIRMING) CloudDeletion.NONE else it }
+
+    /** Confirmed: sync off, the account's cloud data deleted. This phone's data stays. */
+    fun deleteCloudData() {
+        if (cloudDeletion.value != CloudDeletion.CONFIRMING) return
+        cloudDeletion.update { CloudDeletion.DELETING }
+        viewModelScope.launch {
+            try {
+                val deleted = syncController.deleteCloudData()
+                _messages.send(UiMessage(R.string.cloud_delete_done, listOf(deleted)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(SyncController.TAG, "Deleting the cloud data failed", e)
+                _messages.send(
+                    if (e.cloudProblem() == CloudProblem.OFFLINE) UiMessage(R.string.cloud_delete_offline)
+                    else UiMessage(R.string.cloud_delete_failed, listOf("${e.javaClass.simpleName}: ${e.message}")),
+                )
+            } finally {
+                cloudDeletion.update { CloudDeletion.NONE }
+            }
+        }
     }
 
     /** "Sync now". The result shows in the account row. */

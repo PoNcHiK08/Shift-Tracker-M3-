@@ -233,6 +233,15 @@
     <string name="sync_reset_message">Дані цього акаунта в хмарі видалено, мабуть, з іншого телефона. Надіслати туди дані цього телефона знову чи вимкнути синхронізацію?</string>
     <string name="sync_upload_again">Надіслати знову</string>
     <string name="sync_turn_off">Вимкнути синхронізацію</string>
+    <string name="cloud_delete">Видалити мої дані з хмари</string>
+    <string name="cloud_delete_summary">Роботи, зміни й бонуси зникнуть із хмари. На цьому телефоні вони залишаться.</string>
+    <string name="cloud_deleting">Видалення з хмари…</string>
+    <string name="cloud_delete_title">Видалити дані з хмари?</string>
+    <string name="cloud_delete_message">Усі роботи, зміни й бонуси акаунта %1$s буде видалено з хмари, а синхронізацію вимкнено. Дані на цьому телефоні залишаться.\n\nІнші телефони, що синхронізуються з цим акаунтом, зупинять синхронізацію й запитають, що робити. Те, що є лише в хмарі (наприклад, з телефона, якого вже немає), буде втрачено. Скасувати це не можна.</string>
+    <string name="cloud_delete_confirm">Видалити</string>
+    <string name="cloud_delete_done">Дані видалено з хмари (записів: %1$d). Синхронізацію вимкнено, дані на телефоні залишилися.</string>
+    <string name="cloud_delete_offline">Не вдалося видалити дані з хмари: немає зв’язку. Спробуй ще раз, коли будеш онлайн; те, що ще не видалено, залишилося.</string>
+    <string name="cloud_delete_failed">Не вдалося видалити дані з хмари. Код: %1$s. Спробуй ще раз; те, що ще не видалено, залишилося.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Імпорт графіку (.ics)</string>

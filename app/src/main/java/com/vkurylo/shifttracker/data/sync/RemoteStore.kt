@@ -33,6 +33,6 @@ interface RemoteStore {
      */
     suspend fun push(uid: String, records: List<RemoteRecord>): List<PushResult>
 
-    /** Removes every record of the account and its [CloudMeta]. */
-    suspend fun deleteAll(uid: String)
+    /** Removes every record of the account and its [CloudMeta]; returns the number of records removed. */
+    suspend fun deleteAll(uid: String): Int
 }

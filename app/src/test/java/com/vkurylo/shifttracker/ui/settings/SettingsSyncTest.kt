@@ -115,6 +115,14 @@ class SettingsSyncTest {
         return controller
     }
 
+    /** Turns sync on as the switch does, off the main thread (which keeps running meanwhile, as in the app). */
+    private fun linkInBackground(controller: SyncController, choice: SignInChoice) {
+        val linked = java.util.concurrent.CompletableFuture<Unit>()
+        Thread { runCatching { runBlocking { controller.link(choice) } }.fold({ linked.complete(Unit) }, linked::completeExceptionally) }.start()
+        waitFor { linked.isDone }
+        linked.get()
+    }
+
     private fun scrollTo(text: String) = composeRule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(text, substring = true))
 
     private fun tap(text: String) {
@@ -170,11 +178,38 @@ class SettingsSyncTest {
     }
 
     @Test
+    fun deletingMyCloudDataAsksFirstThenDeletesItAndTurnsSyncOff() {
+        val db = database()
+        someData(db, "Kawiarnia")
+        val controller = showSettings(db)
+        linkInBackground(controller, SignInChoice.UPLOAD)
+        assertTrue(cloud.records(ana.uid).size == 3)
+
+        // Cancel: nothing happens.
+        tap(str(R.string.cloud_delete))
+        waitForText(str(R.string.cloud_delete_title))
+        composeRule.onNodeWithText(str(R.string.cancel)).performClick()
+        composeRule.waitForIdle()
+        assertTrue(gone(str(R.string.cloud_delete_title)))
+        assertTrue(cloud.records(ana.uid).size == 3)
+
+        tap(str(R.string.cloud_delete))
+        waitForText(str(R.string.cloud_delete_title))
+        composeRule.onNodeWithText(str(R.string.cloud_delete_confirm)).performClick()
+
+        waitFor { str(R.string.cloud_delete_done, 3) in shownMessages }
+        assertTrue(cloud.records(ana.uid).isEmpty())
+        // Sync is off (no "Sync now"), and the phone still has its data.
+        composeRule.waitUntil(10_000) { gone(str(R.string.sync_now)) }
+        assertTrue(runBlocking { db.jobDao().getAll().size == 1 && db.shiftDao().getAll().size == 2 })
+    }
+
+    @Test
     fun anUploadRefusedBecauseOfTheClockSaysToCheckTheDateAndTime() {
         val db = database()
         val job = someData(db, "Kawiarnia")
         val controller = showSettings(db)
-        runBlocking { controller.link(SignInChoice.UPLOAD) }
+        linkInBackground(controller, SignInChoice.UPLOAD)
 
         // The phone's clock runs 30 minutes ahead; the cloud refuses the next change.
         cloud.refuseWrites = true

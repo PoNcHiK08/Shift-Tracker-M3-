@@ -99,9 +99,9 @@ class FakeRemoteStore : RemoteStore {
         }
     }
 
-    override suspend fun deleteAll(uid: String) {
-        online()
-        accounts.remove(uid)
+    override suspend fun deleteAll(uid: String): Int {
+        online("deleteAll")
+        return accounts.remove(uid)?.records?.size ?: 0
     }
 
     // --- For tests ---

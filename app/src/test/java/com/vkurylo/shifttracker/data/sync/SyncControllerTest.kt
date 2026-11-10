@@ -352,6 +352,54 @@ class SyncControllerTest {
     }
 
     @Test
+    fun deletingMyCloudDataTurnsSyncOffKeepsThePhonesDataAndTurningOnAgainUploadsItAfresh() = runBlocking {
+        val a = phone()
+        a.someData()
+        a.turnOn()
+        val b = phone()
+        b.turnOn() // B had nothing: it took the account's data
+        assertEquals(4, cloud.records(ana.uid).size)
+
+        assertEquals(4, a.controller.deleteCloudData())
+
+        assertTrue(cloud.records(ana.uid).isEmpty())
+        assertNull(cloud.meta(ana.uid))
+        assertFalse(a.settings().enabled)
+        assertTrue(a.scheduler.cancels > 0)
+        assertEquals("this phone keeps its data", listOf(1, 2, 1), listOf(a.db.jobDao().getAll().size, a.db.shiftDao().getAll().size, a.db.bonusDao().getAll().size))
+        assertNull("nothing syncs until sync is turned on again", a.controller.syncNow())
+        // The other phone stops instead of uploading into the emptied account, and asks.
+        assertEquals(AutomaticRun.DONE, b.controller.runAutomatic())
+        assertTrue(b.settings().cloudReset)
+        assertTrue(cloud.records(ana.uid).isEmpty())
+
+        // Turned on again: this phone is no longer linked and the account is empty, so all of it goes up.
+        val outcome = a.turnOn { plan ->
+            assertEquals(SignInPlan.Ready(SignInChoice.UPLOAD), plan)
+            SignInChoice.UPLOAD
+        }
+        assertNull(outcome.problem)
+        assertEquals(4, cloud.records(ana.uid).size)
+    }
+
+    @Test
+    fun deletingWhileOfflineFailsKeepsSyncOffAndDeletingAgainFinishes() = runBlocking {
+        val a = phone()
+        a.someData()
+        a.turnOn()
+
+        cloud.reachable = false
+        val failure = runCatching { a.controller.deleteCloudData() }.exceptionOrNull()
+        assertTrue(failure.toString(), failure is java.io.IOException)
+        assertFalse(a.settings().enabled)
+        assertEquals(4, cloud.records(ana.uid).size)
+
+        cloud.reachable = true
+        assertEquals(4, a.controller.deleteCloudData())
+        assertTrue(cloud.records(ana.uid).isEmpty())
+    }
+
+    @Test
     fun signingOutTurnsSyncOff() = runBlocking {
         val a = phone()
         a.someData()

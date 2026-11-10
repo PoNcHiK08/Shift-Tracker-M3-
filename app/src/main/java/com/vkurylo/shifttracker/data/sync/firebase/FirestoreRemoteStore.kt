@@ -153,13 +153,14 @@ class FirestoreRemoteStore internal constructor(private val firestore: () -> Fir
             }.awaitAll().flatten()
         }
 
-    override suspend fun deleteAll(uid: String) {
+    override suspend fun deleteAll(uid: String): Int {
         // The marker goes first: a phone that syncs from now on finds it gone and stops (it asks the user)
         // instead of uploading into data that is being deleted. If this fails half-way, deleting again finishes.
         db.runTransaction { transaction ->
             transaction.delete(user(uid))
             null
         }.await()
+        var deleted = 0
         for (collection in CloudCollection.entries) {
             while (true) {
                 val page = collection(uid, collection).limit(MAX_WRITES.toLong()).get(Source.SERVER).await()
@@ -168,8 +169,10 @@ class FirestoreRemoteStore internal constructor(private val firestore: () -> Fir
                     page.documents.forEach { transaction.delete(it.reference) }
                     null
                 }.await()
+                deleted += page.size()
             }
         }
+        return deleted
     }
 
     private fun DocumentSnapshot.toMeta(): CloudMeta? = if (exists()) (get(Fields.EPOCH) as? String)?.let(::CloudMeta) else null

@@ -230,6 +230,15 @@
     <string name="sync_reset_message">This account\'s data in the cloud was deleted, probably from another phone. Upload this phone\'s data again, or turn sync off?</string>
     <string name="sync_upload_again">Upload again</string>
     <string name="sync_turn_off">Turn sync off</string>
+    <string name="cloud_delete">Delete my cloud data</string>
+    <string name="cloud_delete_summary">Removes your jobs, shifts and bonuses from the cloud. This phone keeps them.</string>
+    <string name="cloud_deleting">Deleting from the cloud…</string>
+    <string name="cloud_delete_title">Delete your cloud data?</string>
+    <string name="cloud_delete_message">All jobs, shifts and bonuses of %1$s will be deleted from the cloud, and sync turns off. The data on this phone stays.\n\nYour other phones that sync with this account will stop syncing and ask what to do. Anything that exists only in the cloud (for example, from a phone you no longer have) will be lost. This can\'t be undone.</string>
+    <string name="cloud_delete_confirm">Delete</string>
+    <string name="cloud_delete_done">Deleted from the cloud (%1$d records). Sync is off; the data on this phone stays.</string>
+    <string name="cloud_delete_offline">Couldn\'t delete the cloud data: no connection. Try again when you\'re online; whatever wasn\'t deleted yet is still there.</string>
+    <string name="cloud_delete_failed">Couldn\'t delete the cloud data. Code: %1$s. Try again; whatever wasn\'t deleted yet is still there.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Import schedule (.ics)</string>

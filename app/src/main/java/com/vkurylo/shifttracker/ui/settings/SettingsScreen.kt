@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
@@ -295,7 +296,8 @@ fun SettingsScreen(
                 }
                 else -> {
                     val sync = cloud.sync
-                    val rows = if (sync.enabled) 4 else 3
+                    val deleting = cloud.cloudDeletion == CloudDeletion.DELETING
+                    val rows = if (sync.enabled) 5 else 4
                     item {
                         // Sync off: whether the cloud lets this account in (tap to check again after an error).
                         // Sync on: how sync stands (tap after the cloud data was deleted to decide what to do).
@@ -352,7 +354,7 @@ fun SettingsScreen(
                             count = rows,
                             onClick = { viewModel.setSyncEnabled(!sync.enabled) },
                             checked = sync.enabled,
-                            enabled = !cloud.switchingOn,
+                            enabled = !cloud.switchingOn && !deleting,
                         ) {
                             ListItem(
                                 modifier = it,
@@ -362,7 +364,7 @@ fun SettingsScreen(
                                 supportingContent = {
                                     Text(stringResource(if (cloud.switchingOn) R.string.sync_turning_on else R.string.sync_switch_summary))
                                 },
-                                trailingContent = { Switch(checked = sync.enabled, onCheckedChange = null, enabled = !cloud.switchingOn) },
+                                trailingContent = { Switch(checked = sync.enabled, onCheckedChange = null, enabled = !cloud.switchingOn && !deleting) },
                             )
                         }
                     }
@@ -382,7 +384,26 @@ fun SettingsScreen(
                         }
                     }
                     item {
-                        SettingsRow(index = rows - 1, count = rows, onClick = viewModel::signOut) {
+                        // The account's data in the cloud, deleted after a confirmation; this phone keeps its own.
+                        SettingsRow(
+                            index = rows - 2,
+                            count = rows,
+                            onClick = viewModel::requestDeleteCloudData,
+                            enabled = !deleting && !cloud.switchingOn && !sync.running,
+                        ) {
+                            ListItem(
+                                modifier = it,
+                                colors = TransparentListItem,
+                                leadingContent = { Icon(Icons.Filled.DeleteForever, contentDescription = null) },
+                                headlineContent = { Text(stringResource(R.string.cloud_delete)) },
+                                supportingContent = {
+                                    Text(stringResource(if (deleting) R.string.cloud_deleting else R.string.cloud_delete_summary))
+                                },
+                            )
+                        }
+                    }
+                    item {
+                        SettingsRow(index = rows - 1, count = rows, onClick = viewModel::signOut, enabled = !deleting) {
                             ListItem(
                                 modifier = it,
                                 colors = TransparentListItem,
@@ -460,6 +481,23 @@ fun SettingsScreen(
     }
 
     cloud.decision?.let { decision -> SyncDecisionDialog(decision, viewModel) }
+
+    if (cloud.cloudDeletion == CloudDeletion.CONFIRMING) {
+        AlertDialog(
+            onDismissRequest = viewModel::cancelDeleteCloudData,
+            icon = { Icon(Icons.Filled.DeleteForever, contentDescription = null) },
+            title = { Text(stringResource(R.string.cloud_delete_title)) },
+            text = {
+                Text(stringResource(R.string.cloud_delete_message, cloud.account?.email ?: stringResource(R.string.cloud_google_account)))
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::deleteCloudData) {
+                    Text(stringResource(R.string.cloud_delete_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::cancelDeleteCloudData) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }
 
 /** A settings row as one segment of its section's group. */

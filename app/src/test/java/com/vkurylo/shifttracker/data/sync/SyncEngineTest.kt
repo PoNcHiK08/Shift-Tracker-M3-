@@ -259,7 +259,7 @@ class SyncEngineTest {
         val (a, b) = twoLinkedPhones()
         val aBefore = a.view()
 
-        a.engine.deleteCloudData(ana)
+        assertEquals("records deleted", 1 + 2 + 1, a.engine.deleteCloudData(ana))
 
         assertTrue(cloud.records(ana.uid).isEmpty())
         assertNull(cloud.meta(ana.uid))
@@ -278,6 +278,25 @@ class SyncEngineTest {
         assertEquals(SignInPlan.Ready(SignInChoice.UPLOAD), b.engine.prepareSignIn(ana))
         b.engine.completeSignIn(ana, SignInChoice.UPLOAD)
         assertEquals(1 + 3 + 1, cloud.records(ana.uid).size)
+    }
+
+    @Test
+    fun deletingAnotherAccountsCloudDataLeavesThisPhonesLinkAlone() = runBlocking {
+        val (a, b) = twoLinkedPhones()
+        val other = phone()
+        other.job("Biuro")
+        other.signIn(work)
+
+        // Signed in as "work" on phone A (still linked to ana) and deleting work's cloud data.
+        assertEquals(1, a.engine.deleteCloudData(work))
+
+        assertTrue(cloud.records(work.uid).isEmpty())
+        assertEquals(ana.uid, a.state.current.boundUid)
+        a.now += 10_000
+        a.shift(a.db.jobDao().getAll().single().id, date = day.plusDays(5))
+        assertTrue(a.sync() is SyncResult.Synced)
+        b.sync()
+        assertEquals(a.view(), b.view())
     }
 
     // --- Day-to-day sync ------------------------------------------------------------------------------
