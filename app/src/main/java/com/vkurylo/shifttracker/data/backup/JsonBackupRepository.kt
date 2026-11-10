@@ -185,6 +185,12 @@ class JsonBackupRepository @Inject constructor(
         return json.encodeToString(BackupFile.serializer(), file)
     }
 
+    /** What a backup file holds, without importing it; null if it isn't a Shift Tracker backup. */
+    fun countsOf(json: String): BackupCounts? =
+        runCatching { this.json.decodeFromString(BackupFile.serializer(), json) }.getOrNull()
+            ?.takeIf { it.format == BackupFile.FORMAT }
+            ?.let { BackupCounts(jobs = it.jobs.size, shifts = it.shifts.size, bonuses = it.bonuses.size) }
+
     /** Whether this phone holds any job (shifts and bonuses always belong to one). */
     suspend fun hasData(): Boolean = db.jobDao().getAll().isNotEmpty()
 

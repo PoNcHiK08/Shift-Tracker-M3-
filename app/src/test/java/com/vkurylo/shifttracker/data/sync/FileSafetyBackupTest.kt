@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -68,5 +69,42 @@ class FileSafetyBackupTest {
         } finally {
             restored.close()
         }
+    }
+
+    @Test
+    fun theListIsNewestFirstWithWhyAndWhatAndEachReadsBackAsWritten() = runBlocking {
+        val job = db.jobDao().upsert(Job(name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        backups.save(SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA)
+        now += 60_000
+        db.shiftDao().upsert(
+            com.vkurylo.shifttracker.domain.model.Shift(
+                jobId = job, date = java.time.LocalDate.of(2026, 11, 2), start = java.time.LocalTime.of(8, 0),
+                end = java.time.LocalTime.of(16, 0), hourlyRateGrosze = 3300,
+            ).toEntity(),
+        )
+        val before = backups.changes.value
+        backups.save(SafetyBackup.Reason.BEFORE_IMPORT)
+        assertTrue("a new backup is announced", backups.changes.value != before)
+
+        val list = backups.list()
+        assertEquals(listOf(SafetyBackup.Reason.BEFORE_IMPORT, SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA), list.map { it.reason })
+        assertEquals(listOf(now, now - 60_000).map { it / 1_000 * 1_000 }, list.map { it.createdAt })
+        assertEquals(listOf(BackupCounts(1, 1, 0), BackupCounts(1, 0, 0)), list.map { it.counts })
+        assertEquals(File(dir, list[1].name).readText(), backups.read(list[1].name))
+    }
+
+    @Test
+    fun onlyABackupInTheListCanBeRead() = runBlocking {
+        File(context.filesDir, "secret.json").writeText("{}")
+        dir.mkdirs()
+        File(dir, "notes.txt").writeText("x")
+        for (name in listOf("../secret.json", "notes.txt", "missing.json")) {
+            assertTrue(name, runCatching { backups.read(name) }.exceptionOrNull() is java.io.FileNotFoundException)
+        }
+        // A file that isn't a backup is listed as unreadable rather than breaking the list.
+        File(dir, "20261110-120000-before-import.json").writeText("not json")
+        assertEquals(listOf<BackupCounts?>(null), backups.list().map { it.counts })
+        File(context.filesDir, "secret.json").delete()
+        Unit
     }
 }

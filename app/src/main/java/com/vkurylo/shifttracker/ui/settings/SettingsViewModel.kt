@@ -15,6 +15,7 @@ import com.vkurylo.shifttracker.data.sync.CloudAccount
 import com.vkurylo.shifttracker.data.sync.Counts
 import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
 import com.vkurylo.shifttracker.data.sync.SafetyBackup
+import com.vkurylo.shifttracker.data.sync.SafetyBackupFile
 import com.vkurylo.shifttracker.data.sync.RemoteStore
 import com.vkurylo.shifttracker.data.sync.SignInChoice
 import com.vkurylo.shifttracker.data.sync.SignInPlan
@@ -47,6 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -130,6 +132,11 @@ class SettingsViewModel @Inject constructor(
     ) { prefs, lang, jobs, isBusy, pending ->
         SettingsUiState(prefs, lang, jobs.size, isBusy, pending)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState(language = languageRepository.current()))
+
+    /** The safety backups on this phone, newest first (refreshed after each new one). */
+    val safetyBackupFiles: StateFlow<List<SafetyBackupFile>> = safetyBackups.changes
+        .map { safetyBackups.list() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _messages = Channel<UiMessage>(Channel.BUFFERED)
     val messages = _messages.receiveAsFlow()
@@ -358,6 +365,12 @@ class SettingsViewModel @Inject constructor(
         val json = backupRepository.exportJson()
         documentIo.writeText(uri, json)
         _messages.send(UiMessage(R.string.export_done))
+    }
+
+    /** Saves the safety backup [name] to the file the user picked. */
+    fun exportSafetyBackup(name: String, uri: Uri) = runBusy {
+        documentIo.writeText(uri, safetyBackups.read(name))
+        _messages.send(UiMessage(R.string.safety_backup_saved))
     }
 
     fun requestImport(uri: Uri) = pendingImport.update { uri }
