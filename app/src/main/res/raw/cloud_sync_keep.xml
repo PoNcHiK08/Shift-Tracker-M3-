@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    For the release build's resource shrinker (isShrinkResources): keep the Google sign-in Web client id that the
+    google-services plugin generates from google-services.json. The app looks it up by name (FirebaseServices.webClientId:
+    a build without the file has no such resource, so R.string can't name it), which the shrinker can't see, and
+    Firebase's own keep file (firebase_common_keep.xml) doesn't list it. Without this, release APKs lose it and
+    Settings says cloud sync isn't available. Naming a resource that a build doesn't have is harmless.
+    This file itself isn't packaged.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@string/default_web_client_id" />

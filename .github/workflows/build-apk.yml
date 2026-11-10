@@ -121,6 +121,17 @@ jobs:
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew assembleRelease assembleDebug --stacktrace
 
+      # The release build's shrinkers remove anything nothing visibly refers to, and cloud sync looks some things
+      # up by name (the Google sign-in client id, Credential Manager's Google provider). Check the APKs themselves,
+      # before anything is uploaded or published: a build with the Firebase config must have them.
+      - name: Check the APKs still have what cloud sync needs
+        run: |
+          if [ ! -f app/google-services.json ]; then
+            echo "No Firebase config in this build: nothing to check."
+            exit 0
+          fi
+          .github/scripts/check-apk-cloud-sync.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
+
       - name: Rename APKs
         run: |
           mkdir -p dist

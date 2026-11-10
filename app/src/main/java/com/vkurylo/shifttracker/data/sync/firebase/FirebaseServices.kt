@@ -25,7 +25,9 @@ class FirebaseServices @Inject constructor(@ApplicationContext private val conte
 
     /**
      * The OAuth client ("Web client", type 3 in google-services.json) Google sign-in asks an ID token for.
-     * The google-services plugin generates the resource only when the file is there, so it isn't in R.
+     * The google-services plugin generates the resource only when the file is there, so it isn't in R and is
+     * looked up by name. The release build's resource shrinker can't see that: res/raw/cloud_sync_keep.xml keeps
+     * it, and CI checks the APKs still have it (.github/scripts/check-apk-cloud-sync.sh).
      */
     val webClientId: String? by lazy {
         val resources = context.resources

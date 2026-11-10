@@ -190,6 +190,10 @@ full exception, the app's package and the SHA-1 of the key it is signed with.
   and needs its own fingerprint. The Build APK workflow warns when `google-services.json` lacks one.
 - **`ERROR_INVALID_CREDENTIAL` from Firebase**: the `google-services.json` in the build is from another Firebase project.
 - Closing Google's account sheet yourself shows nothing.
+- **"Not available in this build"** means the APK has no usable Firebase config. Either it was built without
+  the `GOOGLE_SERVICES_JSON` secret (the Build APK run warns), or a release build lost the Google sign-in client
+  id to resource shrinking. That happened up to build 1.0.142; `res/raw/cloud_sync_keep.xml` now keeps it, and
+  the Build APK workflow fails if either APK misses it (`.github/scripts/check-apk-cloud-sync.sh`).
 
 ### Security rules
 
