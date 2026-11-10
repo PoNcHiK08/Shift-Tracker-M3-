@@ -28,7 +28,8 @@ interface RemoteStore {
     /**
      * Stores each record unless the cloud already has a version of it with the same or a later
      * `updatedAt`, checking and writing atomically (a version stored meanwhile by another phone is never
-     * overwritten by an older one). Results are in the order of [records].
+     * overwritten by an older one). Results are in the order of [records]. Throws [WriteRefusedException] when
+     * the cloud refuses the write itself.
      */
     suspend fun push(uid: String, records: List<RemoteRecord>): List<PushResult>
 

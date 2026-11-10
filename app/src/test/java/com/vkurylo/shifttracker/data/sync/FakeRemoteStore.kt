@@ -27,14 +27,30 @@ class FakeRemoteStore : RemoteStore {
     /** Runs at the start of the next pushes (while an upload is on its way); set it back to null inside to run once. */
     var duringPush: (suspend () -> Unit)? = null
 
+    /** True: pushes are refused as Firestore's rules refuse them (reads still work). */
+    var refuseWrites = false
+
+    /** Every call, by name, in order: to check what a sync did (or didn't) ask the cloud. */
+    val calls = mutableListOf<String>()
+
+    /** Calls made on the main thread (the app must make none: the UI keeps working while it syncs). */
+    var callsOnMainThread = 0
+        private set
+
+    /** Records stored by pushes (each one write). */
+    var writes = 0
+        private set
+
     private fun account(uid: String) = accounts.getOrPut(uid) { Account() }
     private fun key(record: RemoteRecord) = "${record::class.simpleName}:${record.syncId}"
-    private fun online() {
+    private fun online(call: String = "") {
+        calls += call
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) callsOnMainThread++
         if (!reachable) throw IOException("offline")
     }
 
     override suspend fun readMeta(uid: String): CloudMeta? {
-        online()
+        online("readMeta")
         return accounts[uid]?.meta
     }
 
@@ -67,13 +83,15 @@ class FakeRemoteStore : RemoteStore {
     }
 
     override suspend fun push(uid: String, records: List<RemoteRecord>): List<PushResult> {
-        online()
+        online("push")
+        if (refuseWrites) throw WriteRefusedException(IllegalStateException("PERMISSION_DENIED: Missing or insufficient permissions."))
         duringPush?.invoke()
         val account = account(uid)
         return records.map { record ->
             val existing = account.records[key(record)]
             if (existing == null || existing.record.updatedAt < record.updatedAt) {
                 account.records[key(record)] = Stored(record, nextServerTime())
+                writes++
                 PushResult.Written
             } else {
                 PushResult.Kept(existing.record)

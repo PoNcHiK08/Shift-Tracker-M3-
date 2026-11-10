@@ -1,6 +1,8 @@
 package com.vkurylo.shifttracker.data.backup
 
 import androidx.room.withTransaction
+import com.vkurylo.shifttracker.data.sync.SyncLock
+import kotlinx.coroutines.sync.withLock
 import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
@@ -119,6 +121,7 @@ data class BackupBonus(
 class JsonBackupRepository @Inject constructor(
     private val db: ShiftDatabase,
     private val clock: WallClock = WallClock.System,
+    private val syncLock: SyncLock = SyncLock(),
 ) : BackupRepository {
 
     private val json = Json {
@@ -212,8 +215,11 @@ class JsonBackupRepository @Inject constructor(
             requireUniqueSyncIds("bonus", bonuses.map { it.syncId })
         }
 
-        // If any write fails, the transaction rolls back and the old data stays.
-        db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, clock.nowMillis()) }
+        // If any write fails, the transaction rolls back and the old data stays. A sync never runs in the middle
+        // of it (SyncLock): it waits, then uploads the result.
+        syncLock.mutex.withLock {
+            db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, clock.nowMillis()) }
+        }
         return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)
     }
 

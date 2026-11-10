@@ -170,7 +170,7 @@ class SettingsViewModel @Inject constructor(
             when (e.cloudProblem()) {
                 CloudProblem.OFFLINE -> CloudAccess.OFFLINE to null
                 CloudProblem.ACCESS_DENIED -> CloudAccess.DENIED to null
-                CloudProblem.OTHER -> CloudAccess.ERROR to (e.message ?: e.javaClass.simpleName)
+                CloudProblem.WRITE_REFUSED, CloudProblem.OTHER -> CloudAccess.ERROR to (e.message ?: e.javaClass.simpleName)
             }
         }
         cloudAccess.update { result }

@@ -16,11 +16,37 @@ data class BonusWithJobSyncId(
     @ColumnInfo(name = "job_sync_id") val jobSyncId: String,
 )
 
+/** Changes on this phone not uploaded yet: how many, and the latest change time among them. */
+data class DirtySummary(
+    @ColumnInfo(name = "count") val count: Int,
+    @ColumnInfo(name = "newest") val newest: Long?,
+)
+
 /** Reads and writes of the sync layer. Unlike the app's DAOs, these see tombstones too. */
 @Dao
 interface SyncDao {
     @Query("SELECT * FROM jobs WHERE dirty = 1 ORDER BY id")
     suspend fun dirtyJobs(): List<JobEntity>
+
+    /**
+     * Changes not uploaded yet, as they change: a new edit, an edit of a row still waiting (its newest time moves)
+     * or an upload (fewer rows). Applying the cloud's versions doesn't change it: they are stored as uploaded.
+     */
+    @Query(
+        "SELECT COUNT(*) AS count, MAX(updated_at) AS newest FROM (" +
+            "SELECT updated_at FROM jobs WHERE dirty = 1 UNION ALL " +
+            "SELECT updated_at FROM shifts WHERE dirty = 1 UNION ALL " +
+            "SELECT updated_at FROM bonuses WHERE dirty = 1)",
+    )
+    fun observeDirty(): kotlinx.coroutines.flow.Flow<DirtySummary>
+
+    @Query(
+        "SELECT COUNT(*) AS count, MAX(updated_at) AS newest FROM (" +
+            "SELECT updated_at FROM jobs WHERE dirty = 1 UNION ALL " +
+            "SELECT updated_at FROM shifts WHERE dirty = 1 UNION ALL " +
+            "SELECT updated_at FROM bonuses WHERE dirty = 1)",
+    )
+    suspend fun dirty(): DirtySummary
 
     @Query("SELECT s.*, j.sync_id AS job_sync_id FROM shifts s INNER JOIN jobs j ON j.id = s.job_id WHERE s.dirty = 1 ORDER BY s.id")
     suspend fun dirtyShifts(): List<ShiftWithJobSyncId>

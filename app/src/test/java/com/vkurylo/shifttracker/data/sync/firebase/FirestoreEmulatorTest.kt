@@ -30,6 +30,7 @@ import com.vkurylo.shifttracker.data.sync.SignInChoice
 import com.vkurylo.shifttracker.data.sync.SignInPlan
 import com.vkurylo.shifttracker.data.sync.SyncEngine
 import com.vkurylo.shifttracker.data.sync.SyncResult
+import com.vkurylo.shifttracker.data.sync.WriteRefusedException
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
 import kotlinx.coroutines.CoroutineScope
@@ -149,6 +150,16 @@ class FirestoreEmulatorTest {
     }
 
     @Test
+    fun aChangeTimeTooFarAheadIsRefusedAsAWriteRefusal() = onBackground {
+        val hourAhead = System.currentTimeMillis() + 60 * 60_000
+        val error = runCatching { store.push(account.uid, listOf(job(updatedAt = hourAhead))) }.exceptionOrNull()
+        assertTrue(error.toString(), error is WriteRefusedException)
+        assertEquals(CloudProblem.WRITE_REFUSED, error!!.cloudProblem())
+        // Reads still work: it is the write that was refused.
+        assertTrue(!store.hasRecords(account.uid))
+    }
+
+    @Test
     fun theRulesRefuseAnotherAccount() = onBackground {
         val auth = FirebaseAuth.getInstance(app)
         val stranger = """{"sub":"stranger-${id()}","email":"someone@example.com","email_verified":true}"""
@@ -194,6 +205,11 @@ class FirestoreEmulatorTest {
         assertEquals(1, (b.engine.sync() as SyncResult.Synced).uploaded)
         a.now += 3_000
         assertEquals(1, (a.engine.sync() as SyncResult.Synced).downloaded)
+        // What A took in isn't sent back: the next syncs move nothing, on either phone.
+        a.now += 1_000
+        assertEquals(SyncResult.Synced(downloaded = 0, uploaded = 0, skipped = 0), a.engine.sync())
+        b.now += 1_000
+        assertEquals(SyncResult.Synced(downloaded = 0, uploaded = 0, skipped = 0), b.engine.sync())
         assertEquals(setOf(a.db.shiftDao().getAny(shiftId)!!.syncId to "zamiana"), a.shownShifts())
 
         // A deletes the job (and so its shift); B gets both deletions.

@@ -5,7 +5,6 @@ import com.vkurylo.shifttracker.data.local.ParentChildRule
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.data.local.newSyncId
-import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,7 +47,11 @@ enum class SignInChoice {
 }
 
 sealed interface SyncResult {
-    data class Synced(val downloaded: Int, val uploaded: Int, val skipped: Int) : SyncResult
+    /**
+     * [uploaded] records were written to the cloud (one write each). [limited]: the upload stopped at the write
+     * limit it was given, and some changes are still waiting.
+     */
+    data class Synced(val downloaded: Int, val uploaded: Int, val skipped: Int, val limited: Boolean = false) : SyncResult
 
     /** No account is linked to this phone's data. */
     data object NotLinked : SyncResult
@@ -73,8 +76,10 @@ class SyncEngine @Inject constructor(
     private val state: SyncStateStore,
     private val safetyBackup: SafetyBackup,
     private val clock: WallClock,
+    lock: SyncLock = SyncLock(),
 ) {
-    private val mutex = Mutex()
+    /* Shared with the JSON import: see SyncLock. */
+    private val mutex = lock.mutex
     private val jobDao get() = db.jobDao()
     private val shiftDao get() = db.shiftDao()
     private val bonusDao get() = db.bonusDao()
@@ -105,8 +110,11 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    /** Carries out the user's (or [prepareSignIn]'s) [choice], links this phone's data to [account] and syncs. */
-    suspend fun completeSignIn(account: CloudAccount, choice: SignInChoice): SyncResult = mutex.withLock {
+    /**
+     * Carries out the user's (or [prepareSignIn]'s) [choice], links this phone's data to [account] and syncs
+     * ([onWritten] as for [sync]).
+     */
+    suspend fun completeSignIn(account: CloudAccount, choice: SignInChoice, onWritten: suspend (Int) -> Unit = {}): SyncResult = mutex.withLock {
         when (choice) {
             SignInChoice.CONTINUE, SignInChoice.DOWNLOAD -> Unit
             SignInChoice.UPLOAD -> db.withTransaction { markAllDirty() }
@@ -128,11 +136,18 @@ class SyncEngine @Inject constructor(
             val meta = remote.ensureMeta(account.uid, CloudMeta(epoch = newSyncId()))
             state.update { SyncState(boundUid = account.uid, boundEmail = account.email, epoch = meta.epoch, lastSyncedAt = it.lastSyncedAt) }
         }
-        syncLocked()
+        syncLocked(Int.MAX_VALUE, onWritten)
     }
 
-    /** Downloads, then uploads, what changed. Throws when the cloud can't be reached; nothing is lost then. */
-    suspend fun sync(): SyncResult = mutex.withLock { syncLocked() }
+    /**
+     * Downloads, then uploads, what changed. Throws when the cloud can't be reached; nothing is lost then.
+     *
+     * At most [maxWrites] records are uploaded (the rest stay waiting, and the result says [SyncResult.Synced.limited]);
+     * [onWritten] hears of every batch the cloud stored, as it happens, so writes are counted even if the sync
+     * fails half-way.
+     */
+    suspend fun sync(maxWrites: Int = Int.MAX_VALUE, onWritten: suspend (Int) -> Unit = {}): SyncResult =
+        mutex.withLock { syncLocked(maxWrites, onWritten) }
 
     /**
      * Deletes the account's records and its marker from the cloud and unlinks this phone. This phone's data
@@ -150,7 +165,7 @@ class SyncEngine @Inject constructor(
 
     // --- Sync -----------------------------------------------------------------------------------------
 
-    private suspend fun syncLocked(): SyncResult {
+    private suspend fun syncLocked(maxWrites: Int, onWritten: suspend (Int) -> Unit): SyncResult {
         val saved = state.get()
         val uid = saved.boundUid ?: return SyncResult.NotLinked
         val meta = remote.readMeta(uid)
@@ -162,15 +177,20 @@ class SyncEngine @Inject constructor(
 
         var uploaded = 0
         var skipped = download.skipped
+        var limited = false
         for (round in 1..MAX_UPLOAD_ROUNDS) {
-            val upload = uploadOnce(uid)
+            val upload = uploadOnce(uid, maxWrites - uploaded, onWritten)
             uploaded += upload.written
             skipped += upload.skipped
+            if (upload.limited) {
+                limited = true
+                break
+            }
             // Applying the cloud's versions (or ParentChildRule) can leave records to upload: another round.
             if (upload.sent == 0 || upload.written == 0) break
         }
         state.update { it.copy(lastSyncedAt = clock.nowMillis()) }
-        return SyncResult.Synced(download.applied, uploaded, skipped)
+        return SyncResult.Synced(download.applied, uploaded, skipped, limited)
     }
 
     private class Download(val applied: Int, val skipped: Int)
@@ -202,18 +222,23 @@ class SyncEngine @Inject constructor(
         return Download(applied, skipped)
     }
 
-    private class Upload(val sent: Int, val written: Int, val skipped: Int)
+    private class Upload(val sent: Int, val written: Int, val skipped: Int, val limited: Boolean)
 
-    private suspend fun uploadOnce(uid: String): Upload {
-        val records: List<RemoteRecord> = db.withTransaction {
+    private suspend fun uploadOnce(uid: String, writesLeft: Int, onWritten: suspend (Int) -> Unit): Upload {
+        val dirty: List<RemoteRecord> = db.withTransaction {
             // Jobs first, so the cloud never has a shift or bonus without its job for long.
             syncDao.dirtyJobs().map { it.toRemote(payDao.forJob(it.id)) } +
                 syncDao.dirtyShifts().map { it.shift.toRemote(it.jobSyncId) } +
                 syncDao.dirtyBonuses().map { it.bonus.toRemote(it.jobSyncId) }
         }
-        if (records.isEmpty()) return Upload(0, 0, 0)
+        if (dirty.isEmpty()) return Upload(0, 0, 0, limited = false)
+        // Each record sent can be one write: never send more than may still be written.
+        val records = dirty.take(writesLeft.coerceAtLeast(0))
+        if (records.isEmpty()) return Upload(0, 0, 0, limited = true)
 
-        val results = records.chunked(UPLOAD_CHUNK).flatMap { remote.push(uid, it) }
+        val results = records.chunked(UPLOAD_CHUNK).flatMap { chunk ->
+            remote.push(uid, chunk).also { pushed -> onWritten(pushed.count { it == PushResult.Written }) }
+        }
 
         var written = 0
         var skipped = 0
@@ -231,7 +256,7 @@ class SyncEngine @Inject constructor(
             }
             ParentChildRule.enforce(jobDao)
         }
-        return Upload(records.size, written, skipped)
+        return Upload(records.size, written, skipped, limited = records.size < dirty.size)
     }
 
     private enum class Applied { CHANGED, UNCHANGED, NO_JOB }

@@ -17,6 +17,7 @@ import com.vkurylo.shifttracker.data.sync.RemoteJob
 import com.vkurylo.shifttracker.data.sync.RemoteRecord
 import com.vkurylo.shifttracker.data.sync.RemoteShift
 import com.vkurylo.shifttracker.data.sync.RemoteStore
+import com.vkurylo.shifttracker.data.sync.WriteRefusedException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -97,11 +98,18 @@ class FirestoreRemoteStore internal constructor(private val firestore: () -> Fir
         records.chunked(MAX_WRITES).flatMap { chunk ->
             try {
                 pushOnce(uid, chunk)
-            } catch (e: FirebaseFirestoreException) {
-                if (e.code != FirebaseFirestoreException.Code.PERMISSION_DENIED) throw e
-                pushOnce(uid, chunk)
+            } catch (e: WriteDenied) {
+                try {
+                    pushOnce(uid, chunk)
+                } catch (again: WriteDenied) {
+                    // Refused twice, from a fresh read: not a version stored meanwhile, the rules refuse it.
+                    throw WriteRefusedException(again.cause!!)
+                }
             }
         }
+
+    /** The rules refused the transaction's writes (the reads before it were allowed). */
+    private class WriteDenied(cause: FirebaseFirestoreException) : Exception(cause)
 
     private suspend fun pushOnce(uid: String, records: List<RemoteRecord>): List<PushResult> {
         val cloud = coroutineScope {
@@ -117,14 +125,19 @@ class FirestoreRemoteStore internal constructor(private val firestore: () -> Fir
         }
         val writes = records.filterIndexed { index, _ -> results[index] == PushResult.Written }
         if (writes.isNotEmpty()) {
-            db.runTransaction { transaction ->
-                for (record in writes) {
-                    val fields = record.toFields() + (Fields.SERVER_UPDATED_AT to FieldValue.serverTimestamp())
-                    // Merge: fields a newer app version added to the document stay.
-                    transaction.set(collection(uid, record.collection).document(record.syncId), fields, SetOptions.merge())
-                }
-                null
-            }.await()
+            try {
+                db.runTransaction { transaction ->
+                    for (record in writes) {
+                        val fields = record.toFields() + (Fields.SERVER_UPDATED_AT to FieldValue.serverTimestamp())
+                        // Merge: fields a newer app version added to the document stay.
+                        transaction.set(collection(uid, record.collection).document(record.syncId), fields, SetOptions.merge())
+                    }
+                    null
+                }.await()
+            } catch (e: FirebaseFirestoreException) {
+                if (e.code == FirebaseFirestoreException.Code.PERMISSION_DENIED) throw WriteDenied(e)
+                throw e
+            }
         }
         return results
     }

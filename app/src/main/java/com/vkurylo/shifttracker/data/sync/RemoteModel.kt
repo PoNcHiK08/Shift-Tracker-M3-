@@ -93,5 +93,12 @@ sealed interface PushResult {
     data class Kept(val cloudVersion: RemoteRecord) : PushResult
 }
 
+/**
+ * The cloud refused to store records although it lets this account read (for Firestore: the security rules said
+ * no to the write). Usually the phone's clock running ahead (the rules refuse change times far in the future),
+ * or rules older than the app.
+ */
+class WriteRefusedException(cause: Throwable) : Exception(cause.message, cause)
+
 /** The signed-in account. */
 data class CloudAccount(val uid: String, val email: String?)

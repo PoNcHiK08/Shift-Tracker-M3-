@@ -572,4 +572,70 @@ class SyncEngineTest {
         assertEquals(3, a.shifts.getAllShifts().size)
         assertFalse(a.shifts.getAllShifts().any { it.unpaidBreakMinutes == 600 })
     }
+
+    // --- No ping-pong, and the write limit ------------------------------------------------------------
+
+    @Test
+    fun aDownloadedChangeIsNeverUploadedBack() = runBlocking {
+        val (a, b) = twoLinkedPhones()
+        a.now += 1_000
+        // A changes a job, adds a shift and a bonus.
+        val job = a.db.jobDao().getAll().single()
+        a.jobs.upsert(Job(id = job.id, name = "Kawiarnia (centrum)", hourlyRateGrosze = job.hourlyRateGrosze, color = job.color, currency = job.currency))
+        a.shift(job.id, date = day.plusDays(7), note = "new on A")
+        a.bonus(job.id, amount = 1_234)
+        assertEquals(3, (a.sync() as SyncResult.Synced).uploaded)
+        val writesBefore = cloud.writes
+
+        // B takes them in, stored as uploaded: nothing of them is waiting on B, so this sync offers the cloud
+        // nothing back (not even versions it would keep).
+        b.now += 5_000
+        var calls = cloud.calls.size
+        val download = b.sync() as SyncResult.Synced
+        assertEquals(3, download.downloaded)
+        assertEquals(0, download.uploaded)
+        assertEquals(0, b.dirtyCount())
+        assertFalse(cloud.calls.drop(calls).contains("push"))
+
+        // Another sync on each phone: nothing is offered to the cloud, and it gets no write.
+        calls = cloud.calls.size
+        b.now += 5_000
+        assertEquals(SyncResult.Synced(0, 0, 0), b.sync())
+        a.now += 5_000
+        assertEquals(SyncResult.Synced(0, 0, 0), a.sync())
+        assertFalse(cloud.calls.drop(calls).contains("push"))
+        assertEquals(writesBefore, cloud.writes)
+        assertEquals(a.view(), b.view())
+    }
+
+    @Test
+    fun uploadsStopAtTheWriteLimitAndTheRestWaitsForTheNextSync() = runBlocking {
+        val a = phone()
+        val job = a.job()
+        a.shift(job)
+        a.shift(job, date = day.plusDays(1))
+        a.shift(job, date = day.plusDays(2))
+        a.bonus(job)
+        a.signIn(answer = { SignInChoice.UPLOAD }) // links; uploads all 5
+        a.now += 1_000
+        // Five new changes, a limit of 2.
+        a.shift(job, date = day.plusDays(3))
+        a.shift(job, date = day.plusDays(4))
+        a.shift(job, date = day.plusDays(5))
+        a.bonus(job, amount = 1_000)
+        a.bonus(job, amount = 2_000)
+        val counted = mutableListOf<Int>()
+
+        val first = a.engine.sync(maxWrites = 2) { counted += it } as SyncResult.Synced
+        assertEquals(2, first.uploaded)
+        assertTrue(first.limited)
+        assertEquals(3, a.dirtyCount())
+        assertEquals(2, counted.sum())
+
+        val rest = a.engine.sync(maxWrites = 100) { counted += it } as SyncResult.Synced
+        assertEquals(3, rest.uploaded)
+        assertFalse(rest.limited)
+        assertEquals(0, a.dirtyCount())
+        assertEquals(5, counted.sum())
+    }
 }
