@@ -1,6 +1,7 @@
 package com.vkurylo.shifttracker.ui.settings
 
 import android.app.Application
+import android.os.Looper
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -20,6 +21,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.sync.CloudAccount
+import com.vkurylo.shifttracker.data.sync.FakeCloudAuth
 import com.vkurylo.shifttracker.data.sync.FakeRemoteStore
 import com.vkurylo.shifttracker.data.sync.firebase.SignInException
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -32,6 +34,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
@@ -55,6 +58,12 @@ class SettingsSignInTest {
     fun tearDown() = db.close()
 
     private fun str(id: Int, vararg args: Any) = context.getString(id, *args)
+
+    /** Waits for [condition], keeping the main thread going (the ViewModel's work resumes there). */
+    private fun waitFor(condition: () -> Boolean) = composeRule.waitUntil(10_000) {
+        shadowOf(Looper.getMainLooper()).idle()
+        condition()
+    }
 
     private fun showSettings() {
         val viewModel = settingsViewModel(context, db, auth, FakeRemoteStore())
@@ -94,7 +103,7 @@ class SettingsSignInTest {
         waitForText(str(R.string.cloud_access_ok))
         composeRule.onNodeWithText(str(R.string.cloud_sign_out)).assertExists()
         assertTrue(composeRule.onAllNodesWithText(str(R.string.cloud_sign_in)).fetchSemanticsNodes().isEmpty())
-        composeRule.waitUntil(5_000) { str(R.string.cloud_signed_in, "owner@example.com") in shownMessages }
+        waitFor { str(R.string.cloud_signed_in, "owner@example.com") in shownMessages }
     }
 
     @Test
@@ -103,7 +112,7 @@ class SettingsSignInTest {
         showSettings()
         tapSignIn()
 
-        composeRule.waitUntil(5_000) { auth.signInCalls == 1 }
+        waitFor { auth.signInCalls == 1 }
         composeRule.waitForIdle()
         composeRule.onNodeWithText(str(R.string.cloud_sign_in_summary)).assertExists()
         assertEquals(emptyList<String>(), shownMessages)
@@ -120,7 +129,7 @@ class SettingsSignInTest {
 
         val expected = str(R.string.cloud_sign_in_setup, code, "com.vkurylo.shifttracker.debug", "0E:53:EF:F6")
         waitForText(expected) // in the row, until the next attempt
-        composeRule.waitUntil(5_000) { expected in shownMessages }
+        waitFor { expected in shownMessages }
         assertTrue(expected.contains(code))
     }
 
@@ -132,7 +141,7 @@ class SettingsSignInTest {
 
         val expected = str(R.string.cloud_sign_in_failed, "IllegalStateException: boom")
         waitForText(expected)
-        composeRule.waitUntil(5_000) { expected in shownMessages }
+        waitFor { expected in shownMessages }
 
         auth.onSignIn = { CloudAccount("uid-1", "owner@example.com") }
         tapSignIn()

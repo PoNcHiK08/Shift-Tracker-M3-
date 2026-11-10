@@ -3,12 +3,23 @@ package com.vkurylo.shifttracker.ui.settings
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.data.DocumentIo
 import com.vkurylo.shifttracker.data.sync.CloudAccount
+import com.vkurylo.shifttracker.data.sync.Counts
 import com.vkurylo.shifttracker.data.sync.RemoteStore
+import com.vkurylo.shifttracker.data.sync.SignInChoice
+import com.vkurylo.shifttracker.data.sync.SignInPlan
+import com.vkurylo.shifttracker.data.sync.SyncController
+import com.vkurylo.shifttracker.data.sync.SyncOutcome
+import com.vkurylo.shifttracker.data.sync.SyncProblem
+import com.vkurylo.shifttracker.data.sync.SyncStatus
 import com.vkurylo.shifttracker.data.sync.firebase.CloudAuth
 import com.vkurylo.shifttracker.data.sync.firebase.CloudProblem
 import com.vkurylo.shifttracker.data.sync.firebase.SIGN_IN_LOG_TAG
@@ -30,6 +41,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -61,7 +74,26 @@ data class CloudUiState(
     val signingIn: Boolean = false,
     /** Why the last sign-in failed (with its code), shown until the next attempt. Null after a success. */
     val signInError: UiMessage? = null,
+    val sync: SyncStatus = SyncStatus(),
+    /** What the account row says about sync while it is on (one message per line). */
+    val syncLines: List<UiMessage> = emptyList(),
+    /** Turning sync on is in progress (reading the account, linking, the first sync). */
+    val switchingOn: Boolean = false,
+    /** A question to answer before sync can go on. */
+    val decision: SyncDecision? = null,
 )
+
+/** A question to answer before sync can be turned on (or go on). */
+sealed interface SyncDecision {
+    /** This phone has never synced, and both it and the account have data. */
+    data class Merge(val phone: Counts, val cloud: Counts, val lookAlikes: Int) : SyncDecision
+
+    /** This phone's data was synced with another account. */
+    data class AccountSwitch(val previousEmail: String?, val currentEmail: String?, val phone: Counts, val cloud: Counts) : SyncDecision
+
+    /** The account's cloud data was deleted after this phone synced with it. */
+    data object CloudReset : SyncDecision
+}
 
 /** A message for the snackbar: string resource + format args. */
 data class UiMessage(val resId: Int, val args: List<Any> = emptyList())
@@ -74,6 +106,7 @@ class SettingsViewModel @Inject constructor(
     private val documentIo: DocumentIo,
     private val cloudAuth: CloudAuth,
     private val remoteStore: RemoteStore,
+    private val syncController: SyncController,
     jobRepository: JobRepository,
 ) : ViewModel() {
 
@@ -97,10 +130,16 @@ class SettingsViewModel @Inject constructor(
     private val cloudAccess = MutableStateFlow<Pair<CloudAccess, String?>?>(null)
     private val signingIn = MutableStateFlow(false)
     private val signInError = MutableStateFlow<UiMessage?>(null)
+    private val switchingOn = MutableStateFlow(false)
+    private val decision = MutableStateFlow<SyncDecision?>(null)
 
-    val cloud: StateFlow<CloudUiState> = combine(cloudAuth.account, cloudAccess, signingIn, signInError) { account, access, busy, error ->
+    private val account = combine(cloudAuth.account, cloudAccess, signingIn, signInError) { account, access, busy, error ->
         val check = access.takeIf { account != null }
         CloudUiState(cloudAuth.isAvailable, account, check?.first, check?.second, busy, error.takeIf { account == null })
+    }
+
+    val cloud: StateFlow<CloudUiState> = combine(account, syncController.status, switchingOn, decision) { base, sync, switching, question ->
+        base.copy(sync = sync, syncLines = sync.describe(), switchingOn = switching, decision = question)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloudUiState(available = cloudAuth.isAvailable))
 
     init {
@@ -123,6 +162,8 @@ class SettingsViewModel @Inject constructor(
         signInError.update { null }
         viewModelScope.launch {
             try {
+                // Signing in alone never syncs: sync stays off until it is turned on.
+                syncController.disable()
                 val account = cloudAuth.signIn(activityContext) ?: return@launch // the user closed the sheet
                 _messages.send(UiMessage(R.string.cloud_signed_in, listOf(account.email.orEmpty())))
             } catch (e: CancellationException) {
@@ -150,8 +191,94 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun signOut() = viewModelScope.launch {
-        cloudAuth.signOut()
+        decision.update { null }
+        syncController.cancelDecision()
+        syncController.signOut()
         _messages.send(UiMessage(R.string.cloud_signed_out))
+    }
+
+    // --- Sync on/off --------------------------------------------------------------------------------------
+
+    /**
+     * The Sync switch. On: reads what linking needs; a question (merge, another account's data, the cloud data
+     * deleted) is shown first and nothing syncs until it is answered; otherwise it links and syncs right away.
+     */
+    fun setSyncEnabled(enabled: Boolean) {
+        if (!enabled) {
+            viewModelScope.launch { syncController.disable() }
+            return
+        }
+        if (switchingOn.value || decision.value != null) return
+        switchingOn.update { true }
+        viewModelScope.launch {
+            try {
+                when (val plan = syncController.prepare()) {
+                    is SignInPlan.Ready -> link(plan.choice)
+                    is SignInPlan.AskMerge -> decision.update { SyncDecision.Merge(plan.phone, plan.cloud, plan.lookAlikes) }
+                    is SignInPlan.AskAccountSwitch -> decision.update {
+                        SyncDecision.AccountSwitch(plan.previousEmail, cloudAuth.currentAccount()?.email, plan.phone, plan.cloud)
+                    }
+                    SignInPlan.CloudWasReset -> decision.update { SyncDecision.CloudReset }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(SyncController.TAG, "Turning sync on failed", e)
+                _messages.send(UiMessage(R.string.sync_turn_on_failed, listOf(e.toSyncMessage())))
+            } finally {
+                switchingOn.update { false }
+            }
+        }
+    }
+
+    /** The answer to [CloudUiState.decision]. */
+    fun answer(choice: SignInChoice) {
+        decision.update { null }
+        switchingOn.update { true }
+        viewModelScope.launch {
+            try {
+                link(choice)
+            } finally {
+                switchingOn.update { false }
+            }
+        }
+    }
+
+    /** The question was closed without an answer: sync stays as it was. */
+    fun dismissDecision() {
+        decision.update { null }
+        syncController.cancelDecision()
+    }
+
+    /** The cloud data was deleted while sync was on: ask what to do (from the account row). */
+    fun reviewCloudReset() {
+        if (decision.value == null) decision.update { SyncDecision.CloudReset }
+    }
+
+    /** "Turn sync off" in the cloud-reset question. */
+    fun turnSyncOff() {
+        decision.update { null }
+        syncController.cancelDecision()
+        viewModelScope.launch { syncController.disable() }
+    }
+
+    private suspend fun link(choice: SignInChoice) {
+        val outcome = syncController.link(choice)
+        val problem = outcome.problem
+        _messages.send(
+            if (problem == null || problem == SyncProblem.BUDGET) UiMessage(R.string.sync_turned_on)
+            else UiMessage(R.string.sync_first_sync_failed, listOf(outcome.problemMessage(0)))
+        )
+    }
+
+    /** "Sync now". The result shows in the account row. */
+    fun syncNow() {
+        viewModelScope.launch { syncController.syncNow() }
+    }
+
+    override fun onCleared() {
+        // A question left open when the screen goes away must not keep sync waiting.
+        if (decision.value != null) syncController.cancelDecision()
     }
 
     fun retryCloudAccess() {
@@ -162,7 +289,7 @@ class SettingsViewModel @Inject constructor(
     private suspend fun checkCloudAccess(account: CloudAccount) {
         cloudAccess.update { CloudAccess.CHECKING to null }
         val result = try {
-            remoteStore.readMeta(account.uid)
+            withContext(Dispatchers.Default) { remoteStore.readMeta(account.uid) }
             CloudAccess.OK to null
         } catch (e: CancellationException) {
             throw e
@@ -224,3 +351,54 @@ class SettingsViewModel @Inject constructor(
         }
     }
 }
+
+private val SYNC_TIME = DateTimeFormatter.ofPattern("HH:mm")
+private val SYNC_DATE_TIME = DateTimeFormatter.ofPattern("dd.MM, HH:mm")
+
+/** When it happened, short: "14:32" today, "08.11, 14:32" before. */
+internal fun syncTime(millis: Long, today: LocalDate = LocalDate.now()): String {
+    val time = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault())
+    return (if (time.toLocalDate() == today) SYNC_TIME else SYNC_DATE_TIME).format(time)
+}
+
+/** What the account row says about sync while it is on. */
+internal fun SyncStatus.describe(today: LocalDate = LocalDate.now()): List<UiMessage> {
+    if (!enabled) return emptyList()
+    val lines = mutableListOf<UiMessage>()
+    val outcome = last
+    when {
+        running -> lines += UiMessage(R.string.sync_running)
+        cloudReset -> lines += UiMessage(R.string.sync_cloud_reset)
+        outcome?.problem != null -> lines += outcome.problemMessage(writesToday)
+        lastSyncedAt != null -> lines += UiMessage(
+            R.string.sync_done,
+            listOf(syncTime(lastSyncedAt, today), outcome?.downloaded ?: 0, outcome?.uploaded ?: 0, writesToday),
+        )
+        else -> lines += UiMessage(R.string.sync_not_yet)
+    }
+    if (!running && (outcome?.skipped ?: 0) > 0) lines += UiMessage(R.string.sync_skipped, listOf(outcome!!.skipped))
+    if (!running && pending > 0) lines += UiMessage(R.string.sync_pending, listOf(pending))
+    return lines
+}
+
+/** Why the last attempt didn't complete, for the user. */
+internal fun SyncOutcome.problemMessage(writesToday: Int): UiMessage = when (problem) {
+    SyncProblem.OFFLINE -> UiMessage(R.string.sync_offline)
+    SyncProblem.ACCESS_DENIED -> UiMessage(R.string.cloud_access_denied)
+    SyncProblem.CLOCK -> UiMessage(R.string.sync_clock_ahead, listOf(detail ?: "?"))
+    SyncProblem.WRITE_REFUSED_CLOCK_UNKNOWN -> UiMessage(R.string.sync_refused_check_clock)
+    SyncProblem.WRITE_REFUSED -> UiMessage(R.string.sync_refused_rules)
+    SyncProblem.CLOUD_RESET -> UiMessage(R.string.sync_cloud_reset)
+    SyncProblem.BUDGET -> UiMessage(R.string.sync_budget, listOf(writesToday, SyncController.DAILY_AUTOMATIC_WRITES))
+    SyncProblem.OTHER, null -> UiMessage(R.string.sync_error, listOf(detail ?: "?"))
+}
+
+private fun Exception.toSyncMessage(): UiMessage = when (cloudProblem()) {
+    CloudProblem.OFFLINE -> UiMessage(R.string.sync_offline)
+    CloudProblem.ACCESS_DENIED -> UiMessage(R.string.cloud_access_denied)
+    else -> UiMessage(R.string.sync_error, listOf("${javaClass.simpleName}: $message"))
+}
+
+/** The message's text; an argument that is itself a [UiMessage] is turned into its text first. */
+fun UiMessage.text(context: Context): String =
+    context.getString(resId, *args.map { if (it is UiMessage) it.text(context) else it }.toTypedArray())

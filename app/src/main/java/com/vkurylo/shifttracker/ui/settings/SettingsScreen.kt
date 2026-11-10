@@ -18,6 +18,8 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.CloudSync
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FileDownload
@@ -45,6 +47,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -56,6 +59,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.BuildConfig
 import com.vkurylo.shifttracker.R
+import com.vkurylo.shifttracker.data.sync.SignInChoice
+import com.vkurylo.shifttracker.data.sync.SyncProblem
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.ThemeMode
@@ -82,7 +87,7 @@ fun SettingsScreen(
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
-            snackbar.show(context.getString(message.resId, *message.args.toTypedArray()))
+            snackbar.show(message.text(context))
         }
     }
 
@@ -281,10 +286,7 @@ fun SettingsScreen(
                                 val error = cloud.signInError
                                 when {
                                     cloud.signingIn -> Text(stringResource(R.string.cloud_signing_in))
-                                    error != null -> Text(
-                                        stringResource(error.resId, *error.args.toTypedArray()),
-                                        color = MaterialTheme.colorScheme.error,
-                                    )
+                                    error != null -> Text(error.text(context), color = MaterialTheme.colorScheme.error)
                                     else -> Text(stringResource(R.string.cloud_sign_in_summary))
                                 }
                             },
@@ -292,38 +294,95 @@ fun SettingsScreen(
                     }
                 }
                 else -> {
+                    val sync = cloud.sync
+                    val rows = if (sync.enabled) 4 else 3
                     item {
-                        SettingsRow(
-                            index = 0,
-                            count = 2,
-                            onClick = viewModel::retryCloudAccess.takeIf { cloud.access != CloudAccess.OK && cloud.access != CloudAccess.CHECKING },
-                        ) {
+                        // Sync off: whether the cloud lets this account in (tap to check again after an error).
+                        // Sync on: how sync stands (tap after the cloud data was deleted to decide what to do).
+                        val onClick = when {
+                            sync.enabled && sync.cloudReset -> viewModel::reviewCloudReset
+                            !sync.enabled && cloud.access != CloudAccess.OK && cloud.access != CloudAccess.CHECKING -> viewModel::retryCloudAccess
+                            else -> null
+                        }
+                        SettingsRow(index = 0, count = rows, onClick = onClick) {
                             ListItem(
                                 modifier = it,
                                 colors = TransparentListItem,
                                 leadingContent = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
                                 headlineContent = { Text(account.email ?: stringResource(R.string.cloud_google_account)) },
                                 supportingContent = {
-                                    Text(
-                                        when (cloud.access) {
-                                            CloudAccess.OK -> stringResource(R.string.cloud_access_ok)
-                                            CloudAccess.DENIED -> stringResource(R.string.cloud_access_denied)
-                                            CloudAccess.OFFLINE -> stringResource(R.string.cloud_access_offline)
-                                            CloudAccess.ERROR -> stringResource(R.string.cloud_access_error, cloud.accessError.orEmpty())
-                                            CloudAccess.CHECKING, null -> stringResource(R.string.cloud_access_checking)
-                                        },
-                                        color = if (cloud.access == CloudAccess.DENIED || cloud.access == CloudAccess.ERROR) {
-                                            MaterialTheme.colorScheme.error
-                                        } else {
-                                            Color.Unspecified
-                                        },
-                                    )
+                                    if (sync.enabled) {
+                                        val problem = sync.last?.problem
+                                        Column {
+                                            cloud.syncLines.forEachIndexed { i, line ->
+                                                Text(
+                                                    line.text(context),
+                                                    color = if (i == 0 && !sync.running && (sync.cloudReset || (problem != null && problem != SyncProblem.OFFLINE))) {
+                                                        MaterialTheme.colorScheme.error
+                                                    } else {
+                                                        Color.Unspecified
+                                                    },
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Text(
+                                            when (cloud.access) {
+                                                CloudAccess.OK -> stringResource(R.string.cloud_access_ok)
+                                                CloudAccess.DENIED -> stringResource(R.string.cloud_access_denied)
+                                                CloudAccess.OFFLINE -> stringResource(R.string.cloud_access_offline)
+                                                CloudAccess.ERROR -> stringResource(R.string.cloud_access_error, cloud.accessError.orEmpty())
+                                                CloudAccess.CHECKING, null -> stringResource(R.string.cloud_access_checking)
+                                            },
+                                            color = if (cloud.access == CloudAccess.DENIED || cloud.access == CloudAccess.ERROR) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                Color.Unspecified
+                                            },
+                                        )
+                                    }
                                 },
                             )
                         }
                     }
                     item {
-                        SettingsRow(index = 1, count = 2, onClick = viewModel::signOut) {
+                        // Off until turned on, also after signing in.
+                        SettingsRow(
+                            index = 1,
+                            count = rows,
+                            onClick = { viewModel.setSyncEnabled(!sync.enabled) },
+                            checked = sync.enabled,
+                            enabled = !cloud.switchingOn,
+                        ) {
+                            ListItem(
+                                modifier = it,
+                                colors = TransparentListItem,
+                                leadingContent = { Icon(Icons.Filled.Sync, contentDescription = null) },
+                                headlineContent = { Text(stringResource(R.string.sync_switch)) },
+                                supportingContent = {
+                                    Text(stringResource(if (cloud.switchingOn) R.string.sync_turning_on else R.string.sync_switch_summary))
+                                },
+                                trailingContent = { Switch(checked = sync.enabled, onCheckedChange = null, enabled = !cloud.switchingOn) },
+                            )
+                        }
+                    }
+                    if (sync.enabled) {
+                        item {
+                            SettingsRow(index = 2, count = rows, onClick = viewModel::syncNow, enabled = !sync.running && !cloud.switchingOn) {
+                                ListItem(
+                                    modifier = it,
+                                    colors = TransparentListItem,
+                                    leadingContent = { Icon(Icons.Filled.CloudSync, contentDescription = null) },
+                                    headlineContent = { Text(stringResource(R.string.sync_now)) },
+                                    supportingContent = {
+                                        Text(stringResource(if (sync.running) R.string.sync_running else R.string.sync_now_summary))
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    item {
+                        SettingsRow(index = rows - 1, count = rows, onClick = viewModel::signOut) {
                             ListItem(
                                 modifier = it,
                                 colors = TransparentListItem,
@@ -399,6 +458,8 @@ fun SettingsScreen(
             dismissButton = { TextButton(onClick = viewModel::cancelImport) { Text(stringResource(R.string.cancel)) } },
         )
     }
+
+    cloud.decision?.let { decision -> SyncDecisionDialog(decision, viewModel) }
 }
 
 /** A settings row as one segment of its section's group. */
@@ -431,4 +492,73 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/** The question to answer before sync can be turned on (or go on). Nothing syncs while it is open. */
+@Composable
+private fun SyncDecisionDialog(decision: SyncDecision, viewModel: SettingsViewModel) {
+    when (decision) {
+        is SyncDecision.Merge -> AlertDialog(
+            onDismissRequest = viewModel::dismissDecision,
+            icon = { Icon(Icons.Filled.CloudSync, contentDescription = null) },
+            title = { Text(stringResource(R.string.sync_merge_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.sync_merge_message,
+                        decision.phone.jobs, decision.phone.shifts, decision.phone.bonuses,
+                        decision.cloud.jobs, decision.cloud.shifts, decision.cloud.bonuses,
+                        decision.lookAlikes,
+                    ),
+                )
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { viewModel.answer(SignInChoice.MERGE) }) { Text(stringResource(R.string.sync_merge)) }
+                    TextButton(onClick = { viewModel.answer(SignInChoice.USE_CLOUD_ONLY) }) {
+                        Text(stringResource(R.string.sync_use_account_data), color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = viewModel::dismissDecision) { Text(stringResource(R.string.cancel)) }
+                }
+            },
+        )
+        is SyncDecision.AccountSwitch -> AlertDialog(
+            onDismissRequest = viewModel::dismissDecision,
+            icon = { Icon(Icons.Filled.AccountCircle, contentDescription = null) },
+            title = { Text(stringResource(R.string.sync_account_switch_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.sync_account_switch_message,
+                        decision.previousEmail ?: stringResource(R.string.sync_other_account),
+                        decision.currentEmail ?: stringResource(R.string.cloud_google_account),
+                        decision.phone.jobs, decision.phone.shifts, decision.phone.bonuses,
+                        decision.cloud.jobs, decision.cloud.shifts, decision.cloud.bonuses,
+                    ),
+                )
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { viewModel.answer(SignInChoice.MERGE) }) { Text(stringResource(R.string.sync_add_phone_data)) }
+                    TextButton(onClick = { viewModel.answer(SignInChoice.USE_CLOUD_ONLY) }) {
+                        Text(stringResource(R.string.sync_replace_with_account), color = MaterialTheme.colorScheme.error)
+                    }
+                    TextButton(onClick = viewModel::dismissDecision) { Text(stringResource(R.string.cancel)) }
+                }
+            },
+        )
+        SyncDecision.CloudReset -> AlertDialog(
+            onDismissRequest = viewModel::dismissDecision,
+            icon = { Icon(Icons.Filled.CloudOff, contentDescription = null) },
+            title = { Text(stringResource(R.string.sync_reset_title)) },
+            text = { Text(stringResource(R.string.sync_reset_message)) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { viewModel.answer(SignInChoice.UPLOAD) }) { Text(stringResource(R.string.sync_upload_again)) }
+                    TextButton(onClick = viewModel::turnSyncOff) { Text(stringResource(R.string.sync_turn_off)) }
+                    TextButton(onClick = viewModel::dismissDecision) { Text(stringResource(R.string.cancel)) }
+                }
+            },
+        )
+    }
 }

@@ -120,10 +120,28 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 
 ## Cloud sync (optional, work in progress)
 
-Signing in with Google in **Settings → Account & sync** will keep the data of several phones in step through
-Cloud Firestore. The app keeps working exactly as before without it: Room on the phone stays the only data
-the app reads, and a build made without a Firebase config shows "Not available in this build". So far the
-app signs in and checks that it can reach the cloud; syncing itself comes in the next steps.
+Signing in with Google in **Settings → Account & sync** and turning on **Sync** keeps the data of several
+phones in step through Cloud Firestore. The app keeps working exactly as before without it: Room on the
+phone stays the only data the app reads, and a build made without a Firebase config shows "Not available in
+this build".
+
+### How sync behaves
+
+- **Off until you turn it on.** Signing in alone only checks that the cloud lets the account in. Signing out
+  turns sync off; the data on the phone stays.
+- **Turning it on the first time** never overwrites anything silently. If both the phone and the account have
+  data, you choose: merge (records that look the same are kept once), or take the account's data (a JSON
+  backup of the phone's data is saved first, in the app's files/safety-backups). Data synced with another
+  account, or cloud data deleted from another phone, also asks. Nothing syncs while a question is open.
+- **When it syncs:** at app start and when you come back to the app (at most once a minute), 3 seconds after
+  your last change, and with **Sync now**. It runs in the background (WorkManager), only with a connection,
+  so changes made offline go up by themselves when the network returns. A JSON import and a sync never overlap.
+- **Conflicts:** per record, the newest change wins (by the phone's clock). The cloud refuses change times
+  more than 10 minutes ahead of its own; the status then says to check the phone's date and time.
+- **Free quota (20 000 writes a day):** each record uploaded is one write. Automatic syncs stop at 5 000 writes
+  a day per phone, so a bug can't use the quota up; Sync now isn't limited. Records downloaded from the
+  cloud are stored as already synced, so they never go back up. The status shows the writes of the last
+  sync and today's total. `adb logcat -s CloudSync` logs every sync.
 
 ### Setting up Firebase (once)
 

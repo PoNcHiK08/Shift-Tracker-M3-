@@ -78,8 +78,9 @@ class CloudAuthEmulatorTest {
         Emulators.idleUntil { states.last().access == CloudAccess.OK }
         assertEquals(Emulators.EMAIL, states.last().account?.email)
         assertNull(states.last().signInError)
-        assertTrue(states.any { it.signingIn })
         assertTrue(!states.last().signingIn)
+        // Signing in alone doesn't turn sync on.
+        assertTrue(!states.last().sync.enabled)
 
         viewModel.signOut()
         Emulators.idleUntil { states.last().account == null }
