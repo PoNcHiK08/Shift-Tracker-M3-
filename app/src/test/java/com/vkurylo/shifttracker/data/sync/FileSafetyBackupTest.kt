@@ -118,6 +118,23 @@ class FileSafetyBackupTest {
     }
 
     @Test
+    fun aBackupThatCantBeFinishedLeavesNothingBehind() = runBlocking {
+        db.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        backups.save(SafetyBackup.Reason.BEFORE_IMPORT)
+        val before = files()
+        // The finished file can't take its name (here: a folder is in the way), as if the write had failed.
+        now += 1_000
+        val stamp = java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(java.time.ZoneOffset.UTC)
+            .format(java.time.Instant.ofEpochMilli(now))
+        val blocker = File(dir, "$stamp-before-import.json").apply { mkdirs() }
+
+        assertTrue(runCatching { backups.save(SafetyBackup.Reason.BEFORE_IMPORT) }.exceptionOrNull() is java.io.IOException)
+        blocker.delete()
+        assertEquals("no half-written file is left, and none is listed", before, files())
+        assertEquals(1, backups.list().size)
+    }
+
+    @Test
     fun onlyABackupInTheListCanBeRead() = runBlocking {
         File(context.filesDir, "secret.json").writeText("{}")
         dir.mkdirs()

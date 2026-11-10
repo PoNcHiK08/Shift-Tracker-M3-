@@ -56,7 +56,14 @@ class FileSafetyBackup @Inject constructor(
         if (!backup.hasData()) return@withContext
         val dir = dir.apply { mkdirs() }
         val stamp = STAMP.format(Instant.ofEpochMilli(clock.nowMillis()))
-        File(dir, "$stamp-$reason.json").writeText(backup.exportJson())
+        // Written whole, then renamed: a write cut short (a full disk) leaves no half backup in the list.
+        val partial = File(dir, "$stamp-$reason.partial")
+        try {
+            partial.writeText(backup.exportJson())
+            if (!partial.renameTo(File(dir, "$stamp-$reason.json"))) throw java.io.IOException("Couldn't finish $partial")
+        } finally {
+            partial.delete()
+        }
         files().drop(KEEP).forEach { it.delete() }
         saved.update { it + 1 }
     }

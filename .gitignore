@@ -18,3 +18,9 @@ google-services.json
 node_modules/
 # Firebase emulator logs
 *-debug.log
+# Signing keys: your own release key must never be committed (CI reads it from the SIGNING_* secrets).
+# The public dev key is the one exception, on purpose.
+*.jks
+*.keystore
+*.p12
+!app/signing/dev.keystore

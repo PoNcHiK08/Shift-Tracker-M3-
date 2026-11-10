@@ -28,11 +28,13 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
     you may need it.
 - **Text up to 20 000 characters** per job name or note; the editors stop there. Older or imported text that
   is longer goes to the cloud cut to 20 000 characters. The phone keeps the full text, but other phones get
-  the cut version.
+  the cut version. If one of them then changes that record, its version, with the cut text, comes back and
+  replaces the full one. Shorten such a text yourself, or keep it in a backup.
 - **Safety backups stay on the phone.** The app keeps the newest 5, they aren't in Android's own backup, and
   uninstalling the app deletes them. Save or share the ones you want to keep.
-- **The import replaces data everywhere** while sync is on. The app warns you, and saves a safety backup
-  first.
+- **The import replaces data everywhere** while sync is on. The app warns you, and saves a safety backup of
+  the importing phone's data first. Changes another phone made before the import but hadn't sent yet are
+  replaced as well; changes made after it win.
 - **Deleting the cloud data** (from any phone) makes the other phones stop and ask. If one of them answers
   **Upload again**, its data goes back up.
 - **A phone restored from Android's own backup** (or set up by device transfer) gets the data but not the link
