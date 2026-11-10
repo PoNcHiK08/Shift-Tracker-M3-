@@ -35,12 +35,43 @@ jobs:
       - name: Unit tests (calculator, .ics parser, UI smoke test)
         run: ./gradlew testDebugUnitTest --stacktrace
 
+      # Release signing. Without the SIGNING_KEYSTORE_BASE64 secret, the release APK is signed with the public
+      # dev key, as always, so each build installs over the previous one. With it (your own key, base64, plus
+      # the SIGNING_STORE_PASSWORD, SIGNING_KEY_ALIAS and SIGNING_KEY_PASSWORD secrets) it is signed with your
+      # key, which can't install over a dev-key build: see docs/cloud-sync.md, "Your own release key".
+      # The debug APK always uses the dev key.
+      - name: Choose the release key
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "ALLOW_DEV_RELEASE_SIGNING=true" >> "$GITHUB_ENV"
+            echo "Release APK: signed with the public dev key (no SIGNING_KEYSTORE_BASE64 secret)."
+            exit 0
+          fi
+          for name in SIGNING_STORE_PASSWORD SIGNING_KEY_ALIAS SIGNING_KEY_PASSWORD; do
+            [ -n "${!name}" ] || { echo "::error::SIGNING_KEYSTORE_BASE64 is set but the $name secret isn't."; exit 1; }
+          done
+          printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore" 2> /dev/null \
+            || { echo "::error::The SIGNING_KEYSTORE_BASE64 secret isn't base64."; exit 1; }
+          details=$(keytool -list -v -keystore "$RUNNER_TEMP/release.keystore" -storepass "$SIGNING_STORE_PASSWORD" \
+            -alias "$SIGNING_KEY_ALIAS" 2> /dev/null) \
+            || { echo "::error::Can't open your key: check the SIGNING_STORE_PASSWORD and SIGNING_KEY_ALIAS secrets."; exit 1; }
+          echo "SIGNING_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "Release APK: signed with your key from the SIGNING_* secrets. Its fingerprints (for Firebase):"
+          printf '%s\n' "$details" | grep -E '^[[:space:]]*SHA(1|256):'
+
       # Cloud sync: app/google-services.json (never committed) comes from the GOOGLE_SERVICES_JSON secret,
       # the file's content as it is or base64-encoded. Written after the tests, so they never depend on it.
       # Without the secret (e.g. a pull request from a fork) the APKs build without cloud sync.
       - name: Add Firebase config from the secret
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
         run: |
           if [ -z "$GOOGLE_SERVICES_JSON" ]; then
             echo "::warning::The GOOGLE_SERVICES_JSON secret is not set: these APKs have no cloud sync."
@@ -62,12 +93,18 @@ jobs:
           done
           jq -e 'any(.client[].oauth_client[]?; .client_type == 3)' app/google-services.json > /dev/null \
             || { echo "::error::google-services.json has no Web client: enable Google sign-in in Firebase Authentication, then download the file again."; exit 1; }
-          # Google sign-in also needs the SHA-1 of the key that signs the APK (the dev key, for every build here)
-          # registered for each app; the file lists the fingerprints registered when it was downloaded.
-          fingerprint=$(keytool -list -v -keystore app/signing/dev.keystore -storepass shifttracker -alias shifttracker \
+          # Google sign-in also needs the SHA-1 of the key that signs each APK (the dev key, or your own key for
+          # the release APK) registered for its app; the file lists the fingerprints registered when it was downloaded.
+          dev=$(keytool -list -v -keystore app/signing/dev.keystore -storepass shifttracker -alias shifttracker \
             | sed -n 's/^[[:space:]]*SHA1: //p')
-          sha1=$(printf '%s' "$fingerprint" | tr -d ':' | tr 'A-F' 'a-f')
+          release=$dev
+          if [ -n "${SIGNING_KEYSTORE_PATH:-}" ]; then
+            release=$(keytool -list -v -keystore "$SIGNING_KEYSTORE_PATH" -storepass "$SIGNING_STORE_PASSWORD" -alias "$SIGNING_KEY_ALIAS" \
+              | sed -n 's/^[[:space:]]*SHA1: //p')
+          fi
           for package in com.vkurylo.shifttracker com.vkurylo.shifttracker.debug; do
+            fingerprint=$([ "$package" = com.vkurylo.shifttracker ] && echo "$release" || echo "$dev")
+            sha1=$(printf '%s' "$fingerprint" | tr -d ':' | tr 'A-F' 'a-f')
             jq -e --arg p "$package" --arg h "$sha1" \
               'any(.client[].oauth_client[]?; .client_type == 1 and .android_info.package_name == $p and ((.android_info.certificate_hash // "") | ascii_downcase) == $h)' \
               app/google-services.json > /dev/null \
@@ -75,11 +112,13 @@ jobs:
           done
           echo "Firebase config added: these APKs have cloud sync."
 
-      # The GitHub builds are signed with the public dev key on purpose, so each one installs
-      # over the previous one. The release build refuses that key unless it is allowed here.
+      # The release key was chosen above: the dev key (ALLOW_DEV_RELEASE_SIGNING, set there only without your
+      # key: the release build refuses the dev key unless it is allowed) or yours (SIGNING_KEYSTORE_PATH + these).
       - name: Build APKs
         env:
-          ALLOW_DEV_RELEASE_SIGNING: "true"
+          SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: ./gradlew assembleRelease assembleDebug --stacktrace
 
       - name: Rename APKs
