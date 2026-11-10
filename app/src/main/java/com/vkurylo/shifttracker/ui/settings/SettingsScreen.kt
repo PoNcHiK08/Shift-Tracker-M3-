@@ -466,14 +466,29 @@ fun SettingsScreen(
     }
 
     if (state.pendingImport != null) {
+        // With sync on, the import replaces the data on every phone of the account, not only here.
+        val everywhere = cloud.sync.enabled
         AlertDialog(
             onDismissRequest = viewModel::cancelImport,
             icon = { Icon(Icons.Filled.Restore, contentDescription = null) },
-            title = { Text(stringResource(R.string.import_backup_title)) },
-            text = { Text(stringResource(R.string.import_backup_message)) },
+            title = { Text(stringResource(if (everywhere) R.string.import_backup_title_everywhere else R.string.import_backup_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        when {
+                            everywhere -> R.string.import_backup_message_synced
+                            cloud.sync.linked -> R.string.import_backup_message_linked
+                            else -> R.string.import_backup_message
+                        },
+                    ),
+                )
+            },
             confirmButton = {
                 TextButton(onClick = viewModel::confirmImport) {
-                    Text(stringResource(R.string.replace_data), color = MaterialTheme.colorScheme.error)
+                    Text(
+                        stringResource(if (everywhere) R.string.replace_data_everywhere else R.string.replace_data),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             },
             dismissButton = { TextButton(onClick = viewModel::cancelImport) { Text(stringResource(R.string.cancel)) } },

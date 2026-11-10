@@ -24,7 +24,16 @@ interface SyncStateStore {
     suspend fun update(transform: (SyncState) -> SyncState)
 }
 
-/** Writes a JSON export of everything this phone holds before sync replaces its data. */
+/**
+ * Writes a JSON export of everything this phone holds before its data is replaced (sync taking an account's
+ * data, a JSON import). Writes nothing when the phone holds no data.
+ */
 fun interface SafetyBackup {
     suspend fun save(reason: String)
+
+    /** Why a safety backup was written (part of its file name). */
+    object Reason {
+        const val BEFORE_TAKING_CLOUD_DATA = "before-taking-cloud-data"
+        const val BEFORE_IMPORT = "before-import"
+    }
 }

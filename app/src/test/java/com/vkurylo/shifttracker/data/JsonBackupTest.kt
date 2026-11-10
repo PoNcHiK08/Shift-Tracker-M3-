@@ -100,6 +100,43 @@ class JsonBackupTest {
         }
     }
 
+    @Test
+    fun beforeReplaceRunsOnlyForAValidFileWithSyncHeldOffAndAFailureChangesNothing() = runBlocking {
+        val source = newDb()
+        source.jobDao().upsert(Job(id = 1, name = "Biuro", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val json = JsonBackupRepository(source).exportJson()
+        val db = newDb()
+        db.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val lock = com.vkurylo.shifttracker.data.sync.SyncLock()
+        val repository = JsonBackupRepository(db, syncLock = lock)
+
+        // An invalid file never gets that far.
+        var calls = 0
+        assertThrows(InvalidBackupException::class.java) {
+            runBlocking { repository.importJson("""{"format":"other"}""") { calls++ } }
+        }
+        assertEquals(0, calls)
+
+        // It runs before the data is replaced (it still sees the old data), with syncs held off.
+        repository.importJson(json) {
+            calls++
+            assertTrue("a sync can't run meanwhile", lock.mutex.isLocked)
+            assertEquals(listOf("Kawiarnia"), db.jobDao().getAll().map { it.name })
+        }
+        assertEquals(1, calls)
+        assertEquals(listOf("Biuro"), db.jobDao().getAll().map { it.name })
+
+        // If it fails, nothing is replaced.
+        val other = newDb()
+        other.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val otherLock = com.vkurylo.shifttracker.data.sync.SyncLock()
+        assertThrows(java.io.IOException::class.java) {
+            runBlocking { JsonBackupRepository(other, syncLock = otherLock).importJson(json) { throw java.io.IOException("disk full") } }
+        }
+        assertEquals(listOf("Kawiarnia"), other.jobDao().getAll().map { it.name })
+        assertTrue(!otherLock.mutex.isLocked)
+    }
+
     // --- Versions -------------------------------------------------------------------------------
 
     @Test

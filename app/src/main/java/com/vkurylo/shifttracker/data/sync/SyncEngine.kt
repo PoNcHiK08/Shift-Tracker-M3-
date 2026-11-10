@@ -126,7 +126,7 @@ class SyncEngine @Inject constructor(
                 }
             }
             SignInChoice.USE_CLOUD_ONLY -> {
-                safetyBackup.save("before-taking-cloud-data")
+                safetyBackup.save(SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA)
                 db.withTransaction { deleteEverything() }
             }
         }

@@ -95,11 +95,13 @@ interface BackupRepository {
 
     /**
      * Replaces all data with the backup. The whole file is validated first; if anything is wrong
-     * (or writing fails half-way) nothing in the database changes.
+     * (or writing fails half-way) nothing in the database changes. [beforeReplace] runs after the file
+     * passed and right before the data is replaced, with sync held off (to save a safety backup of the
+     * data about to go); if it throws, nothing changes.
      *
      * @throws InvalidBackupException when the file is not a usable backup.
      */
-    suspend fun importJson(json: String): BackupCounts
+    suspend fun importJson(json: String, beforeReplace: suspend () -> Unit = {}): BackupCounts
 }
 
 /** The backup was rejected; the database is unchanged. */

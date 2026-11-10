@@ -13,6 +13,8 @@ import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.data.DocumentIo
 import com.vkurylo.shifttracker.data.sync.CloudAccount
 import com.vkurylo.shifttracker.data.sync.Counts
+import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
+import com.vkurylo.shifttracker.data.sync.SafetyBackup
 import com.vkurylo.shifttracker.data.sync.RemoteStore
 import com.vkurylo.shifttracker.data.sync.SignInChoice
 import com.vkurylo.shifttracker.data.sync.SignInPlan
@@ -111,6 +113,7 @@ class SettingsViewModel @Inject constructor(
     private val cloudAuth: CloudAuth,
     private val remoteStore: RemoteStore,
     private val syncController: SyncController,
+    private val safetyBackups: FileSafetyBackup,
     jobRepository: JobRepository,
 ) : ViewModel() {
 
@@ -360,14 +363,28 @@ class SettingsViewModel @Inject constructor(
     fun requestImport(uri: Uri) = pendingImport.update { uri }
     fun cancelImport() = pendingImport.update { null }
 
+    /**
+     * Imports the confirmed file. A safety backup of the data about to be replaced is saved first; if that
+     * fails, nothing is imported. With sync on, the result goes to the other phones as any change does.
+     */
     fun confirmImport() {
         val uri = pendingImport.value ?: return
         pendingImport.update { null }
         runBusy {
-            val counts = backupRepository.importJson(documentIo.readText(uri))
+            val counts = backupRepository.importJson(documentIo.readText(uri)) {
+                try {
+                    safetyBackups.save(SafetyBackup.Reason.BEFORE_IMPORT)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    throw SafetyBackupFailedException(e)
+                }
+            }
             _messages.send(UiMessage(R.string.import_backup_done, listOf(counts.jobs, counts.shifts, counts.bonuses)))
         }
     }
+
+    private class SafetyBackupFailedException(cause: Throwable) : Exception(cause)
 
     private fun runBusy(block: suspend () -> Unit) {
         viewModelScope.launch {
@@ -381,6 +398,9 @@ class SettingsViewModel @Inject constructor(
                     InvalidBackupException.Reason.INVALID -> R.string.error_backup_invalid
                 }
                 _messages.send(UiMessage(message))
+            } catch (e: SafetyBackupFailedException) {
+                Log.e(TAG, "Safety backup before an import failed; nothing imported", e)
+                _messages.send(UiMessage(R.string.import_safety_backup_failed))
             } catch (e: Exception) {
                 // Reading/writing the document failed (or the import transaction was rolled back).
                 _messages.send(UiMessage(R.string.error_file_operation))
@@ -390,6 +410,8 @@ class SettingsViewModel @Inject constructor(
         }
     }
 }
+
+private const val TAG = "Settings"
 
 private val SYNC_TIME = DateTimeFormatter.ofPattern("HH:mm")
 private val SYNC_DATE_TIME = DateTimeFormatter.ofPattern("dd.MM, HH:mm")

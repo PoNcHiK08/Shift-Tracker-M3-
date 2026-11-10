@@ -6,6 +6,8 @@ import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.repository.JobDetailsSource
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
+import com.vkurylo.shifttracker.data.local.WallClock
+import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
 import com.vkurylo.shifttracker.data.sync.RemoteStore
 import com.vkurylo.shifttracker.data.sync.SyncController
 import com.vkurylo.shifttracker.data.sync.testSyncController
@@ -31,6 +33,7 @@ internal fun settingsViewModel(
     cloudAuth: CloudAuth,
     remoteStore: RemoteStore,
     syncController: SyncController = testSyncController(db, remoteStore, cloudAuth),
+    safetyBackups: FileSafetyBackup = FileSafetyBackup(context, JsonBackupRepository(db), WallClock.System),
 ): SettingsViewModel {
     val preferences = object : PreferencesRepository {
         override val preferences: Flow<UserPreferences> = MutableStateFlow(UserPreferences(ThemeMode.SYSTEM, false, EarningsMode.GROSS))
@@ -46,5 +49,5 @@ internal fun settingsViewModel(
         override val changes: Flow<String?> = flowOf("uk")
     }
     val jobs = RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), JobDetailsSource(db.paySettingsDao()))
-    return SettingsViewModel(preferences, language, JsonBackupRepository(db), DocumentIo(context), cloudAuth, remoteStore, syncController, jobs)
+    return SettingsViewModel(preferences, language, JsonBackupRepository(db), DocumentIo(context), cloudAuth, remoteStore, syncController, safetyBackups, jobs)
 }

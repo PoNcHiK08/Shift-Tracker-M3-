@@ -11,11 +11,14 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
- * Before sync replaces this phone's data (taking an account's data instead), a JSON export of everything is
- * written to files/safety-backups/ (the newest [KEEP] are kept). It imports like any backup.
+ * Before this phone's data is replaced (sync taking an account's data instead, a JSON import), a JSON export of
+ * everything is written to files/safety-backups/ (the newest [KEEP] are kept; nothing is written when the phone
+ * holds no data). It imports like any backup.
  */
+@Singleton
 class FileSafetyBackup @Inject constructor(
     @ApplicationContext private val context: Context,
     private val backup: JsonBackupRepository,
@@ -23,6 +26,7 @@ class FileSafetyBackup @Inject constructor(
 ) : SafetyBackup {
 
     override suspend fun save(reason: String) = withContext(Dispatchers.IO) {
+        if (!backup.hasData()) return@withContext
         val dir = File(context.filesDir, DIR).apply { mkdirs() }
         val stamp = STAMP.format(Instant.ofEpochMilli(clock.nowMillis()))
         File(dir, "$stamp-$reason.json").writeText(backup.exportJson())

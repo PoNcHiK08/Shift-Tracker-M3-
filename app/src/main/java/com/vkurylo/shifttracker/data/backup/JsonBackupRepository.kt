@@ -185,7 +185,10 @@ class JsonBackupRepository @Inject constructor(
         return json.encodeToString(BackupFile.serializer(), file)
     }
 
-    override suspend fun importJson(json: String): BackupCounts {
+    /** Whether this phone holds any job (shifts and bonuses always belong to one). */
+    suspend fun hasData(): Boolean = db.jobDao().getAll().isNotEmpty()
+
+    override suspend fun importJson(json: String, beforeReplace: suspend () -> Unit): BackupCounts {
         val file = try {
             this.json.decodeFromString(BackupFile.serializer(), json)
         } catch (e: IllegalArgumentException) { // includes kotlinx.serialization's SerializationException
@@ -218,6 +221,7 @@ class JsonBackupRepository @Inject constructor(
         // If any write fails, the transaction rolls back and the old data stays. A sync never runs in the middle
         // of it (SyncLock): it waits, then uploads the result.
         syncLock.mutex.withLock {
+            beforeReplace()
             db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, clock.nowMillis()) }
         }
         return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)

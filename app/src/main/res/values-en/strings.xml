@@ -168,8 +168,13 @@
     <string name="import_data">Import data</string>
     <string name="import_data_summary">Restore from a JSON file (replaces current data)</string>
     <string name="import_backup_title">Replace all data?</string>
-    <string name="import_backup_message">All current jobs and shifts will be deleted and replaced with the data from the file.</string>
+    <string name="import_backup_message">All current jobs and shifts will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.</string>
+    <string name="import_backup_message_linked">All current jobs and shifts will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.\n\nSync is off, but this phone is still linked to your account: when you turn sync on again, this replaces the data on your other devices too.</string>
+    <string name="import_backup_title_everywhere">Replace data on all your devices?</string>
+    <string name="import_backup_message_synced">This will replace data on all your devices. Sync is on, so the jobs, shifts and bonuses that aren\'t in the file are deleted on your other phones too, at their next sync, and the file\'s data takes their place.\n\nA safety backup of this phone\'s current data is saved first.</string>
     <string name="replace_data">Replace</string>
+    <string name="replace_data_everywhere">Replace everywhere</string>
+    <string name="import_safety_backup_failed">Couldn\'t save a safety backup of the current data, so nothing was imported. Your data is unchanged.</string>
     <string name="import_backup_done">Restored %1$d jobs, %2$d shifts and %3$d bonuses</string>
     <string name="error_file_operation">Couldn\'t process the file</string>
     <string name="error_backup_invalid">This isn\'t a valid Shift Tracker backup. Your current data is unchanged.</string>

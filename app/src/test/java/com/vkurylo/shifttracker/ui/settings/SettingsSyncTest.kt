@@ -27,6 +27,9 @@ import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import com.vkurylo.shifttracker.data.sync.CloudAccount
 import com.vkurylo.shifttracker.data.sync.FakeCloudAuth
 import com.vkurylo.shifttracker.data.sync.FakeRemoteStore
+import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
+import com.vkurylo.shifttracker.data.sync.RemoteJob
+import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.sync.SignInChoice
 import com.vkurylo.shifttracker.data.sync.SyncController
 import com.vkurylo.shifttracker.data.sync.testSyncController
@@ -71,6 +74,7 @@ class SettingsSyncTest {
     @After
     fun tearDown() {
         databases.forEach { it.close() }
+        java.io.File(context.filesDir, FileSafetyBackup.DIR).deleteRecursively()
         // Everything the Settings screen set off ran off the main thread.
         org.junit.Assert.assertEquals("cloud calls on the main thread", 0, cloud.callsOnMainThread)
     }
@@ -97,10 +101,12 @@ class SettingsSyncTest {
         job
     }
 
+    private lateinit var viewModel: SettingsViewModel
+
     private fun showSettings(db: ShiftDatabase): SyncController {
         val auth = FakeCloudAuth(signedInAs = ana)
         val controller = testSyncController(db, cloud, auth, serverClock = { serverNow }, clock = clock)
-        val viewModel = settingsViewModel(context, db, auth, cloud, controller)
+        val viewModel = settingsViewModel(context, db, auth, cloud, controller).also { viewModel = it }
         composeRule.setContent {
             val scope = rememberCoroutineScope()
             LaunchedEffect(Unit) {
@@ -202,6 +208,68 @@ class SettingsSyncTest {
         // Sync is off (no "Sync now"), and the phone still has its data.
         composeRule.waitUntil(10_000) { gone(str(R.string.sync_now)) }
         assertTrue(runBlocking { db.jobDao().getAll().size == 1 && db.shiftDao().getAll().size == 2 })
+    }
+
+    /** A backup file with [jobName]'s data, as Export writes it. */
+    private fun backupFile(jobName: String): android.net.Uri {
+        val source = database()
+        someData(source, jobName)
+        val file = java.io.File(context.cacheDir, "backup-$jobName.json")
+        file.writeText(runBlocking { JsonBackupRepository(source).exportJson() })
+        return android.net.Uri.fromFile(file)
+    }
+
+    @Test
+    fun theImportQuestionSaysWhenItReplacesDataOnTheOtherPhonesToo() {
+        val db = database()
+        someData(db, "Kawiarnia")
+        val controller = showSettings(db)
+        val file = backupFile("Biuro")
+
+        // Never synced: the import only replaces this phone's data.
+        viewModel.requestImport(file)
+        waitForText(str(R.string.import_backup_message))
+        composeRule.onNodeWithText(str(R.string.cancel)).performClick()
+
+        // Sync on: all the devices.
+        linkInBackground(controller, SignInChoice.UPLOAD)
+        viewModel.requestImport(file)
+        waitForText(str(R.string.import_backup_title_everywhere))
+        composeRule.onNodeWithText(str(R.string.import_backup_message_synced)).assertExists()
+        composeRule.onNodeWithText(str(R.string.cancel)).performClick()
+
+        // Sync off but still linked: the other devices, once sync is back on.
+        tap(str(R.string.sync_switch))
+        composeRule.waitUntil(10_000) { gone(str(R.string.sync_now)) }
+        viewModel.requestImport(file)
+        waitForText(str(R.string.import_backup_message_linked))
+        composeRule.onNodeWithText(str(R.string.import_backup_title)).assertExists()
+    }
+
+    @Test
+    fun anImportWithSyncOnSavesASafetyBackupFirstAndReplacesTheDataInTheCloudToo() {
+        val db = database()
+        someData(db, "Kawiarnia")
+        val controller = showSettings(db)
+        linkInBackground(controller, SignInChoice.UPLOAD)
+
+        viewModel.requestImport(backupFile("Biuro"))
+        waitForText(str(R.string.import_backup_title_everywhere))
+        composeRule.onNodeWithText(str(R.string.replace_data_everywhere)).performClick()
+        waitFor { str(R.string.import_backup_done, 1, 2, 0) in shownMessages }
+
+        // The data that was replaced is in a safety backup.
+        val saved = java.io.File(context.filesDir, FileSafetyBackup.DIR).listFiles().orEmpty().single()
+        assertTrue(saved.name, saved.name.endsWith("-before-import.json"))
+        assertTrue(saved.readText().contains("\"Kawiarnia\""))
+
+        // After the next sync the cloud has the file's data, and the replaced job is deleted there too.
+        tap(str(R.string.sync_now))
+        // 6 sent: Kawiarnia and its 2 shifts as deleted, Biuro and its 2 shifts (3 writes before, 9 today).
+        scrollTo(str(R.string.sync_switch))
+        waitForText(str(R.string.sync_done, "", 0, 6, 9).substringAfter(" · "), substring = true)
+        val jobs = cloud.records(ana.uid).filterIsInstance<RemoteJob>().associate { it.name to it.deleted }
+        assertTrue(jobs.toString(), jobs == mapOf("Kawiarnia" to true, "Biuro" to false))
     }
 
     @Test

@@ -38,6 +38,8 @@ data class SyncStatus(
     val cloudReset: Boolean = false,
     /** Cloud writes this phone made today. */
     val writesToday: Int = 0,
+    /** This phone's data is linked to an account (also while sync is off): its changes go there once sync is on. */
+    val linked: Boolean = false,
 )
 
 /** Runs syncs in the background (WorkManager): one at a time, when the phone is online, retried with backoff. */
@@ -93,6 +95,7 @@ class SyncController @Inject constructor(
             last = settings.last,
             cloudReset = settings.cloudReset,
             writesToday = settings.writesOn(today()),
+            linked = state.boundUid != null,
         )
     }
 

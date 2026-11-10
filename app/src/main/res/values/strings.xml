@@ -171,8 +171,13 @@
     <string name="import_data">Імпорт даних</string>
     <string name="import_data_summary">Відновити з файлу JSON (замінить поточні дані)</string>
     <string name="import_backup_title">Замінити всі дані?</string>
-    <string name="import_backup_message">Усі поточні роботи й зміни буде видалено й замінено даними з файлу.</string>
+    <string name="import_backup_message">Усі поточні роботи й зміни буде видалено й замінено даними з файлу. Спершу буде збережено страхувальну копію поточних даних.</string>
+    <string name="import_backup_message_linked">Усі поточні роботи й зміни буде видалено й замінено даними з файлу. Спершу буде збережено страхувальну копію поточних даних.\n\nСинхронізацію вимкнено, але телефон досі пов’язаний з акаунтом: коли ти знову її ввімкнеш, це замінить дані й на інших твоїх пристроях.</string>
+    <string name="import_backup_title_everywhere">Замінити дані на всіх пристроях?</string>
+    <string name="import_backup_message_synced">Це замінить дані на всіх твоїх пристроях. Синхронізацію увімкнено, тож роботи, зміни й бонуси, яких немає у файлі, буде видалено й на інших телефонах під час їхньої наступної синхронізації, а замість них з’являться дані з файлу.\n\nСпершу буде збережено страхувальну копію поточних даних цього телефона.</string>
     <string name="replace_data">Замінити</string>
+    <string name="replace_data_everywhere">Замінити всюди</string>
+    <string name="import_safety_backup_failed">Не вдалося зберегти страхувальну копію поточних даних, тому нічого не імпортовано. Дані не змінилися.</string>
     <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
     <string name="error_file_operation">Не вдалося обробити файл</string>
     <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
