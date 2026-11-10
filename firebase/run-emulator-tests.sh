@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs the app's emulator tests (FirestoreEmulatorTest: the Firestore store and the sync engine against
-# firestore.rules) on the Firestore and Auth emulators. Needs Node 20+ and Java 21.
+# Runs the app's emulator tests on the Firestore and Auth emulators: FirestoreEmulatorTest (the Firestore store
+# and the sync engine against firestore.rules) and CloudAuthEmulatorTest (Firebase sign-in up to Settings).
+# Needs Node 20+ and Java 21.
 # The rules tests alone: cd firebase/rules-test && npm ci && npm test
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -14,4 +15,4 @@ cp "$here/firebase.json" "$work/firebase.json"
 
 cd "$work"
 npx --yes firebase-tools@15.34.0 emulators:exec --only firestore,auth --project demo-shift-tracker \
-  "cd '$root' && ./gradlew :app:testDebugUnitTest --tests '*FirestoreEmulatorTest' --rerun ${GRADLE_ARGS:-} $*"
+  "cd '$root' && ./gradlew :app:testDebugUnitTest --tests '*EmulatorTest' --rerun ${GRADLE_ARGS:-} $*"

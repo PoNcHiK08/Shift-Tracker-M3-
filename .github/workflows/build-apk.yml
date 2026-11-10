@@ -62,6 +62,17 @@ jobs:
           done
           jq -e 'any(.client[].oauth_client[]?; .client_type == 3)' app/google-services.json > /dev/null \
             || { echo "::error::google-services.json has no Web client: enable Google sign-in in Firebase Authentication, then download the file again."; exit 1; }
+          # Google sign-in also needs the SHA-1 of the key that signs the APK (the dev key, for every build here)
+          # registered for each app; the file lists the fingerprints registered when it was downloaded.
+          fingerprint=$(keytool -list -v -keystore app/signing/dev.keystore -storepass shifttracker -alias shifttracker \
+            | sed -n 's/^[[:space:]]*SHA1: //p')
+          sha1=$(printf '%s' "$fingerprint" | tr -d ':' | tr 'A-F' 'a-f')
+          for package in com.vkurylo.shifttracker com.vkurylo.shifttracker.debug; do
+            jq -e --arg p "$package" --arg h "$sha1" \
+              'any(.client[].oauth_client[]?; .client_type == 1 and .android_info.package_name == $p and ((.android_info.certificate_hash // "") | ascii_downcase) == $h)' \
+              app/google-services.json > /dev/null \
+              || echo "::warning::google-services.json has no SHA-1 fingerprint $fingerprint for $package. Unless it was added after the file was downloaded, Google refuses sign-in in that app (status 16 or 10): Firebase -> Project settings -> Your apps -> $package -> Add fingerprint, then download the file again and update the secret."
+          done
           echo "Firebase config added: these APKs have cloud sync."
 
       # The GitHub builds are signed with the public dev key on purpose, so each one installs

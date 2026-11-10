@@ -60,7 +60,7 @@ import java.util.UUID
  *
  *   firebase/run-emulator-tests.sh
  *
- * which starts them with the rules (the placeholder email replaced by [EMAIL]) and runs this class.
+ * which starts them with the rules (the placeholder email replaced by [Emulators.EMAIL]) and runs this class.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35], application = Application::class)
@@ -74,18 +74,12 @@ class FirestoreEmulatorTest {
 
     @Before
     fun setUp() {
-        assumeTrue(
-            "Firebase emulators not running",
-            System.getenv("FIRESTORE_EMULATOR_HOST") != null && System.getenv("FIREBASE_AUTH_EMULATOR_HOST") != null,
-        )
-        // Every test starts from empty emulators (the Auth emulator gives the same email the same user).
-        clearEmulator("http://${System.getenv("FIRESTORE_EMULATOR_HOST")}/emulator/v1/projects/$PROJECT/databases/(default)/documents")
-        clearEmulator("http://${System.getenv("FIREBASE_AUTH_EMULATOR_HOST")}/emulator/v1/projects/$PROJECT/accounts")
-        app = emulatorApp()
+        assumeTrue("Firebase emulators not running", Emulators.running)
+        Emulators.clear()
+        app = Emulators.app()
         firestore = FirebaseFirestore.getInstance(app)
         store = FirestoreRemoteStore { firestore }
-        // The Auth emulator takes an unsigned Google ID token: the same claims a real Google sign-in gives.
-        val token = """{"sub":"google-${UUID.randomUUID()}","email":"$EMAIL","email_verified":true}"""
+        val token = Emulators.googleIdToken()
         val user = onBackground { FirebaseAuth.getInstance(app).signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await().user!! }
         account = CloudAccount(user.uid, user.email)
     }
@@ -96,27 +90,7 @@ class FirestoreEmulatorTest {
         if (::app.isInitialized) FirebaseAuth.getInstance(app).signOut()
     }
 
-    private fun clearEmulator(url: String) {
-        val connection = URL(url).openConnection(Proxy.NO_PROXY) as HttpURLConnection
-        connection.requestMethod = "DELETE"
-        check(connection.responseCode == 200) { "clearing $url: ${connection.responseCode}" }
-        connection.disconnect()
-    }
-
-    /**
-     * Runs [block] off the main thread while the test thread keeps Robolectric's main looper going: Firebase
-     * posts some of its work to the main thread.
-     */
-    private fun <T> onBackground(block: suspend () -> T): T {
-        val result = CoroutineScope(Dispatchers.IO).async { block() }
-        val deadline = System.currentTimeMillis() + 60_000
-        while (!result.isCompleted) {
-            shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(5)
-            check(System.currentTimeMillis() < deadline) { "timed out" }
-        }
-        return runBlocking { result.await() }
-    }
+    private fun <T> onBackground(block: suspend () -> T): T = Emulators.onBackground(block)
 
     private fun id() = UUID.randomUUID().toString()
 
@@ -230,30 +204,5 @@ class FirestoreEmulatorTest {
         b.engine.sync()
         assertTrue(b.db.jobDao().getAll().isEmpty())
         assertTrue(b.db.shiftDao().getAll().isEmpty())
-    }
-
-    private companion object {
-        const val PROJECT = "demo-shift-tracker"
-        const val EMAIL = "owner@example.com"
-        const val EMULATOR_HOST = "127.0.0.1"
-        const val APP_NAME = "emulator"
-
-        /** One Firebase app for all the tests (Firebase keeps state across them), pointed at the emulators once. */
-        fun emulatorApp(): FirebaseApp {
-            val context = ApplicationProvider.getApplicationContext<Context>()
-            FirebaseApp.getApps(context).firstOrNull { it.name == APP_NAME }?.let { return it }
-            val options = FirebaseOptions.Builder()
-                .setProjectId(PROJECT)
-                .setApplicationId("1:1:android:1")
-                .setApiKey("fake-api-key")
-                .build()
-            val app = FirebaseApp.initializeApp(context, options, APP_NAME)
-            FirebaseAuth.getInstance(app).useEmulator(EMULATOR_HOST, 9099)
-            FirebaseFirestore.getInstance(app).apply {
-                useEmulator(EMULATOR_HOST, 8080)
-                firestoreSettings = firestoreSettings { setLocalCacheSettings(memoryCacheSettings {}) }
-            }
-            return app
-        }
     }
 }
