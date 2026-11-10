@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <full-backup-content>
     <include domain="database" path="." />
-    <include domain="file" path="datastore/." />
+    <include domain="file" path="datastore" />
+    <!-- Cloud sync's link and position (SyncPreferences): restored elsewhere they wouldn't match the data. -->
+    <exclude domain="file" path="datastore/sync.preferences_pb" />
 </full-backup-content>

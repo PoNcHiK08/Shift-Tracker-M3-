@@ -18,7 +18,15 @@ import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
 import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
+import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
+import com.vkurylo.shifttracker.data.sync.FirestoreHostClock
 import com.vkurylo.shifttracker.data.sync.RemoteStore
+import com.vkurylo.shifttracker.data.sync.SafetyBackup
+import com.vkurylo.shifttracker.data.sync.ServerClock
+import com.vkurylo.shifttracker.data.sync.SyncPreferences
+import com.vkurylo.shifttracker.data.sync.SyncScheduler
+import com.vkurylo.shifttracker.data.sync.SyncStateStore
+import com.vkurylo.shifttracker.data.sync.WorkManagerSyncScheduler
 import com.vkurylo.shifttracker.data.sync.firebase.CloudAuth
 import com.vkurylo.shifttracker.data.sync.firebase.FirebaseCloudAuth
 import com.vkurylo.shifttracker.data.sync.firebase.FirestoreRemoteStore
@@ -79,6 +87,10 @@ abstract class RepositoryModule {
     @Binds abstract fun bindBackupRepository(impl: JsonBackupRepository): BackupRepository
     @Binds abstract fun bindRemoteStore(impl: FirestoreRemoteStore): RemoteStore
     @Binds abstract fun bindCloudAuth(impl: FirebaseCloudAuth): CloudAuth
+    @Binds abstract fun bindSyncStateStore(impl: SyncPreferences): SyncStateStore
+    @Binds abstract fun bindSafetyBackup(impl: FileSafetyBackup): SafetyBackup
+    @Binds abstract fun bindServerClock(impl: FirestoreHostClock): ServerClock
+    @Binds abstract fun bindSyncScheduler(impl: WorkManagerSyncScheduler): SyncScheduler
 }
 
 @javax.inject.Qualifier

@@ -27,7 +27,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.vkurylo.shifttracker.ui.theme.isDark
 import com.vkurylo.shifttracker.widget.LaunchRequest
 import com.vkurylo.shifttracker.widget.WidgetLaunch
+import com.vkurylo.shifttracker.data.sync.SyncController
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
@@ -35,8 +37,16 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
+    @Inject lateinit var syncController: SyncController
+
     /** A widget tap waiting for the navigation graph (see [ShiftTrackerNavHost]). */
     private val launchRequests = MutableStateFlow<LaunchRequest?>(null)
+
+    override fun onStart() {
+        super.onStart()
+        // Cloud sync, if the user turned it on: at start and on coming back to the app (at most once a minute).
+        syncController.onForeground()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
