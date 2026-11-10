@@ -1,6 +1,7 @@
 package com.vkurylo.shifttracker.ui.settings
 
 import android.app.Application
+import android.content.Intent
 import android.net.Uri
 import android.os.Looper
 import androidx.compose.material3.SnackbarHostState
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -27,6 +29,7 @@ import com.vkurylo.shifttracker.data.sync.FakeCloudAuth
 import com.vkurylo.shifttracker.data.sync.FakeRemoteStore
 import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
 import com.vkurylo.shifttracker.data.sync.SafetyBackup
+import com.vkurylo.shifttracker.data.sync.forgetFileProviderFolders
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.SnackbarController
@@ -60,6 +63,7 @@ class SettingsSafetyBackupTest {
     fun tearDown() {
         db.close()
         File(context.filesDir, FileSafetyBackup.DIR).deleteRecursively()
+        File(context.cacheDir, FileSafetyBackup.SHARED_DIR).deleteRecursively()
     }
 
     private fun str(id: Int, vararg args: Any) = context.getString(id, *args)
@@ -117,5 +121,34 @@ class SettingsSafetyBackupTest {
         viewModel.exportSafetyBackup(name, Uri.fromFile(target))
         waitFor { str(R.string.safety_backup_saved) in shownMessages }
         assertEquals(runBlocking { backups.read(name) }, target.readText())
+    }
+
+    @Test
+    fun shareOpensTheShareSheetWithAReadableCopyNamedForWhatItIs() {
+        forgetFileProviderFolders()
+        runBlocking {
+            db.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+            backups.save(SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA)
+        }
+        val name = runBlocking { backups.list() }.single().name
+        showSettings()
+        scrollTo(str(R.string.safety_backups))
+        waitFor { composeRule.onAllNodesWithText(str(R.string.safety_backups_summary, 1)).fetchSemanticsNodes().isNotEmpty() }
+        composeRule.onNodeWithText(str(R.string.safety_backups)).performClick()
+        composeRule.onNodeWithContentDescription(str(R.string.safety_backup_share)).performClick()
+
+        var chooser: Intent? = null
+        waitFor { (chooser ?: shadowOf(context).nextStartedActivity)?.also { chooser = it } != null }
+        assertEquals(Intent.ACTION_CHOOSER, chooser!!.action)
+        val send = chooser!!.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java)!!
+        assertEquals(Intent.ACTION_SEND, send.action)
+        assertEquals("application/json", send.type)
+        assertTrue("the app picked may read it", send.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        val uri = send.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)!!
+        assertEquals("content", uri.scheme)
+        assertEquals("${context.packageName}.files", uri.authority)
+        assertEquals("shift-tracker-safety-$name", uri.lastPathSegment)
+        val shared = context.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() }
+        assertEquals(runBlocking { backups.read(name) }, shared)
     }
 }

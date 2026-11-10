@@ -94,6 +94,30 @@ class FileSafetyBackupTest {
     }
 
     @Test
+    fun sharingHandsOutOnlyAFreshCopyNeverTheBackupsFolder() = runBlocking {
+        forgetFileProviderFolders()
+        db.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        backups.save(SafetyBackup.Reason.BEFORE_IMPORT)
+        now += 1_000
+        backups.save(SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA)
+        val (newest, older) = backups.list().map { it.name }
+
+        backups.shareable(older)
+        val uri = backups.shareable(newest)
+        val shared = File(context.cacheDir, FileSafetyBackup.SHARED_DIR)
+        assertEquals("only the latest copy is kept", listOf("shift-tracker-safety-$newest"), shared.list()!!.toList())
+        assertEquals(backups.read(newest), File(shared, "shift-tracker-safety-$newest").readText())
+        assertEquals("shift-tracker-safety-$newest", uri.lastPathSegment)
+        // The provider can't point at the backups themselves.
+        val direct = runCatching {
+            androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", File(dir, newest))
+        }
+        assertTrue(direct.toString(), direct.exceptionOrNull() is IllegalArgumentException)
+        shared.deleteRecursively()
+        Unit
+    }
+
+    @Test
     fun onlyABackupInTheListCanBeRead() = runBlocking {
         File(context.filesDir, "secret.json").writeText("{}")
         dir.mkdirs()

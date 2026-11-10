@@ -51,6 +51,17 @@
                 android:resource="@xml/shift_tracker_widget_info" />
         </receiver>
 
+        <!-- Shares a safety backup with the app the user picks (Settings, Safety backups); see xml/shared_files. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/shared_files" />
+        </provider>
+
         <!-- Stores the per-app language on Android 12 and below (Android 13+ does it natively). -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

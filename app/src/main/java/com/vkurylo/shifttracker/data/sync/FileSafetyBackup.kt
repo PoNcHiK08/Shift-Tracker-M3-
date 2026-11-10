@@ -1,6 +1,8 @@
 package com.vkurylo.shifttracker.data.sync
 
 import android.content.Context
+import android.net.Uri
+import androidx.core.content.FileProvider
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.domain.repository.BackupCounts
@@ -77,6 +79,20 @@ class FileSafetyBackup @Inject constructor(
         file.readText()
     }
 
+    /**
+     * A copy of the backup [name] that another app may read, named so that it says what it is, as a content Uri
+     * (FileProvider; only this copy is shared, never the backups folder). Each call replaces the previous copy.
+     */
+    suspend fun shareable(name: String): Uri = withContext(Dispatchers.IO) {
+        val json = read(name)
+        val dir = File(context.cacheDir, SHARED_DIR).apply {
+            deleteRecursively()
+            mkdirs()
+        }
+        val copy = File(dir, "shift-tracker-safety-$name").apply { writeText(json) }
+        FileProvider.getUriForFile(context, "${context.packageName}.files", copy)
+    }
+
     private fun files(): List<File> =
         dir.listFiles { file -> file.isFile && file.name.endsWith(".json") }.orEmpty().sortedByDescending { it.name }
 
@@ -87,6 +103,9 @@ class FileSafetyBackup @Inject constructor(
 
     companion object {
         const val DIR = "safety-backups"
+
+        /** In the cache: the copy being shared (xml/shared_files). */
+        const val SHARED_DIR = "shared"
         const val KEEP = 5
         private const val STAMP_LENGTH = 15 // yyyyMMdd-HHmmss
         private val STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC)

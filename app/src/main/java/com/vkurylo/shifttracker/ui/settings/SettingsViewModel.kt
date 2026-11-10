@@ -367,6 +367,16 @@ class SettingsViewModel @Inject constructor(
         _messages.send(UiMessage(R.string.export_done))
     }
 
+    private val _safetyBackupShares = Channel<Uri>(Channel.BUFFERED)
+
+    /** Safety backups ready to share: the screen opens the system's share sheet for each one. */
+    val safetyBackupShares = _safetyBackupShares.receiveAsFlow()
+
+    /** Shares the safety backup [name] with an app the user picks (Drive, a messenger, email…). */
+    fun shareSafetyBackup(name: String) = runBusy {
+        _safetyBackupShares.send(safetyBackups.shareable(name))
+    }
+
     /** Saves the safety backup [name] to the file the user picked. */
     fun exportSafetyBackup(name: String, uri: Uri) = runBusy {
         documentIo.writeText(uri, safetyBackups.read(name))

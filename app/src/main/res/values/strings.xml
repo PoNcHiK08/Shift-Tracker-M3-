@@ -182,12 +182,13 @@
     <string name="safety_backups">Страхувальні копії</string>
     <string name="safety_backups_none">Поки немає. Копія зберігається автоматично перед заміною даних (імпорт файлу або дані акаунта).</string>
     <string name="safety_backups_summary">Збережено перед заміною даних: %1$d. Торкнися, щоб зберегти копію у файл.</string>
-    <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Торкнися копії, щоб зберегти її у файл; відновити її можна через «Імпорт даних».</string>
+    <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Збережи копію у файл або поділися нею (Диск, месенджер, пошта); відновити її можна через «Імпорт даних».</string>
     <string name="safety_backup_reason_import">Перед імпортом файлу</string>
     <string name="safety_backup_reason_cloud">Перед заміною даними акаунта</string>
     <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
     <string name="safety_backup_unreadable">Не вдається прочитати</string>
     <string name="safety_backup_save">Зберегти у файл</string>
+    <string name="safety_backup_share">Поділитися</string>
     <string name="safety_backup_saved">Страхувальну копію збережено</string>
     <string name="import_safety_backup_failed">Не вдалося зберегти страхувальну копію поточних даних, тому нічого не імпортовано. Дані не змінилися.</string>
     <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>

@@ -2,12 +2,14 @@ package com.vkurylo.shifttracker.ui.settings
 
 import android.app.Activity
 import android.content.Context
+import android.content.ClipData
 import android.content.ContextWrapper
+import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -35,10 +37,12 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.SettingsBackupRestore
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.WorkOutline
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
@@ -103,6 +107,17 @@ fun SettingsScreen(
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
             snackbar.show(message.text(context))
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.safetyBackupShares.collect { uri ->
+            val send = Intent(Intent.ACTION_SEND)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            // The read grant travels with the clip data through the share sheet to the app picked.
+            send.clipData = ClipData.newRawUri(null, uri)
+            context.startActivity(Intent.createChooser(send, context.getString(R.string.safety_backup_share)))
         }
     }
 
@@ -550,6 +565,10 @@ fun SettingsScreen(
                 savingSafetyBackup = backup.name
                 saveSafetyBackup.launch("shift-tracker-safety-${backup.name}")
             },
+            onShare = { backup ->
+                showingSafetyBackups = false
+                viewModel.shareSafetyBackup(backup.name)
+            },
             onDismiss = { showingSafetyBackups = false },
         )
     }
@@ -606,9 +625,14 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
 
 private val SAFETY_BACKUP_TIME = DateTimeFormatter.ofPattern("dd.MM.yyyy, HH:mm")
 
-/** The safety backups, newest first; tapping one saves it to a file the user picks. */
+/** The safety backups, newest first; each can be saved to a file the user picks, or shared with an app. */
 @Composable
-private fun SafetyBackupsDialog(backups: List<SafetyBackupFile>, onSave: (SafetyBackupFile) -> Unit, onDismiss: () -> Unit) {
+private fun SafetyBackupsDialog(
+    backups: List<SafetyBackupFile>,
+    onSave: (SafetyBackupFile) -> Unit,
+    onShare: (SafetyBackupFile) -> Unit,
+    onDismiss: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.SettingsBackupRestore, contentDescription = null) },
@@ -618,7 +642,6 @@ private fun SafetyBackupsDialog(backups: List<SafetyBackupFile>, onSave: (Safety
                 Text(stringResource(R.string.safety_backups_message, FileSafetyBackup.KEEP))
                 backups.forEach { backup ->
                     ListItem(
-                        modifier = Modifier.clickable { onSave(backup) },
                         colors = TransparentListItem,
                         headlineContent = {
                             Text(SAFETY_BACKUP_TIME.format(Instant.ofEpochMilli(backup.createdAt).atZone(ZoneId.systemDefault())))
@@ -633,7 +656,16 @@ private fun SafetyBackupsDialog(backups: List<SafetyBackupFile>, onSave: (Safety
                                 ?: stringResource(R.string.safety_backup_unreadable)
                             Text("$reason\n$counts")
                         },
-                        trailingContent = { Icon(Icons.Filled.SaveAlt, contentDescription = stringResource(R.string.safety_backup_save)) },
+                        trailingContent = {
+                            Row {
+                                IconButton(onClick = { onSave(backup) }) {
+                                    Icon(Icons.Filled.SaveAlt, contentDescription = stringResource(R.string.safety_backup_save))
+                                }
+                                IconButton(onClick = { onShare(backup) }) {
+                                    Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.safety_backup_share))
+                                }
+                            }
+                        },
                     )
                 }
             }

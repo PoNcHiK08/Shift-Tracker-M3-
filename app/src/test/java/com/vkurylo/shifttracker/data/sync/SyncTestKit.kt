@@ -67,3 +67,13 @@ internal fun testSyncController(
     val engine = SyncEngine(db, remote, prefs, { }, clock, lock)
     return SyncController(engine, auth, prefs, db, scheduler, serverClock, clock, scope)
 }
+
+/**
+ * FileProvider remembers each authority's folders (here the cache folder) in a static map the first time it is
+ * used. In one app process that folder never changes; Robolectric gives every test its own, so a test that
+ * shares a file after another one did must make it look again.
+ */
+internal fun forgetFileProviderFolders() {
+    val cache = androidx.core.content.FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
+    synchronized(cache.get(null)!!) { (cache.get(null) as MutableMap<*, *>).clear() }
+}
