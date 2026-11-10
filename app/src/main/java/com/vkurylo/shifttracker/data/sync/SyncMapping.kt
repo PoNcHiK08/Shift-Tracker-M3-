@@ -7,9 +7,16 @@ import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.TextLimits
 import java.time.LocalTime
 
-/* Room rows <-> cloud records. Amounts are copied as they are (Long minor units). */
+/*
+ * Room rows <-> cloud records. Amounts are copied as they are (Long minor units).
+ *
+ * Texts go up cut to TextLimits.MAX_LENGTH: one saved before the editors had the limit (or brought in by an
+ * import) would otherwise be refused by firestore.rules and hold up every change sent with it. The phone keeps
+ * its full text; comparing with the cloud's version uses the cut one, so the two count as the same.
+ */
 
 private const val DEFAULT_FROM = 23 * 60
 private const val DEFAULT_TO = 6 * 60
@@ -20,7 +27,7 @@ fun JobEntity.toRemote(payHistory: List<JobPaySettingsEntity>) = RemoteJob(
     syncId = syncId,
     updatedAt = updatedAt,
     deleted = deleted,
-    name = name,
+    name = TextLimits.cut(name),
     hourlyRateGrosze = hourlyRateGrosze,
     color = color,
     secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
@@ -40,8 +47,8 @@ fun ShiftEntity.toRemote(jobSyncId: String) = RemoteShift(
     endMinute = endMinute,
     unpaidBreakMinutes = unpaidBreakMinutes,
     hourlyRateGrosze = hourlyRateGrosze,
-    note = note,
-    externalUid = externalUid,
+    note = note?.let(TextLimits::cut),
+    externalUid = externalUid?.let(TextLimits::cut),
     secondRate = timedRate(secondRateGrosze, secondRateFromMinute, secondRateToMinute),
 )
 
@@ -52,7 +59,7 @@ fun BonusEntity.toRemote(jobSyncId: String) = RemoteBonus(
     jobSyncId = jobSyncId,
     dateEpochDay = dateEpochDay,
     amountGrosze = amountGrosze,
-    note = note,
+    note = note?.let(TextLimits::cut),
 )
 
 /** The cloud's version as a row (already uploaded, so not dirty), keeping the local [id]. */
@@ -121,10 +128,10 @@ fun RemoteRecord.sameContentAs(other: RemoteRecord): Boolean = when {
  */
 
 /**
- * Names and notes have no length limit in the editors; this one only keeps out absurd values. firestore.rules
- * allows the same length, so whatever one phone may upload, the others can apply.
+ * The editors' limit for names and notes ([TextLimits]); firestore.rules allows the same length, so whatever
+ * one phone may upload, the others can apply.
  */
-private const val MAX_TEXT = 20_000
+private const val MAX_TEXT = TextLimits.MAX_LENGTH
 private const val DAY_MINUTES = 24 * 60
 
 /** 0001-01-01 .. 9999-12-31, so LocalDate.ofEpochDay never throws. */

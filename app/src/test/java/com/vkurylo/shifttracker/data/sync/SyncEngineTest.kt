@@ -17,6 +17,7 @@ import com.vkurylo.shifttracker.domain.ics.ImportPlanner
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.TextLimits
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -554,6 +555,32 @@ class SyncEngineTest {
         assertEquals(a.view(), b.view())
         assertTrue(a.shifts.getAllShifts().none { it.note == "not in the backup" })
         assertEquals(2, a.shifts.getAllShifts().size)
+    }
+
+    @Test
+    fun aTextLongerThanTheCloudAllowsGoesUpCutAndHoldsUpNothing() = runBlocking {
+        val (a, b) = twoLinkedPhones()
+        val job = a.db.jobDao().getAll().single().id
+        // Saved before the editors had a limit (or by an import): the cloud refuses more than 20 000.
+        val long = "ї".repeat(TextLimits.MAX_LENGTH + 500)
+        a.now += 10_000
+        val legacy = a.shift(job, date = day.plusDays(7), note = long)
+        a.shift(job, date = day.plusDays(8), note = "sent with it")
+
+        assertEquals(2, (a.sync() as SyncResult.Synced).uploaded)
+        b.sync()
+
+        // This phone keeps its full text; the cloud and the other phone have the first 20 000 characters.
+        val syncId = a.db.shiftDao().getAny(legacy)!!.syncId
+        assertEquals(long, a.shiftBySync(syncId).note)
+        assertEquals(TextLimits.cut(long), b.shiftBySync(syncId).note)
+        assertEquals("sent with it", b.db.shiftDao().getAll().single { it.dateEpochDay == day.plusDays(8).toEpochDay() }.note)
+        // Settled: the two versions count as the same, so nothing goes up again.
+        val writes = cloud.writes
+        assertEquals(0, (a.sync() as SyncResult.Synced).uploaded)
+        assertEquals(0, (b.sync() as SyncResult.Synced).uploaded)
+        assertEquals(writes, cloud.writes)
+        assertEquals(0, a.dirtyCount())
     }
 
     @Test

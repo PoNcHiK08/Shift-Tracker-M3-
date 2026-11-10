@@ -50,6 +50,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.ui.components.EmptyState
+import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -173,6 +174,8 @@ fun EditBonusScreen(
                 value = state.note,
                 onValueChange = viewModel::setNote,
                 label = { Text(stringResource(R.string.bonus_note)) },
+                isError = state.noteTooLong,
+                supportingText = textLengthSupport(state.note.length),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),

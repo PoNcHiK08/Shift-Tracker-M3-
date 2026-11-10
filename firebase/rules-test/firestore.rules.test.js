@@ -218,6 +218,16 @@ describe('records', () => {
     await assertSucceeds(setDoc(jobRef(db), job({ name: 'x'.repeat(20000), secondRate: { rateGrosze: 4000, fromMinute: 1320, toMinute: 360 } })));
   });
 
+  test('text length is counted as the app counts it (UTF-16 units), not in bytes', async () => {
+    const db = owner();
+    const ref = doc(db, 'users', UID, 'shifts', SHIFT_ID);
+    const emoji = '\u{1F600}'; // 2 UTF-16 units, 4 bytes
+    await assertSucceeds(setDoc(ref, shift({ note: 'ї'.repeat(20000) }))); // 40000 bytes
+    await assertFails(setDoc(ref, shift({ note: 'ї'.repeat(20001) })));
+    await assertSucceeds(setDoc(ref, shift({ note: emoji.repeat(10000) })));
+    await assertFails(setDoc(ref, shift({ note: emoji.repeat(10000) + 'a' })));
+  });
+
   test('shifts', async () => {
     const db = owner();
     const ref = doc(db, 'users', UID, 'shifts', SHIFT_ID);

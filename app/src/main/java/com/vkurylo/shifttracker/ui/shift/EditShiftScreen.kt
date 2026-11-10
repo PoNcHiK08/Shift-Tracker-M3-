@@ -58,6 +58,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.ui.components.EmptyState
+import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
@@ -226,6 +227,8 @@ fun EditShiftScreen(
                 value = state.note,
                 onValueChange = viewModel::setNote,
                 label = { Text(stringResource(R.string.note_optional)) },
+                isError = state.noteTooLong,
+                supportingText = textLengthSupport(state.note.length),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),

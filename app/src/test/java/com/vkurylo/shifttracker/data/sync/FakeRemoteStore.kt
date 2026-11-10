@@ -84,7 +84,10 @@ class FakeRemoteStore : RemoteStore {
 
     override suspend fun push(uid: String, records: List<RemoteRecord>): List<PushResult> {
         online("push")
-        if (refuseWrites) throw WriteRefusedException(IllegalStateException("PERMISSION_DENIED: Missing or insufficient permissions."))
+        // firestore.rules refuses the whole write when one text is too long.
+        if (refuseWrites || records.any { it.longestText() > 20_000 }) {
+            throw WriteRefusedException(IllegalStateException("PERMISSION_DENIED: Missing or insufficient permissions."))
+        }
         duringPush?.invoke()
         val account = account(uid)
         return records.map { record ->
@@ -102,6 +105,12 @@ class FakeRemoteStore : RemoteStore {
     override suspend fun deleteAll(uid: String): Int {
         online("deleteAll")
         return accounts.remove(uid)?.records?.size ?: 0
+    }
+
+    private fun RemoteRecord.longestText(): Int = when (this) {
+        is RemoteJob -> name.length
+        is RemoteShift -> maxOf(note?.length ?: 0, externalUid?.length ?: 0)
+        is RemoteBonus -> note?.length ?: 0
     }
 
     // --- For tests ---

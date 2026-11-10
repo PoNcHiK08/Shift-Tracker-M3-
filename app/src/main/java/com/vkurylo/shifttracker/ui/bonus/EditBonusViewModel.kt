@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.vkurylo.shifttracker.domain.model.TextLimits
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -42,7 +43,9 @@ data class EditBonusUiState(
     val amountGrosze: Long? get() =
         MoneyParser.parseMinor(amount, Currencies.fractionDigits(currency), MoneyParser.AMOUNT_WHOLE_DIGITS)?.takeIf { it > 0 }
     val jobMissing: Boolean get() = jobs.none { it.id == jobId }
-    val canSave: Boolean get() = !jobMissing && amountGrosze != null
+    /** A note saved before the length limit, still over it: shorten it to save. */
+    val noteTooLong: Boolean get() = note.length > TextLimits.MAX_LENGTH
+    val canSave: Boolean get() = !jobMissing && amountGrosze != null && !noteTooLong
 }
 
 sealed interface EditBonusEvent {
@@ -108,7 +111,7 @@ class EditBonusViewModel @Inject constructor(
     fun selectJob(job: Job) = _uiState.update { it.copy(jobId = job.id) }
     fun setDate(date: LocalDate) = _uiState.update { it.copy(date = date) }
     fun setAmount(text: String) = _uiState.update { it.copy(amount = text) }
-    fun setNote(text: String) = _uiState.update { it.copy(note = text) }
+    fun setNote(text: String) = _uiState.update { it.copy(note = TextLimits.limitInput(it.note, text)) }
 
     fun save() {
         val state = _uiState.value
