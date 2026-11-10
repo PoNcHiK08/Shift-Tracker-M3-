@@ -193,9 +193,10 @@
     <string name="cloud_sign_out_summary">The data on this phone stays</string>
     <string name="cloud_signed_in">Signed in as %1$s</string>
     <string name="cloud_signed_out">Signed out. The data on this phone stays.</string>
-    <string name="cloud_sign_in_no_account">There\'s no Google account on this phone. Add one in Android settings and try again.</string>
-    <string name="cloud_sign_in_offline">No connection. Try again when you\'re online.</string>
-    <string name="cloud_sign_in_failed">Couldn\'t sign in: %1$s</string>
+    <string name="cloud_sign_in_no_account">There\'s no Google account on this phone. Add one in Android settings and try again. Code: %1$s</string>
+    <string name="cloud_sign_in_offline">No connection. Try again when you\'re online. Code: %1$s</string>
+    <string name="cloud_sign_in_failed">Couldn\'t sign in. Code: %1$s</string>
+    <string name="cloud_sign_in_setup">Google refused the sign-in. Code: %1$s. Most often this means Firebase has no SHA-1 fingerprint %3$s for the app %2$s.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Import schedule (.ics)</string>

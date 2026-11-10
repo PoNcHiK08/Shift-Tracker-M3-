@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.ui.settings
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.R
@@ -10,7 +11,9 @@ import com.vkurylo.shifttracker.data.sync.CloudAccount
 import com.vkurylo.shifttracker.data.sync.RemoteStore
 import com.vkurylo.shifttracker.data.sync.firebase.CloudAuth
 import com.vkurylo.shifttracker.data.sync.firebase.CloudProblem
+import com.vkurylo.shifttracker.data.sync.firebase.SIGN_IN_LOG_TAG
 import com.vkurylo.shifttracker.data.sync.firebase.SignInException
+import com.vkurylo.shifttracker.data.sync.firebase.SignInFailures
 import com.vkurylo.shifttracker.data.sync.firebase.cloudProblem
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.EarningsMode
@@ -56,6 +59,8 @@ data class CloudUiState(
     /** What went wrong, for [CloudAccess.ERROR]. */
     val accessError: String? = null,
     val signingIn: Boolean = false,
+    /** Why the last sign-in failed (with its code), shown until the next attempt. Null after a success. */
+    val signInError: UiMessage? = null,
 )
 
 /** A message for the snackbar: string resource + format args. */
@@ -91,10 +96,11 @@ class SettingsViewModel @Inject constructor(
 
     private val cloudAccess = MutableStateFlow<Pair<CloudAccess, String?>?>(null)
     private val signingIn = MutableStateFlow(false)
+    private val signInError = MutableStateFlow<UiMessage?>(null)
 
-    val cloud: StateFlow<CloudUiState> = combine(cloudAuth.account, cloudAccess, signingIn) { account, access, busy ->
+    val cloud: StateFlow<CloudUiState> = combine(cloudAuth.account, cloudAccess, signingIn, signInError) { account, access, busy, error ->
         val check = access.takeIf { account != null }
-        CloudUiState(cloudAuth.isAvailable, account, check?.first, check?.second, busy)
+        CloudUiState(cloudAuth.isAvailable, account, check?.first, check?.second, busy, error.takeIf { account == null })
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloudUiState(available = cloudAuth.isAvailable))
 
     init {
@@ -105,24 +111,42 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    /** Shows Google's account sheet over [activityContext] (the Activity) and signs in with the chosen account. */
-    suspend fun signIn(activityContext: Context) {
+    /**
+     * Shows Google's account sheet over [activityContext] (the Activity) and signs in with the chosen account.
+     * Runs in the ViewModel's scope, so a recomposition, rotation or leaving the screen can't cancel it half-way
+     * (the Activity is only held while the sheet is open). Closing the sheet shows nothing; any other failure
+     * shows why, with its code, in a snackbar and in the row until the next attempt. CloudAuth logs them all.
+     */
+    fun signIn(activityContext: Context) {
         if (signingIn.value) return
         signingIn.update { true }
-        try {
-            val account = cloudAuth.signIn(activityContext) ?: return // the user closed the sheet
-            _messages.send(UiMessage(R.string.cloud_signed_in, listOf(account.email.orEmpty())))
-        } catch (e: SignInException) {
-            _messages.send(
-                when (e.reason) {
-                    SignInException.Reason.NO_ACCOUNT -> UiMessage(R.string.cloud_sign_in_no_account)
-                    SignInException.Reason.NETWORK -> UiMessage(R.string.cloud_sign_in_offline)
-                    SignInException.Reason.OTHER -> UiMessage(R.string.cloud_sign_in_failed, listOf(e.message.orEmpty()))
-                },
-            )
-        } finally {
-            signingIn.update { false }
+        signInError.update { null }
+        viewModelScope.launch {
+            try {
+                val account = cloudAuth.signIn(activityContext) ?: return@launch // the user closed the sheet
+                _messages.send(UiMessage(R.string.cloud_signed_in, listOf(account.email.orEmpty())))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val failure = e as? SignInException
+                    ?: SignInException(SignInException.Reason.OTHER, SignInFailures.codeOf(e), e).also {
+                        Log.e(SIGN_IN_LOG_TAG, "Sign-in failed: ${it.code}", e)
+                    }
+                val message = failure.toMessage()
+                signInError.update { message }
+                _messages.send(message)
+            } finally {
+                signingIn.update { false }
+            }
         }
+    }
+
+    private fun SignInException.toMessage(): UiMessage = when (reason) {
+        SignInException.Reason.NO_ACCOUNT -> UiMessage(R.string.cloud_sign_in_no_account, listOf(code))
+        SignInException.Reason.NETWORK -> UiMessage(R.string.cloud_sign_in_offline, listOf(code))
+        SignInException.Reason.SETUP ->
+            UiMessage(R.string.cloud_sign_in_setup, listOf(code, packageName ?: "?", signingSha1 ?: "?"))
+        SignInException.Reason.OTHER -> UiMessage(R.string.cloud_sign_in_failed, listOf(code))
     }
 
     fun signOut() = viewModelScope.launch {

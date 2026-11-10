@@ -1,5 +1,8 @@
 package com.vkurylo.shifttracker.ui.settings
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,7 +45,6 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -64,7 +66,6 @@ import com.vkurylo.shifttracker.ui.components.SegmentedItem
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.theme.supportsDynamicColor
 import java.time.LocalDate
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +76,6 @@ fun SettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
-    val scope = rememberCoroutineScope()
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -269,8 +269,8 @@ fun SettingsScreen(
                         index = 0,
                         count = 1,
                         enabled = !cloud.signingIn,
-                        // The account sheet is shown over this Activity; signing in is cancelled with the screen.
-                        onClick = { scope.launch { viewModel.signIn(context) } },
+                        // Google's account sheet is shown over this Activity.
+                        onClick = { viewModel.signIn(context.findActivity() ?: context) },
                     ) {
                         ListItem(
                             modifier = it,
@@ -278,7 +278,15 @@ fun SettingsScreen(
                             leadingContent = { Icon(Icons.Filled.Cloud, contentDescription = null) },
                             headlineContent = { Text(stringResource(R.string.cloud_sign_in)) },
                             supportingContent = {
-                                Text(stringResource(if (cloud.signingIn) R.string.cloud_signing_in else R.string.cloud_sign_in_summary))
+                                val error = cloud.signInError
+                                when {
+                                    cloud.signingIn -> Text(stringResource(R.string.cloud_signing_in))
+                                    error != null -> Text(
+                                        stringResource(error.resId, *error.args.toTypedArray()),
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                    else -> Text(stringResource(R.string.cloud_sign_in_summary))
+                                }
                             },
                         )
                     }
@@ -417,3 +425,10 @@ private fun SettingsRow(
 /** The segment draws the row's background, so the list item itself is transparent. */
 private val TransparentListItem: ListItemColors
     @Composable get() = ListItemDefaults.colors(containerColor = Color.Transparent)
+
+/** The Activity behind a Compose context (Credential Manager shows its sheet over an Activity). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}

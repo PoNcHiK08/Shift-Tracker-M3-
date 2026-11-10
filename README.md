@@ -144,6 +144,17 @@ app signs in and checks that it can reach the cloud; syncing itself comes in the
    Warsaw; it can't be changed later).
 6. **Publish the security rules** (below).
 
+### If signing in fails
+
+The Account & sync row shows why, with a code, until the next attempt; `adb logcat -s CloudSignIn` has the
+full exception, the app's package and the SHA-1 of the key it is signed with.
+
+- **"Google refused the sign-in" (Google status 16 "Account reauth failed", 10, or 28444)**: the SHA-1 fingerprint
+  isn't registered for the package you're running. The debug APK is the separate app `com.vkurylo.shifttracker.debug`
+  and needs its own fingerprint. The Build APK workflow warns when `google-services.json` lacks one.
+- **`ERROR_INVALID_CREDENTIAL` from Firebase**: the `google-services.json` in the build is from another Firebase project.
+- Closing Google's account sheet yourself shows nothing.
+
 ### Security rules
 
 [`firebase/firestore.rules`](firebase/firestore.rules) lets only you in: the signed-in owner of

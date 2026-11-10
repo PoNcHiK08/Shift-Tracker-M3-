@@ -196,9 +196,10 @@
     <string name="cloud_sign_out_summary">Дані на цьому телефоні залишаться</string>
     <string name="cloud_signed_in">Вхід виконано: %1$s</string>
     <string name="cloud_signed_out">Вихід виконано. Дані на телефоні залишилися.</string>
-    <string name="cloud_sign_in_no_account">На телефоні немає акаунта Google. Додай його в налаштуваннях Android і спробуй ще раз.</string>
-    <string name="cloud_sign_in_offline">Немає зв’язку. Спробуй ще раз, коли будеш онлайн.</string>
-    <string name="cloud_sign_in_failed">Не вдалося увійти: %1$s</string>
+    <string name="cloud_sign_in_no_account">На телефоні немає акаунта Google. Додай його в налаштуваннях Android і спробуй ще раз. Код: %1$s</string>
+    <string name="cloud_sign_in_offline">Немає зв’язку. Спробуй ще раз, коли будеш онлайн. Код: %1$s</string>
+    <string name="cloud_sign_in_failed">Не вдалося увійти. Код: %1$s</string>
+    <string name="cloud_sign_in_setup">Google відмовив у вході. Код: %1$s. Найчастіше причина: у Firebase для застосунку %2$s не додано відбиток SHA-1 %3$s.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Імпорт графіку (.ics)</string>
