@@ -207,7 +207,7 @@
     <string name="cloud_google_account">Акаунт Google</string>
     <string name="cloud_access_checking">Перевірка доступу до хмари…</string>
     <string name="cloud_access_ok">Хмара доступна</string>
-    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore. Торкнися, щоб спробувати ще раз.</string>
+    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore і що опубліковано найновіший firestore.rules. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_offline">Немає зв’язку з хмарою. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_error">Помилка хмари: %1$s</string>
     <string name="cloud_sign_out">Вийти</string>

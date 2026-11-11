@@ -204,7 +204,7 @@
     <string name="cloud_google_account">Google account</string>
     <string name="cloud_access_checking">Checking access to the cloud…</string>
     <string name="cloud_access_ok">Cloud is reachable</string>
-    <string name="cloud_access_denied">The cloud refused access. Check that this address is in the Firestore rules. Tap to try again.</string>
+    <string name="cloud_access_denied">The cloud refused access. Check that this address is in the Firestore rules and that the latest firestore.rules are published. Tap to try again.</string>
     <string name="cloud_access_offline">Can\'t reach the cloud. Tap to try again.</string>
     <string name="cloud_access_error">Cloud error: %1$s</string>
     <string name="cloud_sign_out">Sign out</string>
