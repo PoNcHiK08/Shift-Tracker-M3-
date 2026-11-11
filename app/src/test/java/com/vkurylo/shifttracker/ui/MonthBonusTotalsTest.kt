@@ -115,7 +115,7 @@ class MonthBonusTotalsTest {
 
     private fun summary(period: SummaryPeriod, anchor: LocalDate): SummaryViewModel {
         val handle = SavedStateHandle(mapOf("period" to period.name, "anchor" to anchor.toEpochDay()))
-        return SummaryViewModel(handle, shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        return SummaryViewModel(handle, shiftRepository, bonusRepository, jobRepository, preferencesRepository, FakePayoutRepository(listOf(cafe)))
     }
 
     @Test

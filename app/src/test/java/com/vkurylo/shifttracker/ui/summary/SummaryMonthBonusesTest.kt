@@ -1,6 +1,9 @@
 package com.vkurylo.shifttracker.ui.summary
 
 import android.app.Application
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -24,7 +27,12 @@ import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
+import com.vkurylo.shifttracker.ui.FakePayoutRepository
+import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
+import com.vkurylo.shifttracker.ui.components.SnackbarController
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -95,10 +103,15 @@ class SummaryMonthBonusesTest {
 
     private fun show(period: SummaryPeriod = SummaryPeriod.MONTH): SummaryViewModel {
         val handle = SavedStateHandle(mapOf("period" to period.name, "anchor" to november.atDay(10).toEpochDay()))
-        val vm = SummaryViewModel(handle, shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        val payouts = FakePayoutRepository(listOf(cafe))
+        val vm = SummaryViewModel(handle, shiftRepository, bonusRepository, jobRepository, preferencesRepository, payouts)
+        val editor = PayoutEditorViewModel(payouts, CoroutineScope(Dispatchers.Unconfined))
         composeRule.setContent {
-            ShiftTrackerTheme(darkTheme = false, dynamicColor = false) {
-                SummaryScreen(onEditBonus = { edited += it }, onAddMonthBonus = { added += it }, viewModel = vm)
+            val scope = rememberCoroutineScope()
+            CompositionLocalProvider(LocalSnackbarController provides SnackbarController(SnackbarHostState(), scope)) {
+                ShiftTrackerTheme(darkTheme = false, dynamicColor = false) {
+                    SummaryScreen(onEditBonus = { edited += it }, onAddMonthBonus = { added += it }, viewModel = vm, payoutEditor = editor)
+                }
             }
         }
         composeRule.waitUntil(5_000) { !vm.uiState.value.loading }

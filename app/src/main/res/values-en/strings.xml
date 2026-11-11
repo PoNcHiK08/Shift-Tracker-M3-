@@ -348,4 +348,28 @@
     <string name="month_bonuses_sheet_title">Month bonuses · %1$s</string>
     <string name="month_bonuses_none">No bonuses for the whole month</string>
     <string name="add_month_bonus">Add a bonus for the month</string>
+    <string name="received_pay_title">Received pay</string>
+    <string name="received_pay_caption">What actually arrived, next to the calculated pay after deductions (net). It\'s a check only: it is not part of your earnings.</string>
+    <string name="received_pay_year_caption">What arrived, against the calculated net pay of the months you entered payments for. It is not part of your earnings.</string>
+    <string name="received_pay_calculated">Calculated (net)</string>
+    <string name="received_pay_received">Received</string>
+    <string name="received_pay_not_entered">not entered</string>
+    <string name="received_pay_difference">Difference</string>
+    <string name="received_pay_sheet_title">Received pay · %1$s</string>
+    <string name="received_pay_add">Add payment</string>
+    <string name="received_pay_new">New payment</string>
+    <string name="received_pay_edit">Payment</string>
+    <string name="received_pay_amount">Amount received</string>
+    <string name="received_pay_month">For the month</string>
+    <string name="received_pay_month_hint">The month it was earned for</string>
+    <string name="received_pay_received_on">Received on (optional)</string>
+    <string name="received_pay_received_on_value">Received %1$s</string>
+    <string name="received_pay_received_on_clear">Clear the date</string>
+    <string name="received_pay_note">Note (optional)</string>
+    <string name="received_pay_saved">Payment saved</string>
+    <string name="received_pay_deleted">Payment deleted</string>
+    <plurals name="received_pay_count">
+        <item quantity="one">%d payment</item>
+        <item quantity="other">%d payments</item>
+    </plurals>
 </resources>

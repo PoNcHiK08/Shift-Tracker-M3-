@@ -129,7 +129,7 @@ class EarningsModeSwitchTest {
 
     @Test
     fun summaryFollowsTheSwitch() {
-        val vm = SummaryViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        val vm = SummaryViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository, FakePayoutRepository(listOf(cafe, office)))
         vm.setPeriod(SummaryPeriod.YEAR)
         val gross = vm.uiState.awaitValue { !it.loading && it.range.period == SummaryPeriod.YEAR }
         val monthEntry = gross.breakdown[month.monthValue - 1]

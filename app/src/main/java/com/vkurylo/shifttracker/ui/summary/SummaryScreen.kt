@@ -36,12 +36,18 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -52,10 +58,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.ui.components.BonusCard
 import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
+import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
 import com.vkurylo.shifttracker.ui.components.RollingAmounts
 import com.vkurylo.shifttracker.ui.components.RollingText
@@ -80,8 +88,27 @@ fun SummaryScreen(
     onEditBonus: (Long) -> Unit = {},
     onAddMonthBonus: (YearMonth) -> Unit = {},
     viewModel: SummaryViewModel = hiltViewModel(),
+    payoutEditor: PayoutEditorViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbar = LocalSnackbarController.current
+    val context = LocalContext.current
+    // The job and month (yyyymm) whose received payments are open in the sheet; 0: closed.
+    var sheetJobId by rememberSaveable { mutableLongStateOf(0L) }
+    var sheetMonthKey by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(payoutEditor) {
+        payoutEditor.events.collect { event ->
+            when (event) {
+                PayoutEvent.Saved -> snackbar.show(context.getString(R.string.received_pay_saved))
+                is PayoutEvent.Deleted -> snackbar.show(
+                    message = context.getString(R.string.received_pay_deleted),
+                    actionLabel = context.getString(R.string.undo),
+                    onAction = { payoutEditor.undoDelete(event.payout) },
+                )
+            }
+        }
+    }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val range = state.range
 
@@ -137,7 +164,8 @@ fun SummaryScreen(
                     )
                 }
             }
-            if (!state.loading && state.summary.isEmpty) {
+            // A month with received pay but no entries still has something to show.
+            if (!state.loading && state.summary.isEmpty && state.receivedPay.isEmpty() && state.receivedPayYear.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
                         icon = Icons.Filled.QueryStats,
@@ -194,6 +222,46 @@ fun SummaryScreen(
                         }
                     }
                 }
+                if (state.receivedPay.isNotEmpty()) {
+                    // The salary that actually arrived, next to what the app calculates (net). A check, never an earning.
+                    item(key = "received-pay-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
+                    item(key = "received-pay-caption") {
+                        Text(
+                            stringResource(R.string.received_pay_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+                    val rows = state.receivedPay
+                    itemsIndexed(rows, key = { _, it -> "received-${it.job.id}" }) { index, row ->
+                        ReceivedPayItem(
+                            row = row,
+                            index = index,
+                            count = rows.size,
+                            onClick = {
+                                sheetJobId = row.job.id
+                                sheetMonthKey = Payout.keyOf(row.month)
+                            },
+                            modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
+                        )
+                    }
+                }
+                if (state.receivedPayYear.isNotEmpty()) {
+                    item(key = "received-pay-year-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
+                    item(key = "received-pay-year-caption") {
+                        Text(
+                            stringResource(R.string.received_pay_year_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+                    val lines = state.receivedPayYear
+                    itemsIndexed(lines, key = { _, it -> "received-year-${it.job.id}" }) { index, line ->
+                        ReceivedPayYearItem(line, index, lines.size, Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding))
+                    }
+                }
                 if (state.breakdown.isNotEmpty()) {
                     item(key = "breakdown-header") {
                         SectionHeader(stringResource(if (range.period == SummaryPeriod.WEEK) R.string.by_day else R.string.by_month))
@@ -220,6 +288,17 @@ fun SummaryScreen(
                     }
                 }
             }
+        }
+    }
+
+    if (sheetJobId != 0L) {
+        val month = Payout.monthFromKey(sheetMonthKey)
+        val row = state.receivedPay.firstOrNull { it.job.id == sheetJobId && it.month == month }
+        if (row == null || month == null) {
+            // Nothing left to list (the month changed, or its last payment of a job without entries was deleted).
+            LaunchedEffect(Unit) { sheetJobId = 0L }
+        } else {
+            ReceivedPaySheet(job = row.job, month = month, row = row, editor = payoutEditor, onDismiss = { sheetJobId = 0L })
         }
     }
 }

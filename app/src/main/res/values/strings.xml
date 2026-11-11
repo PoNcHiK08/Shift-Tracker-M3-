@@ -367,4 +367,30 @@
     <string name="month_bonuses_sheet_title">Бонуси за місяць · %1$s</string>
     <string name="month_bonuses_none">У цьому місяці немає бонусів на весь місяць</string>
     <string name="add_month_bonus">Додати бонус за місяць</string>
+    <string name="received_pay_title">Отримана зарплата</string>
+    <string name="received_pay_caption">Скільки реально надійшло — поруч із розрахунковою сумою після відрахувань (нетто). Це лише звірка: у ваш заробіток вона не входить.</string>
+    <string name="received_pay_year_caption">Отримане порівняно з розрахунковою сумою (нетто) за ті місяці, де вказано виплати. У заробіток воно не входить.</string>
+    <string name="received_pay_calculated">Розрахунково (нетто)</string>
+    <string name="received_pay_received">Отримано</string>
+    <string name="received_pay_not_entered">не вказано</string>
+    <string name="received_pay_difference">Різниця</string>
+    <string name="received_pay_sheet_title">Отримана зарплата · %1$s</string>
+    <string name="received_pay_add">Додати виплату</string>
+    <string name="received_pay_new">Нова виплата</string>
+    <string name="received_pay_edit">Виплата</string>
+    <string name="received_pay_amount">Отримана сума</string>
+    <string name="received_pay_month">За місяць</string>
+    <string name="received_pay_month_hint">Місяць, за який нараховано</string>
+    <string name="received_pay_received_on">Дата отримання (необов\'язково)</string>
+    <string name="received_pay_received_on_value">Отримано %1$s</string>
+    <string name="received_pay_received_on_clear">Прибрати дату</string>
+    <string name="received_pay_note">Примітка (необов\'язково)</string>
+    <string name="received_pay_saved">Виплату збережено</string>
+    <string name="received_pay_deleted">Виплату видалено</string>
+    <plurals name="received_pay_count">
+        <item quantity="one">%d виплата</item>
+        <item quantity="few">%d виплати</item>
+        <item quantity="many">%d виплат</item>
+        <item quantity="other">%d виплати</item>
+    </plurals>
 </resources>

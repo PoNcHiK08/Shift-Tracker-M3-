@@ -3,6 +3,9 @@ package com.vkurylo.shifttracker.ui.summary
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vkurylo.shifttracker.domain.calc.JobYearReconciliation
+import com.vkurylo.shifttracker.domain.calc.PayReconciler
+import com.vkurylo.shifttracker.domain.calc.PayReconciliation
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
@@ -10,11 +13,13 @@ import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.forWholeMonths
 import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PayoutRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,6 +28,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import java.time.DayOfWeek
@@ -73,6 +79,13 @@ data class SummaryUiState(
     val breakdown: List<BreakdownEntry> = emptyList(),
     /** The month's bonuses for the whole month (month view only): counted in [summary], listed in their own section. */
     val monthBonuses: List<BonusWithJob> = emptyList(),
+    /**
+     * Month view: per job, the salary that actually arrived against the calculated NET pay. A check only: nothing
+     * here is part of [summary].
+     */
+    val receivedPay: List<PayReconciliation> = emptyList(),
+    /** Year view: per job with received pay, over the months that have it. Not part of [summary] either. */
+    val receivedPayYear: List<JobYearReconciliation> = emptyList(),
     /** Shown for zero totals (no entries): the latest job's currency. */
     val defaultCurrency: String = Currencies.DEFAULT,
     val loading: Boolean = true,
@@ -86,6 +99,7 @@ class SummaryViewModel @Inject constructor(
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
     preferencesRepository: PreferencesRepository,
+    payoutRepository: PayoutRepository,
 ) : ViewModel() {
 
     private val period = savedStateHandle.getStateFlow(KEY_PERIOD, SummaryPeriod.MONTH.name)
@@ -100,7 +114,13 @@ class SummaryViewModel @Inject constructor(
                 bonusRepository.observeBonuses(range.from, range.to),
                 jobRepository.observeJobs(),
                 preferencesRepository.preferences.map { it.earningsMode },
-            ) { shifts, allBonuses, jobs, mode ->
+                // Received pay, by the months it was earned for: the month on screen, or the year's.
+                when (range.period) {
+                    SummaryPeriod.WEEK -> flowOf(emptyList())
+                    SummaryPeriod.MONTH -> payoutRepository.observePayouts(YearMonth.from(range.from), YearMonth.from(range.from))
+                    SummaryPeriod.YEAR -> payoutRepository.observePayouts(YearMonth.from(range.from), YearMonth.from(range.to))
+                },
+            ) { shifts, allBonuses, jobs, mode, payouts ->
                 // A week can span two months and a bonus for a whole month belongs to one of them: it is part of
                 // the month and the year, never of a week.
                 val bonuses = if (range.period == SummaryPeriod.WEEK) allBonuses.onDays() else allBonuses
@@ -109,6 +129,8 @@ class SummaryViewModel @Inject constructor(
                     summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode),
                     breakdown = breakdown(range, shifts, bonuses, jobs, mode),
                     monthBonuses = if (range.period == SummaryPeriod.MONTH) bonuses.forWholeMonths() else emptyList(),
+                    receivedPay = receivedPay(range, jobs, shifts, bonuses, payouts),
+                    receivedPayYear = receivedPayYear(range, jobs, shifts, bonuses, payouts),
                     defaultCurrency = Currencies.defaultFor(jobs),
                     loading = false,
                 )
@@ -136,6 +158,25 @@ class SummaryViewModel @Inject constructor(
         }
         savedStateHandle[KEY_ANCHOR] = moved.toEpochDay()
     }
+
+    /** Always against the net pay, whatever [EarningsMode] is on: net is what lands in the bank. */
+    private fun receivedPay(
+        range: PeriodRange,
+        jobs: List<Job>,
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob>,
+        payouts: List<PayoutWithJob>,
+    ): List<PayReconciliation> =
+        if (range.period == SummaryPeriod.MONTH) PayReconciler.forMonth(YearMonth.from(range.from), jobs, shifts, bonuses, payouts) else emptyList()
+
+    private fun receivedPayYear(
+        range: PeriodRange,
+        jobs: List<Job>,
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob>,
+        payouts: List<PayoutWithJob>,
+    ): List<JobYearReconciliation> =
+        if (range.period == SummaryPeriod.YEAR) PayReconciler.forYear(range.from.year, jobs, shifts, bonuses, payouts) else emptyList()
 
     private fun breakdown(
         range: PeriodRange,
