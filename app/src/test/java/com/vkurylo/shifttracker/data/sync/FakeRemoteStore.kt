@@ -73,6 +73,7 @@ class FakeRemoteStore : RemoteStore {
             jobs = records.filterIsInstance<RemoteJob>(),
             shifts = records.filterIsInstance<RemoteShift>(),
             bonuses = records.filterIsInstance<RemoteBonus>(),
+            payouts = records.filterIsInstance<RemotePayout>(),
             newestServerTime = stored.maxOfOrNull { it.serverTime },
         )
     }
@@ -111,6 +112,7 @@ class FakeRemoteStore : RemoteStore {
         is RemoteJob -> name.length
         is RemoteShift -> maxOf(note?.length ?: 0, externalUid?.length ?: 0)
         is RemoteBonus -> note?.length ?: 0
+        is RemotePayout -> note?.length ?: 0
     }
 
     // --- For tests ---

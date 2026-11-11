@@ -10,14 +10,20 @@ package com.vkurylo.shifttracker.data.sync
  * Look-alike, for live records only, one to one, in order:
  * - a job: the same name (ignoring case and surrounding spaces) and currency;
  * - a shift: the same job (after linking jobs), date, start and end;
- * - a bonus: the same job, date and amount.
+ * - a bonus: the same job, date, amount and kind (on a day, or for the whole month);
+ * - a payout: the same job, month and amount.
  * Records whose sync id the other side already has are the same record already and aren't touched.
  */
 object LookAlikes {
 
     /** Local sync id -> the cloud sync id it becomes. */
-    data class Links(val jobs: Map<String, String>, val shifts: Map<String, String>, val bonuses: Map<String, String>) {
-        val size: Int get() = jobs.size + shifts.size + bonuses.size
+    data class Links(
+        val jobs: Map<String, String>,
+        val shifts: Map<String, String>,
+        val bonuses: Map<String, String>,
+        val payouts: Map<String, String> = emptyMap(),
+    ) {
+        val size: Int get() = jobs.size + shifts.size + bonuses.size + payouts.size
     }
 
     fun find(
@@ -25,12 +31,14 @@ object LookAlikes {
         localShifts: List<RemoteShift>,
         localBonuses: List<RemoteBonus>,
         cloud: RemoteChanges,
+        localPayouts: List<RemotePayout> = emptyList(),
     ): Links {
         val jobs = link(localJobs, cloud.jobs) { "${it.name.trim().lowercase()}|${it.currency}" }
         val jobRef = { syncId: String -> jobs[syncId] ?: syncId }
         val shifts = link(localShifts, cloud.shifts) { "${jobRef(it.jobSyncId)}|${it.dateEpochDay}|${it.startMinute}|${it.endMinute}" }
-        val bonuses = link(localBonuses, cloud.bonuses) { "${jobRef(it.jobSyncId)}|${it.dateEpochDay}|${it.amountGrosze}" }
-        return Links(jobs, shifts, bonuses)
+        val bonuses = link(localBonuses, cloud.bonuses) { "${jobRef(it.jobSyncId)}|${it.dateEpochDay}|${it.amountGrosze}|${it.wholeMonth}" }
+        val payouts = link(localPayouts, cloud.payouts) { "${jobRef(it.jobSyncId)}|${it.month}|${it.amountMinor}" }
+        return Links(jobs, shifts, bonuses, payouts)
     }
 
     /**
