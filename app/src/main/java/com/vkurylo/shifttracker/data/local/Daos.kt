@@ -169,6 +169,10 @@ interface ShiftDao {
     @Query("SELECT * FROM shifts WHERE sync_id = :syncId")
     suspend fun getBySyncId(syncId: String): ShiftEntity?
 
+    /** The live (not deleted) shifts of one job, oldest first. */
+    @Query("SELECT * FROM shifts WHERE job_id = :jobId AND deleted = 0 ORDER BY date_epoch_day, start_minute")
+    suspend fun liveOfJob(jobId: Long): List<ShiftEntity>
+
     /** Id, sync id and change time of every live row. */
     @Query("SELECT id, sync_id, updated_at FROM shifts WHERE deleted = 0")
     suspend fun liveKeys(): List<SyncKey>

@@ -184,6 +184,7 @@
     <string name="safety_backups_summary">Збережено перед заміною даних: %1$d. Торкнися, щоб зберегти копію у файл.</string>
     <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Збережи копію у файл або поділися нею (Диск, месенджер, пошта); відновити її можна через «Імпорт даних».</string>
     <string name="safety_backup_reason_import">Перед імпортом файлу</string>
+    <string name="safety_backup_reason_rates">Перед застосуванням поточної ставки до багатьох змін</string>
     <string name="safety_backup_reason_cloud">Перед заміною даними акаунта</string>
     <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="safety_backup_unreadable">Не вдається прочитати</string>

@@ -181,6 +181,7 @@
     <string name="safety_backups_summary">Saved before your data was replaced: %1$d. Tap to save one to a file.</string>
     <string name="safety_backups_message">The app saves these itself before it replaces the data on this phone (the newest %1$d are kept). Save one to a file or share it (Drive, a messenger, email); restore it with Import data.</string>
     <string name="safety_backup_reason_import">Before importing a file</string>
+    <string name="safety_backup_reason_rates">Before applying the current rate to many shifts</string>
     <string name="safety_backup_reason_cloud">Before taking an account\'s data</string>
     <string name="safety_backup_counts">%1$d jobs, %2$d shifts, %3$d bonuses, %4$d received payments</string>
     <string name="safety_backup_unreadable">Can\'t be read</string>

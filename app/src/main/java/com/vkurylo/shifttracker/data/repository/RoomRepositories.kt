@@ -26,10 +26,13 @@ import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.ShiftRates
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.withRates
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.PayoutRepository
+import com.vkurylo.shifttracker.domain.repository.ShiftRatesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -156,6 +159,30 @@ class RoomShiftRepository @Inject constructor(
         )
     }
     override suspend fun delete(shift: Shift) = dao.markDeleted(shift.id, clock.nowMillis())
+}
+
+@Singleton
+class RoomShiftRatesRepository @Inject constructor(
+    private val db: ShiftDatabase,
+    private val dao: ShiftDao,
+    private val clock: WallClock = WallClock.System,
+) : ShiftRatesRepository {
+    override suspend fun liveShiftsOf(jobId: Long): List<Shift> = dao.liveOfJob(jobId).map { it.toDomain() }
+
+    override suspend fun setRates(jobId: Long, rates: Map<Long, ShiftRates>): Int = db.withTransaction {
+        val now = clock.nowMillis()
+        var written = 0
+        for ((id, shiftRates) in rates) {
+            // Never another job's shift, never a deleted one (a tombstone stays as it is).
+            val existing = dao.getAny(id) ?: continue
+            if (existing.deleted || existing.jobId != jobId) continue
+            // Stamped like any edit: newer updated_at, marked to sync.
+            dao.upsert(existing.toDomain().withRates(shiftRates).toEntity().stamped(existing, now))
+            written++
+        }
+        ParentChildRule.enforce(db.jobDao())
+        written
+    }
 }
 
 @Singleton

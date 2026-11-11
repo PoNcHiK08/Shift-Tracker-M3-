@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.ShiftRates
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.domain.model.UserPreferences
@@ -55,6 +56,18 @@ interface ShiftRepository {
      */
     suspend fun importFromCalendar(shifts: List<Shift>)
     suspend fun delete(shift: Shift)
+}
+
+/** The rates saved on shifts, changed for many shifts of a job at once ("Apply to all shifts of this job"). */
+interface ShiftRatesRepository {
+    /** The job's shifts that are not deleted. */
+    suspend fun liveShiftsOf(jobId: Long): List<Shift>
+
+    /**
+     * Writes [rates] (shift id → rates) in one transaction, each shift stamped like any edit so it syncs. Only live
+     * shifts of [jobId] are touched; any other id is skipped. Returns how many shifts were written.
+     */
+    suspend fun setRates(jobId: Long, rates: Map<Long, ShiftRates>): Int
 }
 
 interface BonusRepository {
