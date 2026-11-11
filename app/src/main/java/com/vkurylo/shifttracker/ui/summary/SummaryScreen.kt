@@ -225,7 +225,8 @@ fun SummaryScreen(
                     }
                 }
                 if (state.receivedPay.isNotEmpty()) {
-                    // The salary that actually arrived, next to what the app calculates (net). A check, never an earning.
+                    // The salary that actually arrived, next to what the app calculates (net): the comparison of the two figures
+                    // (the totals above already count what arrived).
                     item(key = "received-pay-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
                     item(key = "received-pay-caption") {
                         Text(

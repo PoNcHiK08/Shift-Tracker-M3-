@@ -7,8 +7,9 @@ import java.time.YearMonth
  * The salary that actually arrived for a job, for the month it was EARNED for (pay is often received the
  * next month). Amounts are minor units of the job's currency.
  *
- * It is a reconciliation figure: it is compared with the calculated (net) pay and is never added to any
- * earnings total. A job can have several payouts for the same month (they are summed).
+ * A job's payouts for a month are its real pay for that month: the totals count their sum instead of (never on
+ * top of) the calculated pay of that job-month (see `PayReconciler.actualSummary`), and the Received pay section
+ * compares them with the calculated (net) pay. A job can have several payouts for the same month (they are summed).
  */
 data class Payout(
     val id: Long = 0,

@@ -40,7 +40,14 @@ UI in **Ukrainian** by default with **English** as an alternative.
 - **Received pay** — per job and per month the pay was earned for, the salary that actually arrived: one or several
   payments (amount, an optional "received on" date and note). Summary → Month shows it next to the calculated pay of
   that month **after deductions (net, whatever the Gross / Net display is)**, with the difference (received minus
-  calculated); Summary → Year has a line per job. It is a check only: it is never added to any earnings total.
+  calculated); Summary → Year has a line per job. **It counts as the real pay of its job and month:** once a job has
+  at least one payment for a month, that job's money for the month is the sum of its payments, and it **replaces**
+  the calculated shift pay, bonuses (for a day and for the whole month) and fixed salary of that job-month (it is
+  never added on top). This is the same in Gross and Net. The calendar's month tile, Summary → Month (total and
+  "By job") and Summary → Year (month rows and total) show it with a **Received** tag ("Incl. received" when the
+  figure mixes received and calculated pay). Hours, shift counts, the average hourly rate, the day panel and dots,
+  and **weekly totals stay calculated**. Several payments for a month are summed, so entering only an advance makes
+  the month show just that amount until the rest is entered. Delete the payments and the calculated figure is back.
 - **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
   M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
   "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. The month's earnings,
