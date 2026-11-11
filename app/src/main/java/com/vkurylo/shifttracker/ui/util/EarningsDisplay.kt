@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.EarningsMode
@@ -64,7 +65,13 @@ fun receivedLabel(part: ReceivedPart): String? = when (part) {
  * for some job-month; nothing for a calculated figure.
  */
 @Composable
-fun ReceivedTag(part: ReceivedPart, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.tertiary) {
+fun ReceivedTag(
+    part: ReceivedPart,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.tertiary,
+    /** Tighter in narrow places (the calendar's month tile), so it fits beside the amount more often. */
+    horizontalPadding: Dp = 6.dp,
+) {
     val label = receivedLabel(part) ?: return
     Surface(
         modifier = modifier.testTag(RECEIVED_TAG),
@@ -72,6 +79,6 @@ fun ReceivedTag(part: ReceivedPart, modifier: Modifier = Modifier, color: Color 
         color = color.copy(alpha = 0.14f),
         contentColor = color,
     ) {
-        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 2.dp))
     }
 }
