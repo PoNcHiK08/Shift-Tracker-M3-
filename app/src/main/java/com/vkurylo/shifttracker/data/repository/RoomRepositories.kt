@@ -5,6 +5,7 @@ import com.vkurylo.shifttracker.data.local.BonusDao
 import com.vkurylo.shifttracker.data.local.JobActivityRow
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
 import com.vkurylo.shifttracker.data.local.ParentChildRule
+import com.vkurylo.shifttracker.data.local.PayoutDao
 import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.data.local.calendarSyncId
 import com.vkurylo.shifttracker.data.local.nextUpdatedAt
@@ -22,15 +23,19 @@ import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PayoutRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -84,8 +89,8 @@ class RoomJobRepository @Inject constructor(
         id
     }
     /**
-     * Deletes the job and its shifts and bonuses as tombstones, so the deletion can sync. The entries'
-     * tombstones are no older than the job's, so an entry restored later counts as newer than the
+     * Deletes the job and its shifts, bonuses and payouts as tombstones, so the deletion can sync. The
+     * entries' tombstones are no older than the job's, so an entry restored later counts as newer than the
      * deletion (see [ParentChildRule]).
      */
     override suspend fun delete(job: Job) = db.withTransaction {
@@ -95,6 +100,7 @@ class RoomJobRepository @Inject constructor(
         dao.markDeleted(job.id, at)
         dao.deleteLiveShiftsOf(job.id, at)
         dao.deleteLiveBonusesOf(job.id, at)
+        dao.deleteLivePayoutsOf(job.id, at)
     }
     override suspend fun shiftCount(jobId: Long): Int = dao.shiftCount(jobId)
     override suspend fun entryCount(jobId: Long): Int = dao.entryCount(jobId)
@@ -173,4 +179,29 @@ class RoomBonusRepository @Inject constructor(
         if (rowId == -1L) bonus.id else rowId
     }
     override suspend fun delete(bonus: Bonus) = dao.markDeleted(bonus.id, clock.nowMillis())
+}
+
+@Singleton
+class RoomPayoutRepository @Inject constructor(
+    private val db: ShiftDatabase,
+    private val dao: PayoutDao,
+    private val details: JobDetailsSource,
+    private val clock: WallClock = WallClock.System,
+) : PayoutRepository {
+    override fun observePayouts(from: YearMonth, to: YearMonth): Flow<List<PayoutWithJob>> =
+        combine(dao.observeBetween(from.toMonthKey(), to.toMonthKey()), details.details) { rows, d ->
+            rows.mapNotNull { row -> row.toDomain()?.let { it.copy(job = it.job.withDetails(d)) } }
+        }
+
+    override suspend fun getPayout(id: Long): Payout? = dao.get(id)?.toDomain()
+
+    /** Keeps the row's sync id, moves `updated_at` forward and marks it changed; Undo uses it to undelete. */
+    override suspend fun upsert(payout: Payout): Long = db.withTransaction {
+        val existing = if (payout.id != 0L) dao.getAny(payout.id) else null
+        val rowId = dao.upsert(payout.toEntity().stamped(existing, clock.nowMillis()))
+        ParentChildRule.enforce(db.jobDao())
+        if (rowId == -1L) payout.id else rowId
+    }
+
+    override suspend fun delete(payout: Payout) = dao.markDeleted(payout.id, clock.nowMillis())
 }

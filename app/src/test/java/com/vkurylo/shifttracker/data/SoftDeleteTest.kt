@@ -11,12 +11,15 @@ import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.data.local.WallClock
 import com.vkurylo.shifttracker.data.repository.JobDetailsSource
 import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
+import com.vkurylo.shifttracker.data.local.PayoutEntity
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
+import com.vkurylo.shifttracker.data.repository.RoomPayoutRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.Shift
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -53,6 +56,7 @@ class SoftDeleteTest {
     private val jobs = RoomJobRepository(db, db.jobDao(), db.paySettingsDao(), details, clock)
     private val shifts = RoomShiftRepository(db, db.shiftDao(), details, clock)
     private val bonuses = RoomBonusRepository(db, db.bonusDao(), details, clock)
+    private val payouts = RoomPayoutRepository(db, db.payoutDao(), details, clock)
 
     private val day = LocalDate.of(2026, 11, 2)
     private val month = YearMonth.from(day)
@@ -69,6 +73,8 @@ class SoftDeleteTest {
 
     private suspend fun bonus(jobId: Long) = bonuses.upsert(Bonus(jobId = jobId, date = day, amountGrosze = 5000))
 
+    private suspend fun payout(jobId: Long) = payouts.upsert(Payout(jobId = jobId, month = month, amountMinor = 450_000))
+
     private fun isUuid(text: String) = runCatching { UUID.fromString(text).toString() == text }.getOrDefault(false)
 
     @Test
@@ -76,18 +82,20 @@ class SoftDeleteTest {
         val jobId = job()
         val shiftId = shift(jobId)
         val bonusId = bonus(jobId)
+        val payoutId = payout(jobId)
 
         val rows = listOf(
             db.jobDao().getAny(jobId)!!.let { Triple(it.syncId, it.updatedAt, it.deleted to it.dirty) },
             db.shiftDao().getAny(shiftId)!!.let { Triple(it.syncId, it.updatedAt, it.deleted to it.dirty) },
             db.bonusDao().getAny(bonusId)!!.let { Triple(it.syncId, it.updatedAt, it.deleted to it.dirty) },
+            db.payoutDao().getAny(payoutId)!!.let { Triple(it.syncId, it.updatedAt, it.deleted to it.dirty) },
         )
         rows.forEach { (syncId, updatedAt, flags) ->
             assertTrue(syncId, isUuid(syncId))
             assertEquals(now, updatedAt)
             assertEquals(false to true, flags) // live, waiting for upload
         }
-        assertEquals(3, rows.map { it.first }.toSet().size)
+        assertEquals(4, rows.map { it.first }.toSet().size)
     }
 
     @Test
@@ -145,12 +153,14 @@ class SoftDeleteTest {
     }
 
     @Test
-    fun deletingAJobDeletesItsShiftsAndBonusesAsTombstones() = runBlocking {
+    fun deletingAJobDeletesItsShiftsBonusesAndPayoutsAsTombstones() = runBlocking {
         val jobId = job()
         val otherJobId = job("Kawiarnia")
         val shiftIds = listOf(shift(jobId), shift(jobId, day.plusDays(1)))
         val bonusId = bonus(jobId)
+        val payoutIds = listOf(payout(jobId), payout(jobId))
         val otherShiftId = shift(otherJobId, day.plusDays(2))
+        val otherPayoutId = payout(otherJobId)
 
         now += 5000
         jobs.delete(jobs.getJob(jobId)!!)
@@ -167,10 +177,17 @@ class SoftDeleteTest {
             assertTrue(it.deleted)
             assertTrue(it.updatedAt >= job.updatedAt)
         }
+        payoutIds.map { db.payoutDao().getAny(it)!! }.forEach {
+            assertTrue(it.deleted)
+            assertTrue(it.dirty)
+            assertTrue("payout tombstones are no older than the job's", it.updatedAt >= job.updatedAt)
+        }
         // The other job is untouched.
         assertEquals(listOf("Kawiarnia"), jobs.observeJobs().first().map { it.name })
         assertEquals(listOf(otherShiftId), shifts.observeMonth(month).first().map { it.shift.id })
         assertFalse(db.shiftDao().getAny(otherShiftId)!!.deleted)
+        assertFalse(db.payoutDao().getAny(otherPayoutId)!!.deleted)
+        assertEquals(listOf(otherPayoutId), payouts.observePayouts(month, month).first().map { it.payout.id })
     }
 
     /** Every read that feeds the app hides tombstones; a guard against a new query forgetting the filter. */
@@ -181,11 +198,15 @@ class SoftDeleteTest {
         val liveBonus = bonus(liveJob)
         val deletedShift = shift(liveJob, day.plusDays(3))
         val deletedBonus = bonus(liveJob)
+        val livePayout = payout(liveJob)
+        val deletedPayout = payout(liveJob)
         shifts.delete(shifts.getShift(deletedShift)!!)
         bonuses.delete(bonuses.getBonus(deletedBonus)!!)
+        payouts.delete(payouts.getPayout(deletedPayout)!!)
         val deletedJob = job("Deleted", currency = "EUR")
         val shiftOfDeletedJob = shift(deletedJob, day.plusDays(4))
         val bonusOfDeletedJob = bonus(deletedJob)
+        val payoutOfDeletedJob = payout(deletedJob)
         jobs.delete(jobs.getJob(deletedJob)!!)
 
         val from = day.minusDays(10).toEpochDay()
@@ -196,7 +217,7 @@ class SoftDeleteTest {
         assertEquals(listOf(liveJob), db.jobDao().getAll().map { it.id })
         assertNull(db.jobDao().get(deletedJob))
         assertEquals(1, db.jobDao().shiftCount(liveJob))
-        assertEquals(2, db.jobDao().entryCount(liveJob))
+        assertEquals(3, db.jobDao().entryCount(liveJob)) // shift + bonus + payout
         assertEquals(0, db.jobDao().entryCount(deletedJob))
         assertEquals("PLN", db.jobDao().latestCurrency())
         assertEquals(listOf("Live"), jobs.observeJobs().first().map { it.name })
@@ -212,6 +233,14 @@ class SoftDeleteTest {
         assertEquals(listOf(liveBonus), db.bonusDao().getAll().map { it.id })
         assertNull(db.bonusDao().get(deletedBonus))
         assertNull(db.bonusDao().get(bonusOfDeletedJob))
+        // Payouts
+        assertEquals(listOf(livePayout), db.payoutDao().observeBetween(202601, 202612).first().map { it.payout.id })
+        assertEquals(listOf(livePayout), db.payoutDao().getAll().map { it.id })
+        assertEquals(listOf(livePayout), payouts.observePayouts(month, month).first().map { it.payout.id })
+        assertNull(db.payoutDao().get(deletedPayout))
+        assertNull(db.payoutDao().get(payoutOfDeletedJob))
+        assertNull(payouts.getPayout(payoutOfDeletedJob))
+        assertEquals(listOf(livePayout), db.payoutDao().liveKeys().map { it.id })
         // Each job's first/last entry (monthly salary span) counts live entries only.
         val activity = db.paySettingsDao().getActivity().associateBy { it.jobId }
         assertEquals(setOf(liveJob), activity.keys)
@@ -284,5 +313,62 @@ class SoftDeleteTest {
         ParentChildRule.enforce(db.jobDao())
         assertEquals(revived, db.jobDao().getAny(revivedJob))
         assertEquals(olderTombstone, db.shiftDao().getAny(olderId))
+    }
+
+    /** A payout is an entry of its job like a shift or bonus: the same rule decides who wins. */
+    @Test
+    fun parentChildRuleTreatsPayoutsAsEntriesOfTheJob() = runBlocking {
+        now = 10
+        val revivedJob = job("Revived")
+        val keptDeletedJob = job("Stays deleted")
+        now = 100
+        jobs.delete(jobs.getJob(revivedJob)!!)
+        jobs.delete(jobs.getJob(keptDeletedJob)!!)
+        val newer = PayoutEntity(jobId = revivedJob, month = 202611, amountMinor = 450_000, note = "added offline after the deletion",
+            receivedEpochDay = null, updatedAt = 150)
+        val older = newer.copy(jobId = keptDeletedJob, note = "added offline before the deletion", syncId = UUID.randomUUID().toString(), updatedAt = 50)
+        val newerId = db.payoutDao().upsert(newer)
+        val olderId = db.payoutDao().upsert(older)
+
+        ParentChildRule.enforce(db.jobDao())
+
+        val revived = db.jobDao().getAny(revivedJob)!!
+        assertFalse(revived.deleted)
+        assertEquals("revived at the newer payout's time", 150L, revived.updatedAt)
+        assertFalse(db.payoutDao().getAny(newerId)!!.deleted)
+        assertEquals(listOf("Revived"), jobs.observeJobs().first().map { it.name })
+        assertEquals(listOf("added offline after the deletion"), db.payoutDao().getAll().map { it.note })
+
+        assertTrue(db.jobDao().getAny(keptDeletedJob)!!.deleted)
+        val olderTombstone = db.payoutDao().getAny(olderId)!!
+        assertTrue(olderTombstone.deleted)
+        assertTrue(olderTombstone.dirty)
+        assertEquals("deleted at the job's deletion time", 100L, olderTombstone.updatedAt)
+
+        // Applying the rule again changes nothing.
+        ParentChildRule.enforce(db.jobDao())
+        assertEquals(revived, db.jobDao().getAny(revivedJob))
+        assertEquals(olderTombstone, db.payoutDao().getAny(olderId))
+    }
+
+    @Test
+    fun undoingAPayoutAfterItsJobWasDeletedBringsBackTheJobWithOnlyThatPayout() = runBlocking {
+        val jobId = job()
+        val undone = payouts.getPayout(payout(jobId))!!
+        val other = payout(jobId)
+        now += 1000
+        payouts.delete(undone)
+        now += 1000
+        jobs.delete(jobs.getJob(jobId)!!)
+        assertTrue(jobs.observeJobs().first().isEmpty())
+
+        now += 1000
+        payouts.upsert(undone) // the snackbar's Undo, after the job was deleted
+
+        val job = db.jobDao().getAny(jobId)!!
+        assertFalse(job.deleted)
+        assertEquals("revived at the payout's change time", db.payoutDao().getAny(undone.id)!!.updatedAt, job.updatedAt)
+        assertEquals(listOf(undone.id), payouts.observePayouts(month, month).first().map { it.payout.id })
+        assertTrue("deleted together with the job, stays deleted", db.payoutDao().getAny(other)!!.deleted)
     }
 }

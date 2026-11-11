@@ -101,15 +101,24 @@ class FirestoreDocumentsTest {
     fun `the fields written are exactly the ones firestore rules accept`() {
         // Unit tests run in the app module; the rules are in firebase/ at the root of the repository.
         val rules = File("../firebase/firestore.rules").readText()
-        fun allowed(function: String): Set<String> {
-            val body = Regex("""function $function\(d\) \{\s*return hasExactly\(d, \[(.*?)]\)""", RegexOption.DOT_MATCHES_ALL)
-                .find(rules)!!.groupValues[1]
-            return Regex("'([A-Za-z]+)'").findAll(body).map { it.groupValues[1] }.toSet()
+        /** Every exact field set the function accepts (a record may have more than one accepted shape). */
+        fun shapes(function: String): List<Set<String>> {
+            val start = rules.indexOf("function $function(d) {")
+            check(start >= 0) { "no function $function in the rules" }
+            val next = rules.indexOf("\n    function ", start + 1)
+            val body = rules.substring(start, if (next < 0) rules.length else next)
+            return Regex("""hasExactly\(d, \[(.*?)]\)""", RegexOption.DOT_MATCHES_ALL).findAll(body).map { match ->
+                Regex("'([A-Za-z]+)'").findAll(match.groupValues[1]).map { it.groupValues[1] }.toSet()
+            }.toList()
         }
+        fun allowed(function: String): Set<String> = shapes(function).single()
         // The store adds serverUpdatedAt to every write.
         assertEquals(allowed("isJob"), job.toFields().keys + "serverUpdatedAt")
         assertEquals(allowed("isShift"), shift.toFields().keys + "serverUpdatedAt")
-        assertEquals(allowed("isBonus"), bonus.toFields().keys + "serverUpdatedAt")
+        // A bonus has two accepted shapes: the one the previous app version writes, and the current one.
+        val bonusShapes = shapes("isBonus")
+        assertEquals(2, bonusShapes.size)
+        assertTrue(bonus.toFields().keys + "serverUpdatedAt" in bonusShapes)
         assertTrue(rules.contains("hasExactly(value, ['rateGrosze', 'fromMinute', 'toMinute'])"))
         assertEquals(setOf("rateGrosze", "fromMinute", "toMinute"), (job.toFields()["secondRate"] as Map<*, *>).keys)
     }

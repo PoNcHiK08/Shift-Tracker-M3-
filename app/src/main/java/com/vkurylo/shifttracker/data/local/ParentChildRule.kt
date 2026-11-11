@@ -1,7 +1,7 @@
 package com.vkurylo.shifttracker.data.local
 
 /**
- * What happens when a job is deleted (a tombstone) but some of its shifts or bonuses are not.
+ * What happens when a job is deleted (a tombstone) but some of its shifts, bonuses or payouts are not.
  *
  * Deleting a job deletes its entries in the same transaction, so on one phone this state doesn't last.
  * It comes up when changes meet: phone A deletes a job while phone B, offline, adds a shift to it; or an
@@ -51,11 +51,13 @@ object ParentChildRule {
                 is Resolution.ReviveJob -> {
                     dao.deleteLiveShiftsNotNewerThan(jobId, resolution.jobDeletedAt)
                     dao.deleteLiveBonusesNotNewerThan(jobId, resolution.jobDeletedAt)
+                    dao.deleteLivePayoutsNotNewerThan(jobId, resolution.jobDeletedAt)
                     dao.markRevived(jobId, resolution.updatedAt)
                 }
                 is Resolution.DeleteEntries -> {
                     dao.deleteLiveShiftsNotNewerThan(jobId, resolution.jobDeletedAt)
                     dao.deleteLiveBonusesNotNewerThan(jobId, resolution.jobDeletedAt)
+                    dao.deleteLivePayoutsNotNewerThan(jobId, resolution.jobDeletedAt)
                 }
             }
         }

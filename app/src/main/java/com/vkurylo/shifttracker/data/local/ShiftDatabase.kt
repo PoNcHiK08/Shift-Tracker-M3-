@@ -7,8 +7,8 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [JobEntity::class, ShiftEntity::class, BonusEntity::class, JobPaySettingsEntity::class],
-    version = 7,
+    entities = [JobEntity::class, ShiftEntity::class, BonusEntity::class, PayoutEntity::class, JobPaySettingsEntity::class],
+    version = 8,
     exportSchema = true,
     autoMigrations = [
         // v2: optional second (timed) rate on jobs and shift snapshots.
@@ -22,19 +22,26 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         // v6: deduction percentage in the pay settings history (0 = none).
         AutoMigration(from = 5, to = 6),
         // v7: manual, see MIGRATION_6_7.
+        // v8: bonuses.whole_month (existing bonuses: false, a bonus on its day) and the empty payouts table.
+        // Nothing else changes; no row is touched or marked as changed.
+        AutoMigration(from = 7, to = 8),
     ],
 )
 abstract class ShiftDatabase : RoomDatabase() {
     abstract fun jobDao(): JobDao
     abstract fun shiftDao(): ShiftDao
     abstract fun bonusDao(): BonusDao
+    abstract fun payoutDao(): PayoutDao
     abstract fun paySettingsDao(): PaySettingsDao
     abstract fun syncDao(): SyncDao
 
     companion object {
         const val NAME = "shift_tracker.db"
 
-        /** Tables whose rows sync (see SyncMetadata.kt). */
+        /**
+         * Tables that had sync metadata added by [MIGRATION_6_7]: the ones that existed at version 6. It must not
+         * grow: `payouts` is created at version 8, already with its sync columns.
+         */
         internal val SYNCED_TABLES = listOf("jobs", "shifts", "bonuses")
 
         /**

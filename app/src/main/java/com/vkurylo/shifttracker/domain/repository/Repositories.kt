@@ -6,6 +6,8 @@ import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
@@ -28,7 +30,7 @@ interface JobRepository {
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
 
-    /** Shifts + bonuses of the job; a job with entries keeps its currency. */
+    /** Shifts + bonuses + received-pay payouts of the job; a job with entries keeps its currency. */
     suspend fun entryCount(jobId: Long): Int
 
     /** Currency of the most recently created job, or null when there is none. */
@@ -61,6 +63,14 @@ interface BonusRepository {
     suspend fun getBonus(id: Long): Bonus?
     suspend fun upsert(bonus: Bonus): Long
     suspend fun delete(bonus: Bonus)
+}
+
+interface PayoutRepository {
+    /** Payouts (with their job) earned for the months [from]..[to], ordered by month. */
+    fun observePayouts(from: YearMonth, to: YearMonth): Flow<List<PayoutWithJob>>
+    suspend fun getPayout(id: Long): Payout?
+    suspend fun upsert(payout: Payout): Long
+    suspend fun delete(payout: Payout)
 }
 
 interface PreferencesRepository {

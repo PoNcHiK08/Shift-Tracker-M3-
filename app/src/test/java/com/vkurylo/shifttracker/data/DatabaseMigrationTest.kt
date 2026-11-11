@@ -1,6 +1,7 @@
 package com.vkurylo.shifttracker.data
 
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteConstraintException
 import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
@@ -8,6 +9,7 @@ import androidx.room.migration.Migration
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.data.local.Migration6To7
+import com.vkurylo.shifttracker.data.local.PayoutEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.domain.model.TimedRate
@@ -121,6 +123,8 @@ class DatabaseMigrationTest {
             // v7: sync metadata on every row.
             assertTrue(isUuid(raw.syncId))
             assertTrue(isUuid(db.shiftDao().getAll().single().syncId))
+            // v8: no payouts yet.
+            assertEquals(0, db.payoutDao().getAll().size)
         } finally {
             db.close()
         }
@@ -188,6 +192,73 @@ class DatabaseMigrationTest {
             assertThrows(SQLiteConstraintException::class.java) { runBlocking { db.shiftDao().insertAll(listOf(duplicate)) } }
         } finally {
             db.close()
+        }
+    }
+
+    /**
+     * v7 -> v8 adds `bonuses.whole_month` and the empty `payouts` table, and nothing else: every row keeps
+     * every value, including its sync id, change time, tombstone and "waiting for upload" mark (so the update
+     * makes nothing look changed and nothing upload again), and every existing bonus stays a bonus on its day.
+     */
+    @Test
+    fun migrateFrom7To8KeepsEveryRowUntouchedAndAddsMonthBonusFlagAndPayouts(): Unit = runBlocking {
+        val uploadedAt = 1_790_000_000_000L
+        val jobKb = "11111111-1111-4111-8111-111111111111"
+        val jobOld = "22222222-2222-4222-8222-222222222222"
+        val jobEur = "33333333-3333-4333-8333-333333333333"
+        val tables = listOf("jobs", "shifts", "bonuses", "job_pay_settings")
+        val before = createDatabase(7).run {
+            // Uploaded, deleted-and-uploaded, and waiting for upload: all three states must survive.
+            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, second_rate_grosze, second_rate_from_minute, second_rate_to_minute, currency, sync_id, updated_at, deleted, dirty) VALUES (1, 'Burger King', 3300, -1, 3700, 1380, 360, 'PLN', '$jobKb', $uploadedAt, 0, 0)")
+            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, currency, sync_id, updated_at, deleted, dirty) VALUES (2, 'Stara praca', 2500, -3, 'PLN', '$jobOld', ${uploadedAt + 10}, 1, 0)")
+            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, currency, sync_id, updated_at, deleted, dirty) VALUES (5, 'Biuro', 0, -2, 'EUR', '$jobEur', ${uploadedAt + 20}, 0, 1)")
+            execSQL("INSERT INTO job_pay_settings (job_id, from_month, pay_type, monthly_amount_minor, deduction_bp) VALUES (5, 0, 'FIXED_MONTHLY', 450000, 1371)")
+            execSQL("INSERT INTO shifts (id, job_id, date_epoch_day, start_minute, end_minute, unpaid_break_minutes, hourly_rate_grosze, note, external_uid, sync_id, updated_at, deleted, dirty) VALUES (10, 1, 20400, 480, 960, 30, 3300, 'uploaded', NULL, '44444444-4444-4444-8444-444444444444', $uploadedAt, 0, 0)")
+            execSQL("INSERT INTO shifts (id, job_id, date_epoch_day, start_minute, end_minute, unpaid_break_minutes, hourly_rate_grosze, note, external_uid, sync_id, updated_at, deleted, dirty) VALUES (11, 2, 20401, 480, 960, 0, 2500, NULL, 'uid@cal', '55555555-5555-4555-8555-555555555555', ${uploadedAt + 10}, 1, 0)")
+            execSQL("INSERT INTO bonuses (id, job_id, date_epoch_day, amount_grosze, note, sync_id, updated_at, deleted, dirty) VALUES (3, 1, 20405, 7500, 'Premia', '66666666-6666-4666-8666-666666666666', ${uploadedAt + 1}, 0, 0)")
+            execSQL("INSERT INTO bonuses (id, job_id, date_epoch_day, amount_grosze, note, sync_id, updated_at, deleted, dirty) VALUES (4, 5, 20410, 1000, NULL, '77777777-7777-4777-8777-777777777777', ${uploadedAt + 21}, 0, 1)")
+            execSQL("INSERT INTO bonuses (id, job_id, date_epoch_day, amount_grosze, note, sync_id, updated_at, deleted, dirty) VALUES (6, 2, 20411, 300, 'gone', '88888888-8888-4888-8888-888888888888', ${uploadedAt + 10}, 1, 1)")
+            val rows = tables.associateWith { rawQuery("SELECT * FROM $it ORDER BY id", null).rows() }
+            close()
+            rows
+        }
+
+        val db = openCurrent()
+        try {
+            val sqlite = db.openHelper.writableDatabase
+            // Nothing moved or changed; the only new value is whole_month = 0 on every bonus.
+            for (table in tables) {
+                val expected = before.getValue(table).map { if (table == "bonuses") it + ("whole_month" to "0") else it }
+                assertEquals(table, expected, sqlite.query("SELECT * FROM $table ORDER BY id").rows())
+            }
+            assertEquals(3, before.getValue("bonuses").size)
+
+            // And through the app's own reads: bonuses on their days, not month bonuses.
+            assertEquals(listOf(3L, 4L), db.bonusDao().getAll().map { it.id })
+            assertEquals(listOf(false, false), db.bonusDao().getAll().map { it.wholeMonth })
+            assertEquals(listOf(false, false), db.bonusDao().getAll().map { it.toDomain().wholeMonth })
+
+            // The payouts table exists, is empty, accepts a payout, keeps sync ids unique and follows its job.
+            assertEquals(0, db.payoutDao().getAll().size)
+            val payout = PayoutEntity(jobId = 1, month = 202611, amountMinor = 450000, note = null, receivedEpochDay = null)
+            db.payoutDao().insertAll(listOf(payout))
+            assertEquals(1, db.payoutDao().getAll().size)
+            assertThrows(SQLiteConstraintException::class.java) {
+                runBlocking { db.payoutDao().insertAll(listOf(payout.copy(amountMinor = 1))) }
+            }
+            sqlite.execSQL("DELETE FROM jobs WHERE id = 1")
+            assertEquals("a payout goes with its job", 0, sqlite.query("SELECT COUNT(*) FROM payouts").rows().single().getValue("COUNT(*)")!!.toInt())
+        } finally {
+            db.close()
+        }
+    }
+
+    /** Every column of every row as text (a missing value stays null), in query order. */
+    private fun Cursor.rows(): List<Map<String, String?>> = use {
+        buildList {
+            while (moveToNext()) {
+                add(columnNames.indices.associate { columnNames[it] to if (isNull(it)) null else getString(it) })
+            }
         }
     }
 
