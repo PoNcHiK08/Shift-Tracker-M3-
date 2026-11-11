@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
@@ -76,7 +77,8 @@ class CalendarViewModel @Inject constructor(
         CalendarUiState(
             month = m,
             shiftsByDate = window.shifts.groupBy { it.shift.date },
-            bonusesByDate = window.bonuses.groupBy { it.bonus.date },
+            // Bonuses for a whole month have no day: not in the grid or the day panel, only in the month's totals.
+            bonusesByDate = window.bonuses.onDays().groupBy { it.bonus.date },
             monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m), mode),
             jobs = jobs,
             defaultCurrency = Currencies.defaultFor(jobs),

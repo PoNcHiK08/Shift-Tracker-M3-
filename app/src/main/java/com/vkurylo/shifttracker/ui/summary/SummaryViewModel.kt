@@ -11,6 +11,7 @@ import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
@@ -96,7 +97,10 @@ class SummaryViewModel @Inject constructor(
                 bonusRepository.observeBonuses(range.from, range.to),
                 jobRepository.observeJobs(),
                 preferencesRepository.preferences.map { it.earningsMode },
-            ) { shifts, bonuses, jobs, mode ->
+            ) { shifts, allBonuses, jobs, mode ->
+                // A week can span two months and a bonus for a whole month belongs to one of them: it is part of
+                // the month and the year, never of a week.
+                val bonuses = if (range.period == SummaryPeriod.WEEK) allBonuses.onDays() else allBonuses
                 SummaryUiState(
                     range = range,
                     summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode),

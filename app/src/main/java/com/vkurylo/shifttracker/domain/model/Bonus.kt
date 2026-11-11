@@ -25,3 +25,12 @@ data class BonusWithJob(
     val bonus: Bonus,
     val job: Job,
 )
+
+/**
+ * Bonuses that belong to a day: what a day, the calendar grid and a week show. A bonus for the whole month is
+ * not one of them (it has no day, and a week can span two months), so weekly totals leave it out.
+ */
+fun List<BonusWithJob>.onDays(): List<BonusWithJob> = filterNot { it.bonus.wholeMonth }
+
+/** Bonuses for a whole month: they count in that month's totals (and nowhere finer). */
+fun List<BonusWithJob>.forWholeMonths(): List<BonusWithJob> = filter { it.bonus.wholeMonth }
