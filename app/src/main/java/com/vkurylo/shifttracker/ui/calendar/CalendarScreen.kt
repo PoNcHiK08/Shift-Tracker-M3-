@@ -93,6 +93,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import androidx.compose.ui.text.style.TextOverflow
+import com.vkurylo.shifttracker.ui.util.ReceivedTag
 import com.vkurylo.shifttracker.ui.util.earningsModeLabel
 import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
@@ -665,6 +666,8 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
                 style = MaterialTheme.typography.titleMediumEmphasized,
                 color = colors.onPrimaryContainer,
             )
+            // The month counts what arrived for a job instead of its calculated pay.
+            ReceivedTag(summary.receivedPart, Modifier.padding(top = 2.dp), color = colors.onPrimaryContainer)
         }
         Tile(
             container = colors.secondaryContainer,

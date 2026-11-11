@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -40,6 +41,7 @@ import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.SnackbarController
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.util.Formatters
+import com.vkurylo.shifttracker.ui.util.RECEIVED_TAG
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -323,5 +325,50 @@ class ReceivedPayScreenTest {
         composeRule.onNodeWithText(text(R.string.received_pay_title)).assertDoesNotExist()
         assertEquals(emptyList<Any>(), vm.uiState.value.receivedPay)
         assertEquals(emptyList<Any>(), vm.uiState.value.receivedPayYear)
+    }
+
+    /** How many "received" markers show [label]. */
+    private fun markers(label: String) =
+        composeRule.onAllNodes(hasText(label) and hasAnyAncestor(hasTestTag(RECEIVED_TAG)), useUnmergedTree = true).fetchSemanticsNodes().size
+
+    private fun allMarkers() = composeRule.onAllNodes(hasTestTag(RECEIVED_TAG), useUnmergedTree = true).fetchSemanticsNodes().size
+
+    @Test
+    fun theMonthTotalAndTheJobWithPaymentsCarryTheReceivedMarker() {
+        show()
+        // The hero: the café's 600 zł received next to the office's calculated salary.
+        assertEquals(1, markers(text(R.string.received_tag_part)))
+        // By job: the café's whole figure is what arrived; the office has no marker.
+        assertEquals(1, markers(text(R.string.received_tag_all)))
+        assertEquals(2, allMarkers())
+        // The hero and the café's row both show the 600 zł received.
+        assertEquals(2, composeRule.onAllNodesWithText(money(60_000)).fetchSemanticsNodes().size)
+        // The 500 zł month bonus is inside what arrived: no "including bonuses" on top of it.
+        val including = context.getString(R.string.including_bonuses, "").trim()
+        composeRule.onAllNodes(hasText(including, substring = true)).fetchSemanticsNodes().let { assertEquals(0, it.size) }
+    }
+
+    @Test
+    fun withoutPaymentsThereIsNoMarker() {
+        show(payments = emptyList())
+        assertEquals(0, allMarkers())
+    }
+
+    @Test
+    fun theYearMarksTheMonthWithPaymentsAndItsTotal() {
+        show(period = SummaryPeriod.YEAR)
+        val part = text(R.string.received_tag_part)
+        // November's row says it includes received pay (its row is one node for accessibility).
+        val label = Formatters.monthName(november, locale)
+        val rows = composeRule.onAllNodes(hasContentDescription(label, substring = true) and hasContentDescription(part, substring = true)).fetchSemanticsNodes()
+        assertEquals(1, rows.size)
+        // The year total, too.
+        assertTrue(markers(part) >= 1)
+    }
+
+    @Test
+    fun theWeekShowsNoMarker() {
+        show(period = SummaryPeriod.WEEK)
+        assertEquals(0, allMarkers())
     }
 }

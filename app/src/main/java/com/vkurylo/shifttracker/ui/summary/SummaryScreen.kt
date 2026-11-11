@@ -73,6 +73,8 @@ import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.ui.util.EarningsModeTag
+import com.vkurylo.shifttracker.ui.util.receivedLabel
+import com.vkurylo.shifttracker.ui.util.ReceivedTag
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
@@ -367,6 +369,8 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                     Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
                     // Gross or net, whenever jobs have deductions.
                     EarningsModeTag(Modifier.padding(start = 8.dp), color = onColor)
+                    // Month / year: job-months with payments count what arrived.
+                    ReceivedTag(summary.receivedPart, Modifier.padding(start = 6.dp), color = onColor)
                 }
             }
             RollingAmounts(
@@ -375,7 +379,8 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                 style = MaterialTheme.typography.displaySmallEmphasized,
                 color = onColor,
             )
-            val bonuses = summary.bonuses.byCurrency.filterValues { it > 0 }
+            // Bonuses of job-months with received pay are inside what arrived, not on top of it.
+            val bonuses = summary.countedBonuses.byCurrency.filterValues { it > 0 }
             if (bonuses.isNotEmpty()) {
                 Text(
                     stringResource(R.string.including_bonuses, Formatters.amounts(Amounts(bonuses), locale)),
@@ -429,11 +434,12 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                             add(hoursLabel(summary.paidMinutes))
                             add(shiftsCountLabel(summary.shiftCount))
                         }
-                        if (summary.salaryMinor > 0) {
-                            add(stringResource(R.string.salary_value, Formatters.money(summary.salaryMinor, summary.currency, locale)))
+                        // Only what is still calculated: a month with received pay has it inside what arrived.
+                        if (summary.countedSalaryMinor > 0) {
+                            add(stringResource(R.string.salary_value, Formatters.money(summary.countedSalaryMinor, summary.currency, locale)))
                         }
-                        if (summary.bonusGrosze > 0) {
-                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, summary.currency, locale)))
+                        if (summary.countedBonusMinor > 0) {
+                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.countedBonusMinor, summary.currency, locale)))
                         }
                     }
                     Text(
@@ -442,7 +448,10 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(Formatters.money(summary.earningsGrosze, summary.currency, locale), style = MaterialTheme.typography.titleMedium)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(Formatters.money(summary.earningsGrosze, summary.currency, locale), style = MaterialTheme.typography.titleMedium)
+                    ReceivedTag(summary.receivedPart, Modifier.padding(top = 2.dp))
+                }
             }
             Spacer(Modifier.height(14.dp))
             val percent = (share * 100).toInt()
@@ -481,7 +490,8 @@ private fun BreakdownItem(
         else -> Formatters.monthName(YearMonth.from(entry.date), locale)
     }
     val empty = entry.isEmpty
-    val valueText = Formatters.amounts(entry.earnings, locale)
+    val received = receivedLabel(entry.receivedPart)
+    val valueText = Formatters.amounts(entry.earnings, locale) + (received?.let { " · $it" } ?: "")
     val hoursText = hoursLabel(entry.paidMinutes)
     SegmentedItem(
         index = index,
@@ -506,8 +516,10 @@ private fun BreakdownItem(
                     )
                     Spacer(Modifier.width(12.dp))
                 }
+                // A month with received pay (year view) shows its marker before the amount.
+                ReceivedTag(entry.receivedPart, Modifier.padding(end = 8.dp))
                 Text(
-                    if (empty) "—" else valueText,
+                    if (empty) "—" else Formatters.amounts(entry.earnings, locale),
                     style = MaterialTheme.typography.titleSmall,
                     color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 )

@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.EarningsMode
+import com.vkurylo.shifttracker.domain.model.ReceivedPart
 
 /**
  * Which earnings the app shows (gross, or net of each job's deductions) and whether to say so: with no
@@ -45,5 +46,32 @@ fun EarningsModeTag(modifier: Modifier = Modifier, color: Color = MaterialTheme.
         contentColor = color,
     ) {
         Text(label, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+    }
+}
+
+const val RECEIVED_TAG = "received-tag"
+
+/** "Received" when the figure is all received pay, "Incl. received" when part of it is; null when calculated. */
+@Composable
+fun receivedLabel(part: ReceivedPart): String? = when (part) {
+    ReceivedPart.NONE -> null
+    ReceivedPart.PART -> stringResource(R.string.received_tag_part)
+    ReceivedPart.ALL -> stringResource(R.string.received_tag_all)
+}
+
+/**
+ * A small marker next to a money figure that counts received pay (what arrived) instead of the calculated pay
+ * for some job-month; nothing for a calculated figure.
+ */
+@Composable
+fun ReceivedTag(part: ReceivedPart, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.tertiary) {
+    val label = receivedLabel(part) ?: return
+    Surface(
+        modifier = modifier.testTag(RECEIVED_TAG),
+        shape = MaterialTheme.shapes.small,
+        color = color.copy(alpha = 0.14f),
+        contentColor = color,
+    ) {
+        Text(label, style = MaterialTheme.typography.labelSmall, maxLines = 1, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
     }
 }

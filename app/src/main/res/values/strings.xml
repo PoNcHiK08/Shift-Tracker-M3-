@@ -368,8 +368,10 @@
     <string name="month_bonuses_none">У цьому місяці немає бонусів на весь місяць</string>
     <string name="add_month_bonus">Додати бонус за місяць</string>
     <string name="received_pay_title">Отримана зарплата</string>
-    <string name="received_pay_caption">Скільки реально надійшло — поруч із розрахунковою сумою після відрахувань (нетто). Це лише звірка: у ваш заробіток вона не входить.</string>
-    <string name="received_pay_year_caption">Отримане порівняно з розрахунковою сумою (нетто) за ті місяці, де вказано виплати. У заробіток воно не входить.</string>
+    <string name="received_pay_caption">Скільки реально надійшло — поруч із розрахунковою сумою після відрахувань (нетто). Місяць роботи з виплатами рахується за отриманою сумою замість розрахункової — такі підсумки позначені «Отримано».</string>
+    <string name="received_pay_year_caption">Отримане порівняно з розрахунковою сумою (нетто) за ті місяці, де вказано виплати. У підсумках ці місяці рахуються за отриманою сумою.</string>
+    <string name="received_tag_all">Отримано</string>
+    <string name="received_tag_part">З отриманим</string>
     <string name="received_pay_calculated">Розрахунково (нетто)</string>
     <string name="received_pay_received">Отримано</string>
     <string name="received_pay_not_entered">не вказано</string>

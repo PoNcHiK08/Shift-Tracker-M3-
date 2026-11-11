@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.ui.util.RECEIVED_TAG
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.util.Formatters
 import org.junit.Assert.assertEquals
@@ -49,7 +50,7 @@ class MonthStripLayoutTest {
     )
     private val total = Formatters.money(summary.totalEarnings["PLN"], "PLN", Locale.US)
 
-    private fun show(fontScale: Float) {
+    private fun show(fontScale: Float, summary: MonthSummary = this.summary) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
@@ -106,5 +107,23 @@ class MonthStripLayoutTest {
         val (earnings, hours, shifts) = assertLinedUp()
         assertTrue("didn't grow with the font", (earnings.bottom - earnings.top).value > 64f)
         assertEverythingFits(earnings, hours, shifts)
+    }
+
+    @Test
+    fun aMonthWithReceivedPayShowsTheMarkerInsideTheEarningsTileAndStillLinesUp() {
+        // 1 477 zł calculated for the month, 1 200 zł received for it instead.
+        val received = summary.copy(received = Amounts.of("PLN", 120_000), replaced = Amounts.of("PLN", 147_700))
+        show(fontScale = 1f, summary = received)
+        val (earnings, _, _) = assertLinedUp()
+        val tag = composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("the marker $tag is cut off by $earnings", tag.top >= earnings.top && tag.bottom <= earnings.bottom)
+        composeRule.onNodeWithText("Received", useUnmergedTree = true).assertExists()
+        assertInside(Formatters.money(120_000, "PLN", Locale.US), earnings)
+    }
+
+    @Test
+    fun aCalculatedMonthHasNoMarker() {
+        show(fontScale = 1f)
+        composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).assertDoesNotExist()
     }
 }

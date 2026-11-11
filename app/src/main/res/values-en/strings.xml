@@ -349,8 +349,10 @@
     <string name="month_bonuses_none">No bonuses for the whole month</string>
     <string name="add_month_bonus">Add a bonus for the month</string>
     <string name="received_pay_title">Received pay</string>
-    <string name="received_pay_caption">What actually arrived, next to the calculated pay after deductions (net). It\'s a check only: it is not part of your earnings.</string>
-    <string name="received_pay_year_caption">What arrived, against the calculated net pay of the months you entered payments for. It is not part of your earnings.</string>
+    <string name="received_pay_caption">What actually arrived, next to the calculated pay after deductions (net). A job\'s month with payments counts what arrived instead of the calculated pay: those totals are marked “Received”.</string>
+    <string name="received_pay_year_caption">What arrived, against the calculated net pay of the months you entered payments for. In the totals those months count what arrived.</string>
+    <string name="received_tag_all">Received</string>
+    <string name="received_tag_part">Incl. received</string>
     <string name="received_pay_calculated">Calculated (net)</string>
     <string name="received_pay_received">Received</string>
     <string name="received_pay_not_entered">not entered</string>
