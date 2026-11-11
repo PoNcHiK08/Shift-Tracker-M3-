@@ -60,7 +60,7 @@ import java.util.Locale
 
 /**
  * Summary → Month → Received pay: what arrived next to the calculated NET pay, per job, with the difference; the
- * payments can be added, edited and deleted. None of it is part of any earnings total.
+ * payments can be added, edited and deleted. The totals count what arrived instead of the calculated pay.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class, sdk = [35], qualifiers = "w411dp-h2400dp")
@@ -183,14 +183,19 @@ class ReceivedPayScreenTest {
     fun theComparisonIsAgainstNetEvenWhenTheScreensShowGross() {
         val (vm, _) = show()
         assertEquals(EarningsMode.GROSS, prefs.value.earningsMode)
-        // Gross is what the totals show; the received-pay row still compares with the net figure.
-        assertEquals(24_000L + 50_000L, vm.uiState.value.summary.perJob.single { it.job.id == 1L }.earningsGrosze)
+        // Gross is what the calculation shows (the total counts the 600 zł received instead); the received-pay row
+        // still compares with the net figure.
+        val cafeRow = vm.uiState.value.summary.perJob.single { it.job.id == 1L }
+        assertEquals(24_000L + 50_000L, cafeRow.calculatedEarningsMinor)
+        assertEquals(60_000L, cafeRow.earningsGrosze)
         assertEquals(cafeNet, vm.uiState.value.receivedPay.single { it.job.id == 1L }.calculatedNetMinor)
         assertRowShows(cafe.id, money(cafeNet))
     }
 
     @Test
-    fun receivedPayNeverChangesAnyTotal() {
+    fun receivedPayReplacesTheCalculatedTotalOfItsJobMonthAndNothingElse() {
+        // Was "received pay never changes any total": received pay now counts as the real money of its job-month,
+        // instead of (never on top of) the calculated figure; hours, shifts and the rate stay calculated.
         val scope = CoroutineScope(Dispatchers.Main.immediate)
         fun viewModel(payments: List<Payout>) = SummaryViewModel(
             SavedStateHandle(mapOf("period" to "MONTH", "anchor" to november.atDay(10).toEpochDay())),
@@ -201,10 +206,16 @@ class ReceivedPayScreenTest {
         val without = viewModel(emptyList())
         composeRule.waitUntil(5_000) { !with.uiState.value.loading && !without.uiState.value.loading }
 
-        assertEquals(without.uiState.value.summary, with.uiState.value.summary)
-        assertEquals(without.uiState.value.breakdown, with.uiState.value.breakdown)
-        assertEquals(mapOf("PLN" to (24_000L + 50_000L), "EUR" to 300_000L), with.uiState.value.summary.totalEarnings.byCurrency)
-        // ...while the received-pay figures do differ.
+        val calculated = without.uiState.value.summary
+        val actual = with.uiState.value.summary
+        assertEquals(mapOf("PLN" to (24_000L + 50_000L), "EUR" to 300_000L), calculated.totalEarnings.byCurrency)
+        assertEquals(mapOf("PLN" to (60_000L + 99_999_999L), "EUR" to 300_000L), actual.totalEarnings.byCurrency)
+        assertEquals(calculated.totalPaidMinutes, actual.totalPaidMinutes)
+        assertEquals(calculated.shiftCount, actual.shiftCount)
+        assertEquals(calculated.bonusCount, actual.bonusCount)
+        assertEquals(calculated.averageRate("PLN"), actual.averageRate("PLN"))
+        assertEquals(calculated.perJob.single { it.job.id == 2L }, actual.perJob.single { it.job.id == 2L })
+        // The comparison figures differ as before.
         assertTrue(with.uiState.value.receivedPay.any { it.receivedMinor > 0 })
         assertTrue(without.uiState.value.receivedPay.all { it.receivedMinor == 0L })
         scope.cancel()
@@ -289,7 +300,9 @@ class ReceivedPayScreenTest {
         composeRule.onNodeWithText(text(R.string.received_pay_title)).assertIsDisplayed()
         assertRowShows(cafe.id, money(1_000))
         composeRule.onNodeWithText(text(R.string.summary_empty_title)).assertDoesNotExist()
-        assertTrue("an empty month has no earnings", vm.uiState.value.summary.isEmpty)
+        // What arrived is the month's money now: 10 zł, received.
+        assertTrue(!vm.uiState.value.summary.isEmpty)
+        assertEquals(1_000L, vm.uiState.value.summary.totalEarnings["PLN"])
     }
 
     @Test
