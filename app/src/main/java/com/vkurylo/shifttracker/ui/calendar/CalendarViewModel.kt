@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.forWholeMonths
 import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
@@ -32,6 +33,8 @@ data class CalendarUiState(
     /** Shifts of the visible month and its neighbours (for the pager), keyed by date. */
     val shiftsByDate: Map<LocalDate, List<ShiftWithJob>> = emptyMap(),
     val bonusesByDate: Map<LocalDate, List<BonusWithJob>> = emptyMap(),
+    /** The visible month's bonuses for the whole month: counted in [monthSummary], shown in their own row. */
+    val monthBonuses: List<BonusWithJob> = emptyList(),
     val monthSummary: MonthSummary = MonthSummary.EMPTY,
     val jobs: List<Job> = emptyList(),
     /** Shown for zero totals (no entries): the latest job's currency. */
@@ -79,6 +82,7 @@ class CalendarViewModel @Inject constructor(
             shiftsByDate = window.shifts.groupBy { it.shift.date },
             // Bonuses for a whole month have no day: not in the grid or the day panel, only in the month's totals.
             bonusesByDate = window.bonuses.onDays().groupBy { it.bonus.date },
+            monthBonuses = monthBonuses.forWholeMonths(),
             monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m), mode),
             jobs = jobs,
             defaultCurrency = Currencies.defaultFor(jobs),

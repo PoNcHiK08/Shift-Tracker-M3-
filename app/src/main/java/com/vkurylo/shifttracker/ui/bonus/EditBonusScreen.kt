@@ -49,7 +49,9 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
+import com.vkurylo.shifttracker.ui.components.MonthStepperField
 import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
@@ -163,12 +165,28 @@ fun EditBonusScreen(
                 }
             }
             Spacer(Modifier.height(16.dp))
-            PickerField(
-                label = stringResource(R.string.date),
-                value = Formatters.fullDate(state.date, locale),
-                icon = { Icon(Icons.Filled.Event, contentDescription = null) },
-                onClick = { showDatePicker = true },
+            // Either a bonus on a day (as before) or one for a whole month, which has no day.
+            ChoiceButtonGroup(
+                options = listOf(false, true),
+                selected = state.wholeMonth,
+                onSelect = viewModel::setWholeMonth,
+                label = { wholeMonth -> stringResource(if (wholeMonth) R.string.bonus_kind_month else R.string.bonus_kind_day) },
             )
+            Spacer(Modifier.height(12.dp))
+            if (state.wholeMonth) {
+                MonthStepperField(
+                    label = stringResource(R.string.bonus_month),
+                    month = state.month,
+                    onChange = viewModel::setMonth,
+                )
+            } else {
+                PickerField(
+                    label = stringResource(R.string.date),
+                    value = Formatters.fullDate(state.date, locale),
+                    icon = { Icon(Icons.Filled.Event, contentDescription = null) },
+                    onClick = { showDatePicker = true },
+                )
+            }
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
                 value = state.note,
@@ -182,7 +200,7 @@ fun EditBonusScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                stringResource(R.string.bonus_hint),
+                stringResource(if (state.wholeMonth) R.string.bonus_hint_month else R.string.bonus_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )

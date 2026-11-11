@@ -11,6 +11,7 @@ import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.forWholeMonths
 import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
@@ -70,6 +71,8 @@ data class SummaryUiState(
     val summary: MonthSummary = MonthSummary.EMPTY,
     /** Days of the week (WEEK) or months of the year (YEAR); empty for MONTH. */
     val breakdown: List<BreakdownEntry> = emptyList(),
+    /** The month's bonuses for the whole month (month view only): counted in [summary], listed in their own section. */
+    val monthBonuses: List<BonusWithJob> = emptyList(),
     /** Shown for zero totals (no entries): the latest job's currency. */
     val defaultCurrency: String = Currencies.DEFAULT,
     val loading: Boolean = true,
@@ -105,6 +108,7 @@ class SummaryViewModel @Inject constructor(
                     range = range,
                     summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode),
                     breakdown = breakdown(range, shifts, bonuses, jobs, mode),
+                    monthBonuses = if (range.period == SummaryPeriod.MONTH) bonuses.forWholeMonths() else emptyList(),
                     defaultCurrency = Currencies.defaultFor(jobs),
                     loading = false,
                 )

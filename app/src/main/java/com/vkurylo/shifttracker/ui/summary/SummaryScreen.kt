@@ -14,16 +14,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -39,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -48,6 +52,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.ui.components.BonusCard
 import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
@@ -67,9 +72,15 @@ import com.vkurylo.shifttracker.ui.util.shiftsCountLabel
 import java.time.LocalDate
 import java.time.YearMonth
 
+const val SUMMARY_ADD_MONTH_BONUS_TAG = "summary-add-month-bonus"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
+fun SummaryScreen(
+    onEditBonus: (Long) -> Unit = {},
+    onAddMonthBonus: (YearMonth) -> Unit = {},
+    viewModel: SummaryViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val range = state.range
@@ -146,6 +157,41 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                             count = jobs.size,
                             modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
                         )
+                    }
+                }
+                if (range.period == SummaryPeriod.MONTH) {
+                    // Bonuses for the whole month have no day: this is where they are seen, edited and deleted.
+                    item(key = "month-bonuses-header") { SectionHeader(stringResource(R.string.month_bonuses_title)) }
+                    val monthBonuses = state.monthBonuses
+                    if (monthBonuses.isEmpty()) {
+                        item(key = "month-bonuses-none") {
+                            Text(
+                                stringResource(R.string.month_bonuses_none),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                            )
+                        }
+                    } else {
+                        itemsIndexed(monthBonuses, key = { _, it -> "month-bonus-${it.bonus.id}" }) { index, item ->
+                            BonusCard(
+                                item = item,
+                                onClick = { onEditBonus(item.bonus.id) },
+                                index = index,
+                                count = monthBonuses.size,
+                                modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
+                            )
+                        }
+                    }
+                    item(key = "month-bonuses-add") {
+                        FilledTonalButton(
+                            onClick = { onAddMonthBonus(YearMonth.from(range.from)) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag(SUMMARY_ADD_MONTH_BONUS_TAG),
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.add_month_bonus))
+                        }
                     }
                 }
                 if (state.breakdown.isNotEmpty()) {

@@ -60,6 +60,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
@@ -135,6 +137,8 @@ fun CalendarScreen(
     onAddBonus: (LocalDate) -> Unit,
     onEditBonus: (Long) -> Unit,
     onManageJobs: () -> Unit,
+    onAddMonthBonus: (YearMonth) -> Unit = {},
+    onEditMonthBonus: (Long) -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -157,6 +161,7 @@ fun CalendarScreen(
         scope.launch { pagerState.animateScrollToPage(page.coerceIn(0, PAGE_COUNT - 1)) }
     }
 
+    var showMonthBonuses by rememberSaveable { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hasJobs = state.jobs.isNotEmpty()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
@@ -210,6 +215,16 @@ fun CalendarScreen(
                     )
                 }
             }
+            // Bonuses for the whole month have no day, so they are not in the grid; they have a row of their own.
+            if (state.monthBonuses.isNotEmpty()) {
+                item(key = "month-bonuses") {
+                    MonthBonusesRow(
+                        items = state.monthBonuses,
+                        onClick = { showMonthBonuses = true },
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
+                    )
+                }
+            }
             item(key = "weekdays") { WeekdayHeader() }
             item(key = "grid") {
                 HorizontalPager(
@@ -258,6 +273,25 @@ fun CalendarScreen(
                 }
             }
         }
+    }
+
+    // The last one can be deleted (or the month changed) while the list is open: then there is nothing to list.
+    val hasMonthBonuses = state.monthBonuses.isNotEmpty()
+    LaunchedEffect(hasMonthBonuses) { if (!hasMonthBonuses) showMonthBonuses = false }
+    if (showMonthBonuses && hasMonthBonuses) {
+        MonthBonusesSheet(
+            month = state.month,
+            items = state.monthBonuses,
+            onDismiss = { showMonthBonuses = false },
+            onEdit = { id ->
+                showMonthBonuses = false
+                onEditMonthBonus(id)
+            },
+            onAdd = {
+                showMonthBonuses = false
+                onAddMonthBonus(state.month)
+            },
+        )
     }
 }
 

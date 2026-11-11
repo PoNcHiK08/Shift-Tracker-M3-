@@ -338,4 +338,14 @@
     <string name="widget_preview_month">November</string>
     <string name="widget_preview_calendar">"Mo Tu We Th Fr Sa Su\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30"</string>
     <string name="widget_preview_when">Tomorrow · 18:30–01:30</string>
+    <string name="bonus_kind_day">On a specific day</string>
+    <string name="bonus_kind_month">For the whole month</string>
+    <string name="bonus_month">Month</string>
+    <string name="bonus_hint_month">The bonus counts in this month\'s earnings, but isn\'t shown on any day or in weekly totals. It doesn\'t change hours or the average rate.</string>
+    <string name="bonus_for_whole_month">For the whole month</string>
+    <string name="month_bonuses_title">Month bonuses</string>
+    <string name="month_bonuses_row">Month bonuses · %1$d</string>
+    <string name="month_bonuses_sheet_title">Month bonuses · %1$s</string>
+    <string name="month_bonuses_none">No bonuses for the whole month</string>
+    <string name="add_month_bonus">Add a bonus for the month</string>
 </resources>
