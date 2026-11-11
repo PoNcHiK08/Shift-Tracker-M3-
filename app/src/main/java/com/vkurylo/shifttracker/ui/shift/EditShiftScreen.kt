@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -85,8 +86,10 @@ fun EditShiftScreen(
     onManageJobs: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: EditShiftViewModel = hiltViewModel(),
+    applyRate: ApplyRateViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val applyRateDialog by applyRate.dialog.collectAsStateWithLifecycle()
     val locale = currentLocale()
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
@@ -102,6 +105,20 @@ fun EditShiftScreen(
                 )
             }
             onClose()
+        }
+    }
+
+    // "Apply to all shifts of this job": the result, with Undo. The editor stays open (its own shift is saved by Save).
+    LaunchedEffect(applyRate) {
+        applyRate.events.collect { event ->
+            when (event) {
+                is ApplyRateEvent.Applied -> snackbar.show(
+                    message = context.resources.getQuantityString(R.plurals.apply_rate_done, event.count, event.count),
+                    actionLabel = context.getString(R.string.undo),
+                    onAction = { applyRate.undo(event) { snackbar.show(context.getString(R.string.apply_rate_undo_failed)) } },
+                )
+                ApplyRateEvent.Failed -> snackbar.show(context.getString(R.string.apply_rate_failed))
+            }
         }
     }
 
@@ -235,7 +252,11 @@ fun EditShiftScreen(
             )
 
             Spacer(Modifier.height(16.dp))
-            PreviewCard(state, onUseCurrentRate = viewModel::useCurrentRate)
+            PreviewCard(
+                state,
+                onUseCurrentRate = viewModel::useCurrentRate,
+                onApplyToAll = { state.selectedJob?.let { applyRate.open(it, state.shiftId, state.date) } },
+            )
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -275,6 +296,18 @@ fun EditShiftScreen(
             onDismiss = { showEndPicker = false },
         )
     }
+    applyRateDialog?.let { dialog ->
+        ApplyRateDialogView(
+            dialog = dialog,
+            onScope = applyRate::setScope,
+            onConfirm = {
+                // This shift gets the rates on screen (kept by Save); the others are written now.
+                viewModel.useCurrentRate()
+                applyRate.confirm()
+            },
+            onDismiss = applyRate::dismiss,
+        )
+    }
     if (state.confirmDelete) {
         AlertDialog(
             onDismissRequest = viewModel::cancelDelete,
@@ -301,7 +334,7 @@ private fun FieldLabel(text: String) {
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
+private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, onApplyToAll: () -> Unit) {
     val locale = currentLocale()
     val onColor = MaterialTheme.colorScheme.onSecondaryContainer
     val pay = state.pay
@@ -385,7 +418,13 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit) {
                         stringResource(R.string.rate_changed_hint, state.selectedJob?.let { jobRatesLabel(it) } ?: ""),
                         style = MaterialTheme.typography.bodySmall,
                     )
-                    TextButton(onClick = onUseCurrentRate) { Text(stringResource(R.string.use_current_rate)) }
+                    // This shift only, or (after a preview and a confirmation) the job's other shifts too.
+                    FlowRow {
+                        TextButton(onClick = onUseCurrentRate) { Text(stringResource(R.string.use_current_rate)) }
+                        TextButton(onClick = onApplyToAll, modifier = Modifier.testTag(APPLY_RATE_ALL_BUTTON)) {
+                            Text(stringResource(R.string.apply_rate_all))
+                        }
+                    }
                 }
             }
         }

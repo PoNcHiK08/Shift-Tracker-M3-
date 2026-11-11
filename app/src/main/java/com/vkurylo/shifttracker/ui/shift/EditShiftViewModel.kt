@@ -36,6 +36,8 @@ import javax.inject.Inject
 data class EditShiftUiState(
     val loading: Boolean = true,
     val isNew: Boolean = true,
+    /** The stored shift being edited; null for a new one. */
+    val shiftId: Long? = null,
     val jobs: List<Job> = emptyList(),
     val jobId: Long? = null,
     val date: LocalDate = LocalDate.now(),
@@ -108,6 +110,7 @@ class EditShiftViewModel @Inject constructor(
                 EditShiftUiState(
                     loading = false,
                     isNew = false,
+                    shiftId = existing.id,
                     jobs = jobs,
                     jobId = existing.jobId,
                     date = existing.date,
