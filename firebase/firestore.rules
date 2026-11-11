@@ -51,6 +51,11 @@ service cloud.firestore {
         allow read, delete: if isOwner(uid);
         allow create, update: if isOwner(uid) && isId(id) && isLater() && isBonus(request.resource.data);
       }
+
+      match /payouts/{id} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && isId(id) && isLater() && isPayout(request.resource.data);
+      }
     }
 
     // --- Records -------------------------------------------------------------------------------------
@@ -99,13 +104,33 @@ service cloud.firestore {
         && isTimedRate(d.secondRate);
     }
 
+    // A bonus has two accepted shapes, so a phone on the previous app version keeps syncing:
+    //  - the original one, without wholeMonth (what the previous version writes);
+    //  - the current one, with wholeMonth: true for a bonus that belongs to the whole month of its date.
+    // A write that merges the previous version's fields onto a document that already has wholeMonth sees the
+    // merged document here, so it passes as the current shape and the field survives.
     function isBonus(d) {
-      return hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'dateEpochDay', 'amountGrosze', 'note'])
+      return (hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'dateEpochDay', 'amountGrosze', 'note'])
+          || (hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'dateEpochDay', 'amountGrosze', 'note',
+              'wholeMonth']) && d.wholeMonth is bool))
         && isRecord(d)
         && isId(d.jobId)
         && d.dateEpochDay is int
         && isAmount(d.amountGrosze)
         && isOptionalText(d.note);
+    }
+
+    // The salary that actually arrived, for one job and the month it was earned for. month is yyyymm.
+    // Several payouts per job and month are allowed; receivedEpochDay is optional but always present (null).
+    function isPayout(d) {
+      return hasExactly(d, ['v', 'updatedAt', 'serverUpdatedAt', 'deleted', 'jobId', 'month', 'amountMinor', 'note',
+          'receivedEpochDay'])
+        && isRecord(d)
+        && isId(d.jobId)
+        && isMonthKey(d.month)
+        && isAmount(d.amountMinor)
+        && isOptionalText(d.note)
+        && (d.receivedEpochDay == null || d.receivedEpochDay is int);
     }
 
     // --- Values --------------------------------------------------------------------------------------
@@ -126,6 +151,11 @@ service cloud.firestore {
 
     function isMinute(value) {
       return value is int && value >= 0 && value < 24 * 60;
+    }
+
+    // A month as yyyymm (2026-11 is 202611), years 1000-9999.
+    function isMonthKey(value) {
+      return value is int && value >= 100001 && value <= 999912 && value % 100 >= 1 && value % 100 <= 12;
     }
 
     // The app's limit for names and notes (TextLimits.kt; a test keeps the two equal). size() counts UTF-16
