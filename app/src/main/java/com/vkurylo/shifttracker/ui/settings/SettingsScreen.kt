@@ -652,7 +652,7 @@ private fun SafetyBackupsDialog(
                                 SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA -> stringResource(R.string.safety_backup_reason_cloud)
                                 else -> backup.reason
                             }
-                            val counts = backup.counts?.let { stringResource(R.string.safety_backup_counts, it.jobs, it.shifts, it.bonuses) }
+                            val counts = backup.counts?.let { stringResource(R.string.safety_backup_counts, it.jobs, it.shifts, it.bonuses, it.payouts) }
                                 ?: stringResource(R.string.safety_backup_unreadable)
                             Text("$reason\n$counts")
                         },

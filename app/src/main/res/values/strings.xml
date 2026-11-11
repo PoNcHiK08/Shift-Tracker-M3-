@@ -185,13 +185,13 @@
     <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Збережи копію у файл або поділися нею (Диск, месенджер, пошта); відновити її можна через «Імпорт даних».</string>
     <string name="safety_backup_reason_import">Перед імпортом файлу</string>
     <string name="safety_backup_reason_cloud">Перед заміною даними акаунта</string>
-    <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
+    <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="safety_backup_unreadable">Не вдається прочитати</string>
     <string name="safety_backup_save">Зберегти у файл</string>
     <string name="safety_backup_share">Поділитися</string>
     <string name="safety_backup_saved">Страхувальну копію збережено</string>
     <string name="import_safety_backup_failed">Не вдалося зберегти страхувальну копію поточних даних, тому нічого не імпортовано. Дані не змінилися.</string>
-    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
+    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="error_file_operation">Не вдалося обробити файл</string>
     <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
     <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Оновіть Shift Tracker і спробуйте ще раз. Поточні дані не змінено.</string>

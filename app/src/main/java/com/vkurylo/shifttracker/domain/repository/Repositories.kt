@@ -99,7 +99,7 @@ interface LanguageRepository {
     val changes: kotlinx.coroutines.flow.Flow<String?>
 }
 
-/** JSON export/import of all jobs, shifts and bonuses. */
+/** JSON export/import of all jobs, shifts, bonuses and received-pay payouts. */
 interface BackupRepository {
     suspend fun exportJson(): String
 
@@ -129,4 +129,4 @@ class InvalidBackupException(
     }
 }
 
-data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int)
+data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int, val payouts: Int = 0)

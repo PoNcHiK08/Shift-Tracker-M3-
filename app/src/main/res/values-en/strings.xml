@@ -182,13 +182,13 @@
     <string name="safety_backups_message">The app saves these itself before it replaces the data on this phone (the newest %1$d are kept). Save one to a file or share it (Drive, a messenger, email); restore it with Import data.</string>
     <string name="safety_backup_reason_import">Before importing a file</string>
     <string name="safety_backup_reason_cloud">Before taking an account\'s data</string>
-    <string name="safety_backup_counts">%1$d jobs, %2$d shifts, %3$d bonuses</string>
+    <string name="safety_backup_counts">%1$d jobs, %2$d shifts, %3$d bonuses, %4$d received payments</string>
     <string name="safety_backup_unreadable">Can\'t be read</string>
     <string name="safety_backup_save">Save to a file</string>
     <string name="safety_backup_share">Share</string>
     <string name="safety_backup_saved">Safety backup saved</string>
     <string name="import_safety_backup_failed">Couldn\'t save a safety backup of the current data, so nothing was imported. Your data is unchanged.</string>
-    <string name="import_backup_done">Restored %1$d jobs, %2$d shifts and %3$d bonuses</string>
+    <string name="import_backup_done">Restored %1$d jobs, %2$d shifts, %3$d bonuses and %4$d received payments</string>
     <string name="error_file_operation">Couldn\'t process the file</string>
     <string name="error_backup_invalid">This isn\'t a valid Shift Tracker backup. Your current data is unchanged.</string>
     <string name="error_backup_newer_version">This backup was made by a newer version of the app. Update Shift Tracker and try again. Your current data is unchanged.</string>
