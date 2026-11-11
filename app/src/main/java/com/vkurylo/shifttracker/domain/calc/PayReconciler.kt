@@ -3,6 +3,9 @@ package com.vkurylo.shifttracker.domain.calc
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.JobSummary
+import com.vkurylo.shifttracker.domain.model.Amounts
+import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
@@ -11,9 +14,10 @@ import java.time.YearMonth
 /**
  * One job's salary that actually arrived for one month, set against what the app calculates for it.
  *
- * Reconciliation only: nothing here feeds an earnings total (that would count the money twice). The calculated
- * figure is always the NET pay (after the job's deductions), whatever the display mode is: net is what lands in
- * the bank. All amounts are minor units of the job's currency.
+ * The comparison shown under "Received pay". The totals count received pay through [PayReconciler.actualSummary]
+ * instead (it replaces the calculated money, never adds to it). The calculated figure here is always the NET pay
+ * (after the job's deductions), whatever the display mode is: net is what lands in the bank. All amounts are
+ * minor units of the job's currency.
  */
 data class PayReconciliation(
     val job: Job,
@@ -39,7 +43,89 @@ data class JobYearReconciliation(val job: Job, val months: List<PayReconciliatio
     val differenceMinor: Long get() = receivedMinor - calculatedNetMinor
 }
 
+/** One job's money for one month: the received sum when anything arrived for it, else the calculated figure. */
+data class MonthPay(val amountMinor: Long, val received: Boolean)
+
 object PayReconciler {
+
+    /**
+     * The rule for one job-month: with at least one payout, its actual pay is the sum of the payouts (several are
+     * added up; an advance alone counts as the month's pay) and replaces [calculatedMinor] entirely. Without
+     * payouts it is [calculatedMinor]. The payouts must all belong to that job and month.
+     */
+    fun actualMonthPay(calculatedMinor: Long, payouts: List<Payout>): MonthPay =
+        if (payouts.isEmpty()) MonthPay(calculatedMinor, received = false)
+        else MonthPay(payouts.sumOf { it.amountMinor }, received = true)
+
+    /**
+     * Totals for a period in which received pay counts as the real money: [ShiftCalculator.summarize] of the
+     * period, where every job-month of [months] (the period's whole months; none for a week) with payouts counts
+     * their sum instead of its calculated shifts, bonuses (day and whole-month) and fixed salary. Hours, shift
+     * counts, shift earnings and the average rate stay calculated. A job with payouts but no entries in the
+     * period still gets a row. Payouts for months outside [months] are ignored. Same in Gross and Net mode.
+     */
+    fun actualSummary(
+        shifts: List<ShiftWithJob>,
+        bonuses: List<BonusWithJob>,
+        jobs: List<Job>,
+        months: List<YearMonth>,
+        mode: EarningsMode,
+        payouts: List<PayoutWithJob>,
+    ): MonthSummary {
+        val calculated = ShiftCalculator.summarize(shifts, bonuses, jobs, months, mode)
+        val relevant = payouts.filter { it.payout.month in months }
+        if (relevant.isEmpty()) return calculated
+
+        val jobsById = (relevant.map { it.job } + jobs).associateBy { it.id }
+        val swaps = relevant.groupBy { it.job.id to it.payout.month }.map { (key, rows) ->
+            val (jobId, month) = key
+            val job = jobsById.getValue(jobId)
+            val part = ShiftCalculator.summarize(
+                shifts = shifts.filter { it.job.id == jobId && YearMonth.from(it.shift.date) == month },
+                bonuses = bonuses.filter { it.job.id == jobId && it.bonus.month == month },
+                jobs = listOf(job),
+                salaryMonths = listOf(month),
+                mode = mode,
+            ).perJob.firstOrNull()
+            val pay = actualMonthPay(part?.calculatedEarningsMinor ?: 0, rows.map { it.payout })
+            JobSummary(
+                job = job, paidMinutes = 0, shiftEarningsGrosze = 0, bonusGrosze = 0, shiftCount = 0,
+                receivedMinor = pay.amountMinor,
+                replacedMinor = part?.calculatedEarningsMinor ?: 0,
+                replacedBonusMinor = part?.bonusGrosze ?: 0,
+                replacedSalaryMinor = part?.salaryMinor ?: 0,
+                receivedMonths = 1,
+            )
+        }.groupBy { it.job.id }
+
+        val byJob = calculated.perJob.associateBy { it.job.id }
+        val unsorted = (byJob.keys + swaps.keys).map { jobId ->
+            val base = byJob[jobId] ?: JobSummary(jobsById.getValue(jobId), 0, 0, 0, 0)
+            val jobSwaps = swaps[jobId].orEmpty()
+            base.copy(
+                receivedMinor = jobSwaps.sumOf { it.receivedMinor },
+                replacedMinor = jobSwaps.sumOf { it.replacedMinor },
+                replacedBonusMinor = jobSwaps.sumOf { it.replacedBonusMinor },
+                replacedSalaryMinor = jobSwaps.sumOf { it.replacedSalaryMinor },
+                receivedMonths = jobSwaps.size,
+            )
+        }
+        val swapped = unsorted.filter { it.receivedMonths > 0 }
+        val summary = calculated.copy(
+            received = Amounts.sum(swapped, { it.currency }, { it.receivedMinor }),
+            replaced = Amounts.sum(swapped, { it.currency }, { it.replacedMinor }),
+            replacedBonuses = Amounts.sum(swapped, { it.currency }, { it.replacedBonusMinor }),
+            replacedSalaries = Amounts.sum(swapped, { it.currency }, { it.replacedSalaryMinor }),
+        )
+        val currencyOrder = summary.totalEarnings.sortedByValue().map { it.first }
+        return summary.copy(
+            perJob = unsorted.sortedWith(
+                compareBy<JobSummary> { currencyOrder.indexOf(it.currency) }
+                    .thenByDescending { it.earningsGrosze }
+                    .thenBy { it.job.name },
+            ),
+        )
+    }
 
     /**
      * Per job of [month]: the calculated net pay and the payouts for the month. A job appears when it has any

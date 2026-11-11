@@ -18,8 +18,8 @@ import java.time.LocalTime
 import java.time.YearMonth
 
 /**
- * Received pay is compared with the calculated NET pay of its month, per job; it is never an input of any
- * earnings total.
+ * Received pay is compared with the calculated NET pay of its month, per job. The totals count it through
+ * [PayReconciler.actualSummary] (see ActualPayTest).
  */
 class PayReconcilerTest {
     private val october = YearMonth.of(2026, 10)
@@ -128,12 +128,26 @@ class PayReconcilerTest {
     }
 
     @Test
-    fun receivedPayNeverChangesAnyEarningsTotal() {
-        val before = ShiftCalculator.summarize(shifts, listOf(dayBonus, monthBonus), jobs, listOf(november), EarningsMode.NET)
-        PayReconciler.forMonth(november, jobs, shifts, listOf(dayBonus, monthBonus), listOf(payout(cafe, november, 999_999)))
-        PayReconciler.forYear(2026, jobs, shifts, listOf(dayBonus, monthBonus), listOf(payout(cafe, november, 999_999)))
-        val after = ShiftCalculator.summarize(shifts, listOf(dayBonus, monthBonus), jobs, listOf(november), EarningsMode.NET)
-        assertEquals(before, after)
+    fun receivedPayReplacesTheJobMonthsEarningsAndChangesNothingElse() {
+        // Was "received pay never changes any earnings total"; received pay now counts as the real money of its
+        // job-month: it replaces that job-month's calculated money (never adds to it) and leaves everything else.
+        val bonuses = listOf(dayBonus, monthBonus)
+        val shifts = shifts.filter { YearMonth.from(it.shift.date) == november }
+        val calculated = ShiftCalculator.summarize(shifts, bonuses, jobs, listOf(november), EarningsMode.NET)
+        val payouts = listOf(payout(cafe, november, 999_999))
+        // The comparison itself still changes nothing.
+        PayReconciler.forMonth(november, jobs, shifts, bonuses, payouts)
+        PayReconciler.forYear(2026, jobs, shifts, bonuses, payouts)
+        assertEquals(calculated, ShiftCalculator.summarize(shifts, bonuses, jobs, listOf(november), EarningsMode.NET))
+
+        val actual = PayReconciler.actualSummary(shifts, bonuses, jobs, listOf(november), EarningsMode.NET, payouts)
+        val cafeCalculated = calculated.perJob.single { it.job.id == 1L }.earningsGrosze
+        assertEquals(calculated.totalEarnings["PLN"] - cafeCalculated + 999_999, actual.totalEarnings["PLN"])
+        assertEquals(calculated.totalEarnings["EUR"], actual.totalEarnings["EUR"])
+        assertEquals(calculated.totalPaidMinutes, actual.totalPaidMinutes)
+        assertEquals(calculated.shiftCount, actual.shiftCount)
+        assertEquals(calculated.averageRate("PLN"), actual.averageRate("PLN"))
+        assertEquals(calculated.shiftEarnings, actual.shiftEarnings)
     }
 
     @Test
