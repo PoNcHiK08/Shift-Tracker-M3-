@@ -75,8 +75,8 @@ data class RemoteBonus(
 ) : RemoteRecord
 
 /**
- * The salary that actually arrived for a job, for the month it was earned for ([month], yyyymm). A reconciliation
- * figure: never part of any earnings total.
+ * The salary that actually arrived for a job, for the month it was earned for ([month], yyyymm). The app counts it
+ * as that job-month's pay when computing totals; nothing about it is stored or synced differently for that.
  */
 data class RemotePayout(
     override val syncId: String,

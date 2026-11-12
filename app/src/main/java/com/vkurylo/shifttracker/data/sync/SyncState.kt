@@ -35,5 +35,6 @@ fun interface SafetyBackup {
     object Reason {
         const val BEFORE_TAKING_CLOUD_DATA = "before-taking-cloud-data"
         const val BEFORE_IMPORT = "before-import"
+        const val BEFORE_RATE_CHANGE = "before-rate-change"
     }
 }

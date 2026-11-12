@@ -77,6 +77,14 @@ data class Amounts(val byCurrency: Map<String, Long> = emptyMap()) {
 
     fun plus(currency: String, value: Long): Amounts = this + of(currency, value)
 
+    /** Subtracts per currency; a currency of [other] missing here appears with a negative value. */
+    operator fun minus(other: Amounts): Amounts {
+        if (other.isEmpty) return this
+        val merged = LinkedHashMap(byCurrency)
+        other.byCurrency.forEach { (code, value) -> merged[code] = (merged[code] ?: 0L) - value }
+        return Amounts(merged)
+    }
+
     /** The largest amount first (ties keep their order); used to pick what to show first. */
     fun sortedByValue(): List<Pair<String, Long>> = byCurrency.entries.sortedByDescending { it.value }.map { it.key to it.value }
 

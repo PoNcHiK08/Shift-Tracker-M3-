@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.ui.util.RECEIVED_TAG
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.util.Formatters
 import org.junit.Assert.assertEquals
@@ -49,7 +50,7 @@ class MonthStripLayoutTest {
     )
     private val total = Formatters.money(summary.totalEarnings["PLN"], "PLN", Locale.US)
 
-    private fun show(fontScale: Float) {
+    private fun show(fontScale: Float, summary: MonthSummary = this.summary) {
         composeRule.setContent {
             val density = LocalDensity.current
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
@@ -106,5 +107,94 @@ class MonthStripLayoutTest {
         val (earnings, hours, shifts) = assertLinedUp()
         assertTrue("didn't grow with the font", (earnings.bottom - earnings.top).value > 64f)
         assertEverythingFits(earnings, hours, shifts)
+    }
+
+    @Test
+    fun aMonthWithReceivedPayShowsTheMarkerInsideTheEarningsTileAndStillLinesUp() {
+        // 1 477 zł calculated for the month, 1 200 zł received for it instead.
+        val received = summary.copy(received = Amounts.of("PLN", 120_000), replaced = Amounts.of("PLN", 147_700))
+        show(fontScale = 1f, summary = received)
+        val (earnings, _, _) = assertLinedUp()
+        val tag = composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertTrue("the marker $tag is cut off by $earnings", tag.top >= earnings.top && tag.bottom <= earnings.bottom)
+        composeRule.onNodeWithText("Received", useUnmergedTree = true).assertExists()
+        assertInside(Formatters.money(120_000, "PLN", Locale.US), earnings)
+    }
+
+    @Test
+    fun aCalculatedMonthHasNoMarker() {
+        show(fontScale = 1f)
+        composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    // --- The "Received" tag beside the amount ---------------------------------------------------------------
+
+    private fun receivedSummary(receivedMinor: Long) =
+        summary.copy(received = Amounts.of("PLN", receivedMinor), replaced = Amounts.of("PLN", 147_700))
+
+    private fun tagBounds() = composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).getUnclippedBoundsInRoot()
+    private fun amountBounds() = composeRule.onNodeWithTag(MONTH_TILE_AMOUNT, useUnmergedTree = true).getUnclippedBoundsInRoot()
+
+    private fun assertWithin(inner: DpRect, outer: DpRect, what: String) {
+        assertTrue("$what $inner is cut off by $outer", inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom)
+    }
+
+    private fun assertNoOverlap(a: DpRect, b: DpRect) {
+        val overlaps = a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
+        assertTrue("$a and $b overlap", !overlaps)
+    }
+
+    @Test
+    fun theTagSitsBesideTheAmountOnItsRow() {
+        show(fontScale = 1f, summary = receivedSummary(120_000))
+        val (earnings, _, _) = assertLinedUp()
+        val tag = tagBounds()
+        val amount = amountBounds()
+        assertTrue("the tag $tag is not right of the amount $amount", tag.left >= amount.right)
+        val middle = (tag.top + tag.bottom) / 2
+        assertTrue("the tag $tag is not on the amount's row $amount", middle >= amount.top && middle <= amount.bottom)
+        assertWithin(tag, earnings, "the tag")
+        assertWithin(amount, earnings, "the amount")
+    }
+
+    @Test
+    fun aLongAmountWithAHugeFontPutsTheTagUnderTheAmountWithoutCuttingAnything() {
+        show(fontScale = 2f, summary = receivedSummary(1_234_567))
+        val (earnings, _, _) = assertLinedUp()
+        val tag = tagBounds()
+        val amount = amountBounds()
+        assertTrue("the tag $tag didn't move under the amount $amount", tag.top >= amount.bottom - 0.5.dp)
+        assertNoOverlap(tag, amount)
+        assertWithin(tag, earnings, "the tag")
+        assertInside(Formatters.money(1_234_567, "PLN", Locale.US), earnings)
+    }
+
+    @Test
+    fun aLongAmountAtANormalFontKeepsEverythingInside() {
+        show(fontScale = 1f, summary = receivedSummary(1_234_567))
+        val (earnings, _, _) = assertLinedUp()
+        val tag = tagBounds()
+        assertNoOverlap(tag, amountBounds())
+        assertWithin(tag, earnings, "the tag")
+        assertInside(Formatters.money(1_234_567, "PLN", Locale.US), earnings)
+    }
+
+    @Test
+    @Config(qualifiers = "uk-w384dp-h832dp-night-xxhdpi")
+    fun theUkrainianTagFitsBesideOrUnderTheAmount() {
+        show(fontScale = 1.3f, summary = receivedSummary(1_234_567))
+        val (earnings, _, _) = assertLinedUp()
+        composeRule.onNodeWithText("Отримано", useUnmergedTree = true).assertExists()
+        val tag = tagBounds()
+        assertNoOverlap(tag, amountBounds())
+        assertWithin(tag, earnings, "the tag")
+        assertWithin(amountBounds(), earnings, "the amount")
+    }
+
+    @Test
+    fun aLongCalculatedAmountHasNoTag() {
+        show(fontScale = 2f, summary = summary.copy(shiftEarnings = Amounts.of("PLN", 1_234_567)))
+        composeRule.onNodeWithTag(RECEIVED_TAG, useUnmergedTree = true).assertDoesNotExist()
+        assertLinedUp()
     }
 }

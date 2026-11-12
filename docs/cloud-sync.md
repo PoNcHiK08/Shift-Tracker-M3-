@@ -45,9 +45,14 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
 - **Needs Google Play services** for signing in.
 - **Weekly totals leave out bonuses for a whole month.** A week can span two months, so such a bonus is part of
   its month and of the year, never of a week or of a day (it is not in the calendar grid or the day panel).
-- **Received pay is a check, not an earning.** It is set against the calculated pay after deductions (net),
-  whatever Gross / Net is on, and is never added to any total. Several payments for one month are summed. A
-  payment belongs to the month it was earned for, not the month it arrived.
+- **Received pay replaces the calculated pay of its job and month.** Once a job has a payment for a month, the
+  month tile, Summary → Month and Year count what arrived for that job instead of its calculated shifts, bonuses
+  and salary (never on top), marked **Received**, in Gross and in Net. Several payments for one month are summed,
+  so an advance alone shows as the whole month until the rest is entered. Hours, shifts, the average rate, the
+  day panel and **weeks stay calculated**. The **Received pay** section still compares what arrived with the
+  calculated pay after deductions (net). A payment belongs to the month it was earned for, not the month it
+  arrived. Nothing is stored differently for this: older app versions on another phone keep showing the
+  calculated pay.
 - **Restoring a backup replaces received pay too.** A backup made before received pay existed has none, so
   importing it deletes the payments (as deletions that sync, like every other record). The safety backup taken
   first has them.
@@ -132,9 +137,15 @@ last check.
      entered, the **Difference** (received minus calculated).
    - Tap a job → **Add payment**: amount, the month it was earned for, an optional received date and note.
      Add a second payment for the same month: they are summed ("2 payments").
-   - **The month's totals did not move.** Compare the hero card and **By job** before and after.
-   - Switch Gross / Net: the calculated figure in **Received pay** stays the net one.
-   - Delete a payment and **Undo**. **Year** shows a line per job with payments.
+   - **The totals now count what arrived for that job and month.** The calendar's month tile, the hero card,
+     the job in **By job** and the month's row in **Year** (and its total) show the received sum with a
+     **Received** tag ("Incl. received" when another job is still calculated). The job's bonuses and salary are
+     not added on top.
+   - **Week** and the **day panel** are unchanged, and so are hours, shifts and the average rate.
+   - Switch Gross / Net: the received figure stays the same; the calculated figure in **Received pay** stays the
+     net one.
+   - Delete the payments: every figure is the calculated one again and the tags are gone. **Undo** brings them
+     back. **Year** shows a line per job with payments.
 3. **Two phones.** Do 1 and 2 on A, then **Sync now** on both: B shows the same month bonus (not on a day) and the
    same payments. **Sync now** again on B: "0 received, 0 sent".
 4. **Backup.** **Export data** (the file says `"version": 6` and lists `payouts`), then **Import data** it back

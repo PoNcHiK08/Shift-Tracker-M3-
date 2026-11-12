@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -40,6 +41,7 @@ import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.SnackbarController
 import com.vkurylo.shifttracker.ui.theme.ShiftTrackerTheme
 import com.vkurylo.shifttracker.ui.util.Formatters
+import com.vkurylo.shifttracker.ui.util.RECEIVED_TAG
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -60,7 +62,7 @@ import java.util.Locale
 
 /**
  * Summary → Month → Received pay: what arrived next to the calculated NET pay, per job, with the difference; the
- * payments can be added, edited and deleted. None of it is part of any earnings total.
+ * payments can be added, edited and deleted. The totals count what arrived instead of the calculated pay.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(application = Application::class, sdk = [35], qualifiers = "w411dp-h2400dp")
@@ -183,14 +185,19 @@ class ReceivedPayScreenTest {
     fun theComparisonIsAgainstNetEvenWhenTheScreensShowGross() {
         val (vm, _) = show()
         assertEquals(EarningsMode.GROSS, prefs.value.earningsMode)
-        // Gross is what the totals show; the received-pay row still compares with the net figure.
-        assertEquals(24_000L + 50_000L, vm.uiState.value.summary.perJob.single { it.job.id == 1L }.earningsGrosze)
+        // Gross is what the calculation shows (the total counts the 600 zł received instead); the received-pay row
+        // still compares with the net figure.
+        val cafeRow = vm.uiState.value.summary.perJob.single { it.job.id == 1L }
+        assertEquals(24_000L + 50_000L, cafeRow.calculatedEarningsMinor)
+        assertEquals(60_000L, cafeRow.earningsGrosze)
         assertEquals(cafeNet, vm.uiState.value.receivedPay.single { it.job.id == 1L }.calculatedNetMinor)
         assertRowShows(cafe.id, money(cafeNet))
     }
 
     @Test
-    fun receivedPayNeverChangesAnyTotal() {
+    fun receivedPayReplacesTheCalculatedTotalOfItsJobMonthAndNothingElse() {
+        // Was "received pay never changes any total": received pay now counts as the real money of its job-month,
+        // instead of (never on top of) the calculated figure; hours, shifts and the rate stay calculated.
         val scope = CoroutineScope(Dispatchers.Main.immediate)
         fun viewModel(payments: List<Payout>) = SummaryViewModel(
             SavedStateHandle(mapOf("period" to "MONTH", "anchor" to november.atDay(10).toEpochDay())),
@@ -201,10 +208,16 @@ class ReceivedPayScreenTest {
         val without = viewModel(emptyList())
         composeRule.waitUntil(5_000) { !with.uiState.value.loading && !without.uiState.value.loading }
 
-        assertEquals(without.uiState.value.summary, with.uiState.value.summary)
-        assertEquals(without.uiState.value.breakdown, with.uiState.value.breakdown)
-        assertEquals(mapOf("PLN" to (24_000L + 50_000L), "EUR" to 300_000L), with.uiState.value.summary.totalEarnings.byCurrency)
-        // ...while the received-pay figures do differ.
+        val calculated = without.uiState.value.summary
+        val actual = with.uiState.value.summary
+        assertEquals(mapOf("PLN" to (24_000L + 50_000L), "EUR" to 300_000L), calculated.totalEarnings.byCurrency)
+        assertEquals(mapOf("PLN" to (60_000L + 99_999_999L), "EUR" to 300_000L), actual.totalEarnings.byCurrency)
+        assertEquals(calculated.totalPaidMinutes, actual.totalPaidMinutes)
+        assertEquals(calculated.shiftCount, actual.shiftCount)
+        assertEquals(calculated.bonusCount, actual.bonusCount)
+        assertEquals(calculated.averageRate("PLN"), actual.averageRate("PLN"))
+        assertEquals(calculated.perJob.single { it.job.id == 2L }, actual.perJob.single { it.job.id == 2L })
+        // The comparison figures differ as before.
         assertTrue(with.uiState.value.receivedPay.any { it.receivedMinor > 0 })
         assertTrue(without.uiState.value.receivedPay.all { it.receivedMinor == 0L })
         scope.cancel()
@@ -289,7 +302,9 @@ class ReceivedPayScreenTest {
         composeRule.onNodeWithText(text(R.string.received_pay_title)).assertIsDisplayed()
         assertRowShows(cafe.id, money(1_000))
         composeRule.onNodeWithText(text(R.string.summary_empty_title)).assertDoesNotExist()
-        assertTrue("an empty month has no earnings", vm.uiState.value.summary.isEmpty)
+        // What arrived is the month's money now: 10 zł, received.
+        assertTrue(!vm.uiState.value.summary.isEmpty)
+        assertEquals(1_000L, vm.uiState.value.summary.totalEarnings["PLN"])
     }
 
     @Test
@@ -310,5 +325,50 @@ class ReceivedPayScreenTest {
         composeRule.onNodeWithText(text(R.string.received_pay_title)).assertDoesNotExist()
         assertEquals(emptyList<Any>(), vm.uiState.value.receivedPay)
         assertEquals(emptyList<Any>(), vm.uiState.value.receivedPayYear)
+    }
+
+    /** How many "received" markers show [label]. */
+    private fun markers(label: String) =
+        composeRule.onAllNodes(hasText(label) and hasAnyAncestor(hasTestTag(RECEIVED_TAG)), useUnmergedTree = true).fetchSemanticsNodes().size
+
+    private fun allMarkers() = composeRule.onAllNodes(hasTestTag(RECEIVED_TAG), useUnmergedTree = true).fetchSemanticsNodes().size
+
+    @Test
+    fun theMonthTotalAndTheJobWithPaymentsCarryTheReceivedMarker() {
+        show()
+        // The hero: the café's 600 zł received next to the office's calculated salary.
+        assertEquals(1, markers(text(R.string.received_tag_part)))
+        // By job: the café's whole figure is what arrived; the office has no marker.
+        assertEquals(1, markers(text(R.string.received_tag_all)))
+        assertEquals(2, allMarkers())
+        // The hero and the café's row both show the 600 zł received.
+        assertEquals(2, composeRule.onAllNodesWithText(money(60_000)).fetchSemanticsNodes().size)
+        // The 500 zł month bonus is inside what arrived: no "including bonuses" on top of it.
+        val including = context.getString(R.string.including_bonuses, "").trim()
+        composeRule.onAllNodes(hasText(including, substring = true)).fetchSemanticsNodes().let { assertEquals(0, it.size) }
+    }
+
+    @Test
+    fun withoutPaymentsThereIsNoMarker() {
+        show(payments = emptyList())
+        assertEquals(0, allMarkers())
+    }
+
+    @Test
+    fun theYearMarksTheMonthWithPaymentsAndItsTotal() {
+        show(period = SummaryPeriod.YEAR)
+        val part = text(R.string.received_tag_part)
+        // November's row says it includes received pay (its row is one node for accessibility).
+        val label = Formatters.monthName(november, locale)
+        val rows = composeRule.onAllNodes(hasContentDescription(label, substring = true) and hasContentDescription(part, substring = true)).fetchSemanticsNodes()
+        assertEquals(1, rows.size)
+        // The year total, too.
+        assertTrue(markers(part) >= 1)
+    }
+
+    @Test
+    fun theWeekShowsNoMarker() {
+        show(period = SummaryPeriod.WEEK)
+        assertEquals(0, allMarkers())
     }
 }

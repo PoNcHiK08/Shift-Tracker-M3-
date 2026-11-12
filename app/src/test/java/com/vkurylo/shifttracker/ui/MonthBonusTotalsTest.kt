@@ -178,7 +178,7 @@ class MonthBonusTotalsTest {
 
     @Test
     fun theCalendarGridAndDayPanelHaveNoMonthBonusButTheMonthTotalHasIt() {
-        val vm = CalendarViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        val vm = CalendarViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository, FakePayoutRepository(listOf(cafe)))
         vm.showMonth(november)
         val state = vm.uiState.awaitValue { !it.loading && it.month == november && it.monthSummary.totalEarnings["PLN"] > 0 }
 

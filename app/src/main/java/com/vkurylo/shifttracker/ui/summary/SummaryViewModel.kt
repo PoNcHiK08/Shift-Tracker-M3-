@@ -14,6 +14,7 @@ import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.PayoutWithJob
+import com.vkurylo.shifttracker.domain.model.ReceivedPart
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.forWholeMonths
 import com.vkurylo.shifttracker.domain.model.onDays
@@ -62,29 +63,38 @@ data class PeriodRange(val period: SummaryPeriod, val from: LocalDate, val to: L
 data class BreakdownEntry(
     val date: LocalDate,
     val paidMinutes: Long,
-    /** Shift pay + bonuses of that day / month, per currency. */
+    /**
+     * Shift pay + bonuses of that day / month, per currency. In the year view a job's month with received pay
+     * counts what arrived instead (see [receivedPart]); a day of the week is always calculated.
+     */
     val earnings: Amounts,
     val shiftCount: Int,
     val bonusCount: Int,
     /** A monthly salary is counted in this month (year view). */
     val hasSalary: Boolean = false,
+    /** How much of [earnings] is received pay (year view only). */
+    val receivedPart: ReceivedPart = ReceivedPart.NONE,
 ) {
-    val isEmpty: Boolean get() = shiftCount == 0 && bonusCount == 0 && !hasSalary
+    val isEmpty: Boolean get() = shiftCount == 0 && bonusCount == 0 && !hasSalary && receivedPart == ReceivedPart.NONE
 }
 
 data class SummaryUiState(
     val range: PeriodRange = PeriodRange.of(SummaryPeriod.MONTH, LocalDate.now()),
+    /**
+     * Totals of the period. Month and year: a job's month with received pay counts what arrived instead of its
+     * calculated pay. Week: always calculated.
+     */
     val summary: MonthSummary = MonthSummary.EMPTY,
     /** Days of the week (WEEK) or months of the year (YEAR); empty for MONTH. */
     val breakdown: List<BreakdownEntry> = emptyList(),
     /** The month's bonuses for the whole month (month view only): counted in [summary], listed in their own section. */
     val monthBonuses: List<BonusWithJob> = emptyList(),
     /**
-     * Month view: per job, the salary that actually arrived against the calculated NET pay. A check only: nothing
-     * here is part of [summary].
+     * Month view: per job, the salary that actually arrived against the calculated NET pay: the comparison of the
+     * two figures ([summary] already counts the received one).
      */
     val receivedPay: List<PayReconciliation> = emptyList(),
-    /** Year view: per job with received pay, over the months that have it. Not part of [summary] either. */
+    /** Year view: per job with received pay, over the months that have it. */
     val receivedPayYear: List<JobYearReconciliation> = emptyList(),
     /** Shown for zero totals (no entries): the latest job's currency. */
     val defaultCurrency: String = Currencies.DEFAULT,
@@ -126,8 +136,9 @@ class SummaryViewModel @Inject constructor(
                 val bonuses = if (range.period == SummaryPeriod.WEEK) allBonuses.onDays() else allBonuses
                 SummaryUiState(
                     range = range,
-                    summary = ShiftCalculator.summarize(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode),
-                    breakdown = breakdown(range, shifts, bonuses, jobs, mode),
+                    // A week covers no whole month and observes no payouts: it stays calculated.
+                    summary = PayReconciler.actualSummary(shifts, bonuses, jobs, ShiftCalculator.wholeMonths(range.from, range.to), mode, payouts),
+                    breakdown = breakdown(range, shifts, bonuses, jobs, mode, payouts),
                     monthBonuses = if (range.period == SummaryPeriod.MONTH) bonuses.forWholeMonths() else emptyList(),
                     receivedPay = receivedPay(range, jobs, shifts, bonuses, payouts),
                     receivedPayYear = receivedPayYear(range, jobs, shifts, bonuses, payouts),
@@ -184,6 +195,7 @@ class SummaryViewModel @Inject constructor(
         bonuses: List<BonusWithJob>,
         jobs: List<Job>,
         mode: EarningsMode,
+        payouts: List<PayoutWithJob>,
     ): List<BreakdownEntry> = when (range.period) {
         SummaryPeriod.WEEK -> (0L..6L).map { offset ->
             val day = range.from.plusDays(offset)
@@ -191,16 +203,22 @@ class SummaryViewModel @Inject constructor(
         }
         SummaryPeriod.YEAR -> (1..12).map { month ->
             val first = range.from.withMonth(month).withDayOfMonth(1)
-            entry(
+            val monthShifts = shifts.filter { it.shift.date.monthValue == month }
+            val monthBonuses = bonuses.filter { it.bonus.date.monthValue == month }
+            val calculated = entry(
                 first,
-                shifts.filter { it.shift.date.monthValue == month },
-                bonuses.filter { it.bonus.date.monthValue == month },
+                monthShifts,
+                monthBonuses,
                 mode,
                 // Each month of the year carries its fixed salaries.
                 salaries = jobs.fold(Amounts.EMPTY) { acc, job ->
                     ShiftCalculator.salary(job, YearMonth.from(first), mode).let { if (it > 0) acc.plus(job.currency, it) else acc }
                 },
             )
+            // Jobs of the month with received pay count what arrived instead of their calculated pay.
+            val actual = PayReconciler.actualSummary(monthShifts, monthBonuses, jobs, listOf(YearMonth.from(first)), mode, payouts)
+            if (actual.receivedPart == ReceivedPart.NONE) calculated
+            else calculated.copy(earnings = calculated.earnings - actual.replaced + actual.received, receivedPart = actual.receivedPart)
         }
         SummaryPeriod.MONTH -> emptyList()
     }

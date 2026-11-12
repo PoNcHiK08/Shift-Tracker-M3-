@@ -650,6 +650,7 @@ private fun SafetyBackupsDialog(
                             val reason = when (backup.reason) {
                                 SafetyBackup.Reason.BEFORE_IMPORT -> stringResource(R.string.safety_backup_reason_import)
                                 SafetyBackup.Reason.BEFORE_TAKING_CLOUD_DATA -> stringResource(R.string.safety_backup_reason_cloud)
+                                SafetyBackup.Reason.BEFORE_RATE_CHANGE -> stringResource(R.string.safety_backup_reason_rates)
                                 else -> backup.reason
                             }
                             val counts = backup.counts?.let { stringResource(R.string.safety_backup_counts, it.jobs, it.shifts, it.bonuses, it.payouts) }
