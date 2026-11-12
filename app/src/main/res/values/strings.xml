@@ -141,6 +141,15 @@
     <string name="rate_used">Ставка: %1$s</string>
     <string name="rate_changed_hint">Поточна ставка цієї роботи вже інша: %1$s</string>
     <string name="use_current_rate">Застосувати поточну ставку</string>
+    <string name="apply_rate_all">Застосувати до всіх змін цієї роботи…</string>
+    <string name="apply_rate_title">Застосувати поточну ставку?</string>
+    <string name="apply_rate_scope_all">Усі зміни цієї роботи</string>
+    <string name="apply_rate_scope_from">Від дати цієї зміни (%1$s) і пізніші</string>
+    <string name="apply_rate_none">Інших змін змінювати не треба: у них уже ця ставка.</string>
+    <string name="apply_rate_warning">Це перерахує заробіток минулих змін, зокрема за місяці, за які вам, можливо, уже заплатили. Ця зміна отримує ставку на екрані: натисніть «Зберегти», щоб її залишити. Спершу зберігається резервна копія всіх даних.</string>
+    <string name="apply_rate_confirm">Застосувати</string>
+    <string name="apply_rate_failed">Не вдалося застосувати ставку. Нічого не змінено.</string>
+    <string name="apply_rate_undo_failed">Не вдалося скасувати зміну ставки.</string>
     <string name="error_job_required">Обери роботу</string>
     <string name="error_break_too_long">Перерва довша за саму зміну</string>
     <string name="delete_shift">Видалити зміну</string>
@@ -184,6 +193,7 @@
     <string name="safety_backups_summary">Збережено перед заміною даних: %1$d. Торкнися, щоб зберегти копію у файл.</string>
     <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Збережи копію у файл або поділися нею (Диск, месенджер, пошта); відновити її можна через «Імпорт даних».</string>
     <string name="safety_backup_reason_import">Перед імпортом файлу</string>
+    <string name="safety_backup_reason_rates">Перед застосуванням поточної ставки до багатьох змін</string>
     <string name="safety_backup_reason_cloud">Перед заміною даними акаунта</string>
     <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="safety_backup_unreadable">Не вдається прочитати</string>
@@ -275,6 +285,18 @@
     <string name="import_empty_message">У файлі немає подій з часом початку й кінця. Події на весь день пропускаються.</string>
     <string name="import_needs_job">Щоб імпортувати графік, спершу створи роботу, до якої належать ці зміни.</string>
 
+    <plurals name="apply_rate_summary">
+        <item quantity="one">Зміниться %1$d зміна · %2$s</item>
+        <item quantity="few">Зміняться %1$d зміни · %2$s</item>
+        <item quantity="many">Зміниться %1$d змін · %2$s</item>
+        <item quantity="other">Зміниться %1$d зміни · %2$s</item>
+    </plurals>
+    <plurals name="apply_rate_done">
+        <item quantity="one">Ставку оновлено на %1$d зміні</item>
+        <item quantity="few">Ставку оновлено на %1$d змінах</item>
+        <item quantity="many">Ставку оновлено на %1$d змінах</item>
+        <item quantity="other">Ставку оновлено на %1$d зміни</item>
+    </plurals>
     <plurals name="shift_count">
         <item quantity="one">%1$d зміна</item>
         <item quantity="few">%1$d зміни</item>
