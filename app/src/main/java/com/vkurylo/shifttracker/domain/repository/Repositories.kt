@@ -6,7 +6,10 @@ import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.ShiftRates
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.domain.model.UserPreferences
@@ -28,7 +31,7 @@ interface JobRepository {
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
 
-    /** Shifts + bonuses of the job; a job with entries keeps its currency. */
+    /** Shifts + bonuses + received-pay payouts of the job; a job with entries keeps its currency. */
     suspend fun entryCount(jobId: Long): Int
 
     /** Currency of the most recently created job, or null when there is none. */
@@ -43,8 +46,28 @@ interface ShiftRepository {
     suspend fun getShift(id: Long): Shift?
     suspend fun getAllShifts(): List<Shift>
     suspend fun upsert(shift: Shift): Long
-    suspend fun insertAll(shifts: List<Shift>)
+
+    /**
+     * Saves shifts imported from a calendar (.ics) file. Each one is identified by its calendar event
+     * rather than at random, so the same event imported on two phones is one shift, and importing an
+     * event again never adds a second one: a shift that exists only gets the event's start and end time
+     * (its job, rates, unpaid break and note are the user's and stay), and a deleted one comes back as the
+     * calendar has it.
+     */
+    suspend fun importFromCalendar(shifts: List<Shift>)
     suspend fun delete(shift: Shift)
+}
+
+/** The rates saved on shifts, changed for many shifts of a job at once ("Apply to all shifts of this job"). */
+interface ShiftRatesRepository {
+    /** The job's shifts that are not deleted. */
+    suspend fun liveShiftsOf(jobId: Long): List<Shift>
+
+    /**
+     * Writes [rates] (shift id → rates) in one transaction, each shift stamped like any edit so it syncs. Only live
+     * shifts of [jobId] are touched; any other id is skipped. Returns how many shifts were written.
+     */
+    suspend fun setRates(jobId: Long, rates: Map<Long, ShiftRates>): Int
 }
 
 interface BonusRepository {
@@ -53,6 +76,14 @@ interface BonusRepository {
     suspend fun getBonus(id: Long): Bonus?
     suspend fun upsert(bonus: Bonus): Long
     suspend fun delete(bonus: Bonus)
+}
+
+interface PayoutRepository {
+    /** Payouts (with their job) earned for the months [from]..[to], ordered by month. */
+    fun observePayouts(from: YearMonth, to: YearMonth): Flow<List<PayoutWithJob>>
+    suspend fun getPayout(id: Long): Payout?
+    suspend fun upsert(payout: Payout): Long
+    suspend fun delete(payout: Payout)
 }
 
 interface PreferencesRepository {
@@ -81,17 +112,19 @@ interface LanguageRepository {
     val changes: kotlinx.coroutines.flow.Flow<String?>
 }
 
-/** JSON export/import of all jobs, shifts and bonuses. */
+/** JSON export/import of all jobs, shifts, bonuses and received-pay payouts. */
 interface BackupRepository {
     suspend fun exportJson(): String
 
     /**
      * Replaces all data with the backup. The whole file is validated first; if anything is wrong
-     * (or writing fails half-way) nothing in the database changes.
+     * (or writing fails half-way) nothing in the database changes. [beforeReplace] runs after the file
+     * passed and right before the data is replaced, with sync held off (to save a safety backup of the
+     * data about to go); if it throws, nothing changes.
      *
      * @throws InvalidBackupException when the file is not a usable backup.
      */
-    suspend fun importJson(json: String): BackupCounts
+    suspend fun importJson(json: String, beforeReplace: suspend () -> Unit = {}): BackupCounts
 }
 
 /** The backup was rejected; the database is unchanged. */
@@ -109,4 +142,4 @@ class InvalidBackupException(
     }
 }
 
-data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int)
+data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int, val payouts: Int = 0)

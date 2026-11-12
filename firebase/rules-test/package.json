@@ -1,0 +1,13 @@
+{
+  "name": "shift-tracker-firestore-rules-test",
+  "private": true,
+  "description": "Tests for ../firestore.rules on the Firestore emulator (needs Node 20+ and Java 21).",
+  "type": "module",
+  "scripts": {
+    "test": "npx --yes firebase-tools@15.34.0 emulators:exec --only firestore --project demo-shift-tracker \"node --test\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "firebase": "13.1.0"
+  }
+}

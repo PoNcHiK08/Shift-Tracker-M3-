@@ -55,7 +55,7 @@ class WidgetRepositoryTest {
         override suspend fun setDynamicColor(enabled: Boolean) = Unit
         override suspend fun setEarningsMode(mode: EarningsMode) = Unit
     }
-    private val shifts = RoomShiftRepository(db.shiftDao(), details)
+    private val shifts = RoomShiftRepository(db, db.shiftDao(), details)
     private val repository = WidgetRepository(
         context,
         shifts,

@@ -14,16 +14,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.QueryStats
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -33,12 +36,19 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -48,9 +58,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.model.JobSummary
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.ui.components.BonusCard
 import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.EmptyState
 import com.vkurylo.shifttracker.ui.components.JobAvatar
+import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
 import com.vkurylo.shifttracker.ui.components.PeriodSwitcher
 import com.vkurylo.shifttracker.ui.components.RollingAmounts
 import com.vkurylo.shifttracker.ui.components.RollingText
@@ -60,6 +73,8 @@ import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.domain.model.Amounts
 import com.vkurylo.shifttracker.ui.util.EarningsModeTag
+import com.vkurylo.shifttracker.ui.util.receivedLabel
+import com.vkurylo.shifttracker.ui.util.ReceivedTag
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import com.vkurylo.shifttracker.ui.util.hoursLabel
@@ -67,10 +82,35 @@ import com.vkurylo.shifttracker.ui.util.shiftsCountLabel
 import java.time.LocalDate
 import java.time.YearMonth
 
+const val SUMMARY_ADD_MONTH_BONUS_TAG = "summary-add-month-bonus"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
+fun SummaryScreen(
+    onEditBonus: (Long) -> Unit = {},
+    onAddMonthBonus: (YearMonth) -> Unit = {},
+    viewModel: SummaryViewModel = hiltViewModel(),
+    payoutEditor: PayoutEditorViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val snackbar = LocalSnackbarController.current
+    val context = LocalContext.current
+    // The job and month (yyyymm) whose received payments are open in the sheet; 0: closed.
+    var sheetJobId by rememberSaveable { mutableLongStateOf(0L) }
+    var sheetMonthKey by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(payoutEditor) {
+        payoutEditor.events.collect { event ->
+            when (event) {
+                PayoutEvent.Saved -> snackbar.show(context.getString(R.string.received_pay_saved))
+                is PayoutEvent.Deleted -> snackbar.show(
+                    message = context.getString(R.string.received_pay_deleted),
+                    actionLabel = context.getString(R.string.undo),
+                    onAction = { payoutEditor.undoDelete(event.payout) },
+                )
+            }
+        }
+    }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val range = state.range
 
@@ -126,7 +166,8 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                     )
                 }
             }
-            if (!state.loading && state.summary.isEmpty) {
+            // A month with received pay but no entries still has something to show.
+            if (!state.loading && state.summary.isEmpty && state.receivedPay.isEmpty() && state.receivedPayYear.isEmpty()) {
                 item(key = "empty") {
                     EmptyState(
                         icon = Icons.Filled.QueryStats,
@@ -146,6 +187,82 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                             count = jobs.size,
                             modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
                         )
+                    }
+                }
+                if (range.period == SummaryPeriod.MONTH) {
+                    // Bonuses for the whole month have no day: this is where they are seen, edited and deleted.
+                    item(key = "month-bonuses-header") { SectionHeader(stringResource(R.string.month_bonuses_title)) }
+                    val monthBonuses = state.monthBonuses
+                    if (monthBonuses.isEmpty()) {
+                        item(key = "month-bonuses-none") {
+                            Text(
+                                stringResource(R.string.month_bonuses_none),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                            )
+                        }
+                    } else {
+                        itemsIndexed(monthBonuses, key = { _, it -> "month-bonus-${it.bonus.id}" }) { index, item ->
+                            BonusCard(
+                                item = item,
+                                onClick = { onEditBonus(item.bonus.id) },
+                                index = index,
+                                count = monthBonuses.size,
+                                modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
+                            )
+                        }
+                    }
+                    item(key = "month-bonuses-add") {
+                        FilledTonalButton(
+                            onClick = { onAddMonthBonus(YearMonth.from(range.from)) },
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp).testTag(SUMMARY_ADD_MONTH_BONUS_TAG),
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.add_month_bonus))
+                        }
+                    }
+                }
+                if (state.receivedPay.isNotEmpty()) {
+                    // The salary that actually arrived, next to what the app calculates (net): the comparison of the two figures
+                    // (the totals above already count what arrived).
+                    item(key = "received-pay-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
+                    item(key = "received-pay-caption") {
+                        Text(
+                            stringResource(R.string.received_pay_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+                    val rows = state.receivedPay
+                    itemsIndexed(rows, key = { _, it -> "received-${it.job.id}" }) { index, row ->
+                        ReceivedPayItem(
+                            row = row,
+                            index = index,
+                            count = rows.size,
+                            onClick = {
+                                sheetJobId = row.job.id
+                                sheetMonthKey = Payout.keyOf(row.month)
+                            },
+                            modifier = Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding),
+                        )
+                    }
+                }
+                if (state.receivedPayYear.isNotEmpty()) {
+                    item(key = "received-pay-year-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
+                    item(key = "received-pay-year-caption") {
+                        Text(
+                            stringResource(R.string.received_pay_year_caption),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
+                        )
+                    }
+                    val lines = state.receivedPayYear
+                    itemsIndexed(lines, key = { _, it -> "received-year-${it.job.id}" }) { index, line ->
+                        ReceivedPayYearItem(line, index, lines.size, Modifier.animateItem().padding(SegmentedListDefaults.ItemPadding))
                     }
                 }
                 if (state.breakdown.isNotEmpty()) {
@@ -174,6 +291,17 @@ fun SummaryScreen(viewModel: SummaryViewModel = hiltViewModel()) {
                     }
                 }
             }
+        }
+    }
+
+    if (sheetJobId != 0L) {
+        val month = Payout.monthFromKey(sheetMonthKey)
+        val row = state.receivedPay.firstOrNull { it.job.id == sheetJobId && it.month == month }
+        if (row == null || month == null) {
+            // Nothing left to list (the month changed, or its last payment of a job without entries was deleted).
+            LaunchedEffect(Unit) { sheetJobId = 0L }
+        } else {
+            ReceivedPaySheet(job = row.job, month = month, row = row, editor = payoutEditor, onDismiss = { sheetJobId = 0L })
         }
     }
 }
@@ -242,6 +370,8 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                     Text(stringResource(res), style = MaterialTheme.typography.labelLarge, color = onColor.copy(alpha = 0.8f))
                     // Gross or net, whenever jobs have deductions.
                     EarningsModeTag(Modifier.padding(start = 8.dp), color = onColor)
+                    // Month / year: job-months with payments count what arrived.
+                    ReceivedTag(summary.receivedPart, Modifier.padding(start = 6.dp), color = onColor)
                 }
             }
             RollingAmounts(
@@ -250,7 +380,8 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                 style = MaterialTheme.typography.displaySmallEmphasized,
                 color = onColor,
             )
-            val bonuses = summary.bonuses.byCurrency.filterValues { it > 0 }
+            // Bonuses of job-months with received pay are inside what arrived, not on top of it.
+            val bonuses = summary.countedBonuses.byCurrency.filterValues { it > 0 }
             if (bonuses.isNotEmpty()) {
                 Text(
                     stringResource(R.string.including_bonuses, Formatters.amounts(Amounts(bonuses), locale)),
@@ -304,11 +435,12 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                             add(hoursLabel(summary.paidMinutes))
                             add(shiftsCountLabel(summary.shiftCount))
                         }
-                        if (summary.salaryMinor > 0) {
-                            add(stringResource(R.string.salary_value, Formatters.money(summary.salaryMinor, summary.currency, locale)))
+                        // Only what is still calculated: a month with received pay has it inside what arrived.
+                        if (summary.countedSalaryMinor > 0) {
+                            add(stringResource(R.string.salary_value, Formatters.money(summary.countedSalaryMinor, summary.currency, locale)))
                         }
-                        if (summary.bonusGrosze > 0) {
-                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.bonusGrosze, summary.currency, locale)))
+                        if (summary.countedBonusMinor > 0) {
+                            add(stringResource(R.string.bonuses_value, Formatters.money(summary.countedBonusMinor, summary.currency, locale)))
                         }
                     }
                     Text(
@@ -317,7 +449,10 @@ private fun JobSummaryItem(summary: JobSummary, totalEarnings: Long, index: Int,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Text(Formatters.money(summary.earningsGrosze, summary.currency, locale), style = MaterialTheme.typography.titleMedium)
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(Formatters.money(summary.earningsGrosze, summary.currency, locale), style = MaterialTheme.typography.titleMedium)
+                    ReceivedTag(summary.receivedPart, Modifier.padding(top = 2.dp))
+                }
             }
             Spacer(Modifier.height(14.dp))
             val percent = (share * 100).toInt()
@@ -356,7 +491,8 @@ private fun BreakdownItem(
         else -> Formatters.monthName(YearMonth.from(entry.date), locale)
     }
     val empty = entry.isEmpty
-    val valueText = Formatters.amounts(entry.earnings, locale)
+    val received = receivedLabel(entry.receivedPart)
+    val valueText = Formatters.amounts(entry.earnings, locale) + (received?.let { " · $it" } ?: "")
     val hoursText = hoursLabel(entry.paidMinutes)
     SegmentedItem(
         index = index,
@@ -381,8 +517,10 @@ private fun BreakdownItem(
                     )
                     Spacer(Modifier.width(12.dp))
                 }
+                // A month with received pay (year view) shows its marker before the amount.
+                ReceivedTag(entry.receivedPart, Modifier.padding(end = 8.dp))
                 Text(
-                    if (empty) "—" else valueText,
+                    if (empty) "—" else Formatters.amounts(entry.earnings, locale),
                     style = MaterialTheme.typography.titleSmall,
                     color = if (empty) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
                 )

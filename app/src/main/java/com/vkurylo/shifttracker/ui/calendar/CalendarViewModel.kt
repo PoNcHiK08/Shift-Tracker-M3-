@@ -3,14 +3,18 @@ package com.vkurylo.shifttracker.ui.calendar
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
+import com.vkurylo.shifttracker.domain.calc.PayReconciler
 import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.MonthSummary
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.forWholeMonths
+import com.vkurylo.shifttracker.domain.model.onDays
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.PayoutRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,6 +35,9 @@ data class CalendarUiState(
     /** Shifts of the visible month and its neighbours (for the pager), keyed by date. */
     val shiftsByDate: Map<LocalDate, List<ShiftWithJob>> = emptyMap(),
     val bonusesByDate: Map<LocalDate, List<BonusWithJob>> = emptyMap(),
+    /** The visible month's bonuses for the whole month: counted in [monthSummary], shown in their own row. */
+    val monthBonuses: List<BonusWithJob> = emptyList(),
+    /** The visible month's totals; a job with received pay for the month counts that instead of its calculated pay. */
     val monthSummary: MonthSummary = MonthSummary.EMPTY,
     val jobs: List<Job> = emptyList(),
     /** Shown for zero totals (no entries): the latest job's currency. */
@@ -48,19 +55,30 @@ class CalendarViewModel @Inject constructor(
     bonusRepository: BonusRepository,
     jobRepository: JobRepository,
     preferencesRepository: PreferencesRepository,
+    payoutRepository: PayoutRepository,
 ) : ViewModel() {
 
     private val month = MutableStateFlow(YearMonth.now())
     private val selectedDate = savedStateHandle.getStateFlow(KEY_SELECTED, LocalDate.now().toEpochDay())
 
-    private data class Window(val month: YearMonth, val shifts: List<ShiftWithJob>, val bonuses: List<BonusWithJob>)
+    private data class Window(
+        val month: YearMonth,
+        val shifts: List<ShiftWithJob>,
+        val bonuses: List<BonusWithJob>,
+        /** Payouts for the visible month only: they count in its totals, never on a day. */
+        val payouts: List<PayoutWithJob>,
+    )
 
     // The visible month plus its neighbours, so the pager can render adjacent months while swiping.
     private val around = month.flatMapLatest { m ->
         val from = m.minusMonths(1).atDay(1)
         val to = m.plusMonths(1).atEndOfMonth()
-        combine(shiftRepository.observeShifts(from, to), bonusRepository.observeBonuses(from, to)) { shifts, bonuses ->
-            Window(m, shifts, bonuses)
+        combine(
+            shiftRepository.observeShifts(from, to),
+            bonusRepository.observeBonuses(from, to),
+            payoutRepository.observePayouts(m, m),
+        ) { shifts, bonuses, payouts ->
+            Window(m, shifts, bonuses, payouts)
         }
     }
 
@@ -76,8 +94,10 @@ class CalendarViewModel @Inject constructor(
         CalendarUiState(
             month = m,
             shiftsByDate = window.shifts.groupBy { it.shift.date },
-            bonusesByDate = window.bonuses.groupBy { it.bonus.date },
-            monthSummary = ShiftCalculator.summarize(monthShifts, monthBonuses, jobs, listOf(m), mode),
+            // Bonuses for a whole month have no day: not in the grid or the day panel, only in the month's totals.
+            bonusesByDate = window.bonuses.onDays().groupBy { it.bonus.date },
+            monthBonuses = monthBonuses.forWholeMonths(),
+            monthSummary = PayReconciler.actualSummary(monthShifts, monthBonuses, jobs, listOf(m), mode, window.payouts),
             jobs = jobs,
             defaultCurrency = Currencies.defaultFor(jobs),
             selectedDate = selected,

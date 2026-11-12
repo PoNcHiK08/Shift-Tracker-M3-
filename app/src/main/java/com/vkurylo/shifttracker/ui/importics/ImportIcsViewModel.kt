@@ -108,7 +108,7 @@ class ImportIcsViewModel @Inject constructor(
         _uiState.update { it.copy(importing = true) }
         viewModelScope.launch {
             val shifts = state.selected.sorted().map { ImportPlanner.toShift(state.candidates[it].event, job) }
-            shiftRepository.insertAll(shifts)
+            shiftRepository.importFromCalendar(shifts)
             _done.send(shifts.size)
         }
     }

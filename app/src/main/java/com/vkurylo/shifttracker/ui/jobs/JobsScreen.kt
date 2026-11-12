@@ -83,6 +83,9 @@ import com.vkurylo.shifttracker.R
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
+import com.vkurylo.shifttracker.domain.model.TextLimits
+import com.vkurylo.shifttracker.ui.components.isTooLong
+import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
 import com.vkurylo.shifttracker.domain.model.payFor
@@ -262,7 +265,7 @@ private fun JobEditorSheet(
     val deductionBp = if (deduction.isBlank()) 0 else MoneyParser.parseMinor(deduction, 2, wholeDigits = 3)?.takeIf { it <= 10_000 }?.toInt()
     val deductionError = deductionBp == null
     val hourly = payType == PayType.HOURLY
-    val nameError = name.isBlank()
+    val nameError = name.isBlank() || isTooLong(name)
     val rateError = hourly && rateGrosze == null
     val secondRateError = hourly && secondEnabled && secondRateGrosze == null
     val windowError = hourly && secondEnabled && secondFrom == secondTo
@@ -292,13 +295,15 @@ private fun JobEditorSheet(
             Spacer(Modifier.height(20.dp))
             OutlinedTextField(
                 value = name,
-                onValueChange = { name = it },
+                onValueChange = { name = TextLimits.limitInput(name, it) },
                 label = { Text(stringResource(R.string.job_name)) },
                 singleLine = true,
-                isError = showErrors && nameError,
-                supportingText = if (showErrors && nameError) {
+                isError = (showErrors && nameError) || isTooLong(name),
+                supportingText = if (showErrors && name.isBlank()) {
                     { Text(stringResource(R.string.error_name_required)) }
-                } else null,
+                } else {
+                    textLengthSupport(name.length)
+                },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
                 modifier = Modifier.fillMaxWidth(),
             )

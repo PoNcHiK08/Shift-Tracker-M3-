@@ -291,10 +291,18 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                     },
                     onEditBonus = { id -> rootNav.navigate(EditBonusRoute(bonusId = id, sharedKey = SharedKeys.bonus(id))) },
                     onManageJobs = { rootNav.navigate(JobsRoute) },
+                    // From the month-bonuses list (a sheet): no card to grow the editor out of, so it slides in.
+                    onAddMonthBonus = { month -> rootNav.navigate(EditBonusRoute(dateEpochDay = month.atDay(1).toEpochDay(), wholeMonth = true)) },
+                    onEditMonthBonus = { id -> rootNav.navigate(EditBonusRoute(bonusId = id)) },
                 )
             }
             composable<SummaryRoute> {
-                Box(Modifier.predictiveBackSurface(this)) { SummaryScreen() }
+                Box(Modifier.predictiveBackSurface(this)) {
+                    SummaryScreen(
+                        onEditBonus = { id -> rootNav.navigate(EditBonusRoute(bonusId = id, sharedKey = SharedKeys.bonus(id))) },
+                        onAddMonthBonus = { month -> rootNav.navigate(EditBonusRoute(dateEpochDay = month.atDay(1).toEpochDay(), wholeMonth = true)) },
+                    )
+                }
             }
             composable<SettingsRoute> {
                 Box(Modifier.predictiveBackSurface(this)) {

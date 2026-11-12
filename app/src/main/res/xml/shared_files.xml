@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    What the app's FileProvider may hand to other apps: only the copies made for sharing
+    (FileSafetyBackup.shareable). The safety backups themselves, the database and everything else stay private.
+-->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

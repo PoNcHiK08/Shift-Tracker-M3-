@@ -29,9 +29,27 @@ UI in **Ukrainian** by default with **English** as an alternative.
   vibration settings apply.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
-  earnings (the editor offers "use current rate" when they differ).
+  earnings (the editor offers "use current rate" when they differ). **"Apply to all shifts of this job…"** next to it
+  puts the job's current rates on all its other shifts, or on those from that shift's date on: a dialog first shows
+  how many shifts change and the money it moves, a safety backup is saved, and a snackbar offers Undo.
 - **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
   calendar and summary, but not towards hours or the average hourly rate.
+  - **For the whole month**: the bonus editor has a switch, *On a specific day* / *For the whole month*. A month bonus
+    counts in that month's earnings (calendar tiles, Summary month and year, "By job"; reduced by the job's
+    deductions in Net mode) but has no day: it is not in the calendar grid or the day panel, and **not in weekly
+    totals** (a week can span two months). The calendar has a "Month bonuses" row under the month tiles when the month
+    has any, and Summary → Month lists them in a section of their own, where you edit, delete (with Undo) or add one.
+- **Received pay** — per job and per month the pay was earned for, the salary that actually arrived: one or several
+  payments (amount, an optional "received on" date and note). Summary → Month shows it next to the calculated pay of
+  that month **after deductions (net, whatever the Gross / Net display is)**, with the difference (received minus
+  calculated); Summary → Year has a line per job. **It counts as the real pay of its job and month:** once a job has
+  at least one payment for a month, that job's money for the month is the sum of its payments, and it **replaces**
+  the calculated shift pay, bonuses (for a day and for the whole month) and fixed salary of that job-month (it is
+  never added on top). This is the same in Gross and Net. The calendar's month tile, Summary → Month (total and
+  "By job") and Summary → Year (month rows and total) show it with a **Received** tag ("Incl. received" when the
+  figure mixes received and calculated pay). Hours, shift counts, the average hourly rate, the day panel and dots,
+  and **weekly totals stay calculated**. Several payments for a month are summed, so entering only an advance makes
+  the month show just that amount until the rest is entered. Delete the payments and the calculated figure is back.
 - **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
   M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
   "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. The month's earnings,
@@ -52,16 +70,25 @@ UI in **Ukrainian** by default with **English** as an alternative.
   and on clock / time zone / locale changes (so a new day or a finished shift can take up to 30 min to show).
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
-  An import checks the whole file before touching anything (format versions 1–4; files older than 4 import as PLN,
+  Exports are format version 6 (every job, shift, bonus and received payment carries its sync id, so a backup restored
+  on another phone holds the same records rather than look-alike copies; bonuses say whether they are for the whole
+  month, and the received payments are a list of their own).
+  An import checks the whole file before touching anything (format versions 1–6; files older than 4 import as PLN,
   hourly, no deductions; currency codes, pay types, months, salaries and percentages are validated; a file from a newer app version
-  gets its own message; unique job IDs, amounts within what the editors accept, a break shorter than the shift, a
-  second-rate window that isn't empty, bonuses above zero) and replaces the data in one transaction, so a bad or
-  half-written file leaves the existing data exactly as it was.
+  gets its own message; unique job IDs and sync ids, amounts within what the editors accept, a break shorter than the shift, a
+  second-rate window that isn't empty, bonuses and received payments above zero, a real month and date for every payment)
+  and replaces the data in one transaction, so a bad or
+  half-written file leaves the existing data exactly as it was. Records the file doesn't have are kept as deleted
+  (tombstones), records it does have are updated in place, so the replacement can later reach other devices.
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
   Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;
   picking a job (shift/bonus editors, schedule import) uses toggle buttons that morph from a squircle into a pill.
 - **Schedule import** — pick an `.ics` file, choose the job, preview the events (duplicates are detected and unchecked), confirm.
+  An imported shift's id comes from its calendar event (UID + date + start, or the time slot when there is no UID), so
+  two phones importing the same file get the same shifts, and importing an event again never adds a copy: ticking a
+  duplicate in the preview only moves its shift's start/end to the calendar's (your break and note stay; a break is
+  only cut down if it would no longer be shorter than the shift), and a deleted one comes back.
   Imported shifts take that job's rates, currency and pay settings.
   Handles folded lines, `TZID` / UTC / floating times, `DURATION`, Outlook time-zone names, and skips all-day/cancelled events.
   A broken event (an impossible date or duration) is skipped and counted instead of failing the whole file.
@@ -73,13 +100,14 @@ UI in **Ukrainian** by default with **English** as an alternative.
 
 Every push builds the app on GitHub Actions:
 
-- **Permanent link to the newest build:**
+- **Permanent link to the newest build of the default branch:**
   `https://github.com/PoNcHiK08/Shift-Tracker-M3-/releases/download/latest-build/ShiftTracker.apk`
-- Or open **Actions → Build APK → latest run → Artifacts**.
+  (only pushes to the default branch update it).
+- Builds of other branches and pull requests: **Actions → Build APK → that run → Artifacts**.
 
 All builds are signed with the same development key (`app/signing/dev.keystore`), so a new build installs
 as an update over the old one and keeps your data. Android will ask to allow installs from your browser /
-file manager the first time.
+file manager the first time. (Unless you give the workflow your own release key: see below.)
 
 ### Signing
 
@@ -89,9 +117,12 @@ file manager the first time.
 | `ALLOW_DEV_RELEASE_SIGNING=true` (env) or `-PallowDevReleaseSigning=true` | Signed with the public dev key, with a warning banner in the build log |
 | neither | The build stops before signing and explains both options |
 
-Debug builds always use the dev key. The GitHub workflow opts in explicitly for its builds. The dev key's
-password is in this repo, so anyone can sign an APK with it: fine for test builds, **not** for Google Play —
-generate your own key and pass it through the `SIGNING_*` variables (e.g. from GitHub Secrets).
+Debug builds always use the dev key. The GitHub workflow opts in explicitly for its builds, unless the
+`SIGNING_KEYSTORE_BASE64` secret (your own key) and its three `SIGNING_*` secrets are set: then its release APK
+is signed with your key. The dev key's password is in this repo, so anyone can sign an APK with it: fine for
+test builds, **not** for Google Play. Switching an installed app to your own key means reinstalling it; see
+[docs/cloud-sync.md](docs/cloud-sync.md#optional-your-own-release-key) for the steps and what happens to the
+data.
 
 ## Crash reports
 
@@ -110,6 +141,108 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 ./gradlew installDebug        # install a debug build on a connected phone
 ```
 
+## Cloud sync (optional)
+
+Signing in with Google in **Settings → Account & sync** and turning on **Sync** keeps the data of several
+phones in step through Cloud Firestore. The app keeps working exactly as before without it: Room on the
+phone stays the only data the app reads, and a build made without a Firebase config shows "Not available in
+this build".
+
+**[docs/cloud-sync.md](docs/cloud-sync.md)** has:
+- the limitations;
+- step-by-step tests on one phone (airplane mode) and on two phones;
+- **moving your everyday app to the sync version** (what the update does, what to do first, how to roll
+  back);
+- switching to your own release key.
+
+### How sync behaves
+
+- **Off until you turn it on.** Signing in alone only checks that the cloud lets the account in. Signing out
+  turns sync off; the data on the phone stays.
+- **Turning it on the first time** never overwrites anything silently. If both the phone and the account have
+  data, you choose: merge (records that look the same are kept once), or take the account's data (a JSON
+  backup of the phone's data is saved first, in the app's files/safety-backups). Data synced with another
+  account, or cloud data deleted from another phone, also asks. Nothing syncs while a question is open.
+- **When it syncs:** at app start and when you come back to the app (at most once a minute), 3 seconds after
+  your last change, and with **Sync now**. It runs in the background (WorkManager), only with a connection,
+  so changes made offline go up by themselves when the network returns. A JSON import and a sync never overlap.
+- **Conflicts:** per record, the newest change wins (by the phone's clock). The cloud refuses change times
+  more than 10 minutes ahead of its own; the status then says to check the phone's date and time.
+- **Free quota (20 000 writes a day):** each record uploaded is one write. Automatic syncs stop at 5 000 writes
+  a day per phone, so a bug can't use the quota up; Sync now isn't limited. Records downloaded from the
+  cloud are stored as already synced, so they never go back up. The status shows the writes of the last
+  sync and today's total. `adb logcat -s CloudSync` logs every sync.
+- **Your data stays yours to manage:**
+  - **Delete my cloud data** (after a confirmation) turns sync off and deletes the account's data from the
+    cloud. The phone keeps its data; other phones stop and ask.
+  - With sync on, **Import data** warns that it replaces the data on all your devices.
+  - Every import first saves a safety backup of the data it replaces. **Settings → Data → Safety backups**
+    lists the newest 5; save one to a file or share it, and restore it with Import data.
+- **Names and notes stop at 20 000 characters**, the cloud's limit, with a counter near it. Longer older
+  text goes up cut instead of holding up sync.
+
+### Setting up Firebase (once)
+
+1. [Firebase console](https://console.firebase.google.com) → create a project (Analytics not needed).
+2. **Authentication → Sign-in method → Google → Enable**.
+3. **Project settings → Your apps → Add app → Android**, twice: `com.vkurylo.shifttracker` and
+   `com.vkurylo.shifttracker.debug`. For each, add both fingerprints of the dev key that signs every build
+   (`app/signing/dev.keystore`):
+   - SHA-1 `0E:53:EF:F6:AF:70:26:32:27:B4:33:41:1E:A5:6A:38:B5:5E:7C:7B`
+   - SHA-256 `8F:6C:D8:05:54:CC:9A:71:5F:4C:94:5C:26:97:68:72:50:E7:F6:E0:51:AC:9A:1E:61:D5:28:24:A1:B6:11:27`
+4. Download `google-services.json` (after steps 2–3, so it has both apps and the Google sign-in client).
+   **Never commit it** (it is in `.gitignore`).
+   - GitHub builds: **Settings → Secrets and variables → Actions → New repository secret**, name
+     `GOOGLE_SERVICES_JSON`, value: the file's whole content (or the same base64-encoded). Without the secret
+     the workflow still builds, without cloud sync, and says so in a warning.
+   - Local builds: put the file at `app/google-services.json`.
+5. **Firestore Database → Create database**, production mode, a location near you (e.g. `europe-central2`,
+   Warsaw; it can't be changed later).
+6. **Publish the security rules** (below).
+
+### If signing in fails
+
+The Account & sync row shows why, with a code, until the next attempt; `adb logcat -s CloudSignIn` has the
+full exception, the app's package and the SHA-1 of the key it is signed with.
+
+- **"Google refused the sign-in" (Google status 16 "Account reauth failed", 10, or 28444)**: the SHA-1 fingerprint
+  isn't registered for the package you're running. The debug APK is the separate app `com.vkurylo.shifttracker.debug`
+  and needs its own fingerprint. The Build APK workflow warns when `google-services.json` lacks one.
+- **`ERROR_INVALID_CREDENTIAL` from Firebase**: the `google-services.json` in the build is from another Firebase project.
+- Closing Google's account sheet yourself shows nothing.
+- **"Not available in this build"** means the APK has no usable Firebase config. Either it was built without
+  the `GOOGLE_SERVICES_JSON` secret (the Build APK run warns), or a release build lost the Google sign-in client
+  id to resource shrinking. That happened up to build 1.0.142; `res/raw/cloud_sync_keep.xml` now keeps it, and
+  the Build APK workflow fails if either APK misses it (`.github/scripts/check-apk-cloud-sync.sh`).
+
+### Security rules
+
+[`firebase/firestore.rules`](firebase/firestore.rules) lets only you in: the signed-in owner of
+`users/{uid}`, signed in with Google, whose verified email is the one in the rules. It also checks every
+field of every document, and lets a record be replaced only by a later version of it.
+
+The repository is public, so the committed file has the placeholder `YOUR_EMAIL_HERE`, and as committed it
+lets nobody in. To publish: **Firestore Database → Rules**, paste the whole file, replace `YOUR_EMAIL_HERE`
+with your Google account's address **there, in the console only**, then **Publish**. (With the Firebase CLI:
+deploy a local copy with your address in it, never a committed one.) Republish whenever the file changes.
+
+**Publish the rules before installing a build that adds a kind of record** (the whole-month bonus flag and the
+received-pay `payouts` collection came this way). The rules accept both the previous app version's documents and the
+new ones, so publishing early is safe for a phone that has not updated yet. A new build against old rules is refused
+(Settings says the cloud refused access and to publish the latest rules); nothing is lost, the changes wait.
+
+What protects your data is these rules, not the app's fingerprints: the dev key's password is public, so
+anyone can build an APK that Firebase accepts as this app, and the `google-services.json` values end up
+inside every APK anyway. With the rules, such an app can only sign in with the stranger's own Google
+account, which can't read or write anything.
+
+Tests (they need Node 20+ and Java 21, and run in GitHub Actions whenever the rules or the sync code change):
+
+```bash
+cd firebase/rules-test && npm ci && npm test   # the rules on the Firestore emulator
+firebase/run-emulator-tests.sh                 # the app's Firestore code and sync engine against the rules
+```
+
 ## Tech stack
 
 | Area | Choice |
@@ -118,7 +251,8 @@ ALLOW_DEV_RELEASE_SIGNING=true ./gradlew assembleRelease
 | Motion | Springs (MotionScheme.expressive; screen transitions use them ~15 % quicker — same damping, stiffness × 1.38): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press feedback that squeezes and morphs shapes (segmented list items round their inner corners, day cells become squircles, button groups and icon buttons morph); circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
 | Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back: while you drag, the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts towards the swiping edge; when you let go it keeps going from that exact point (shrinks to 85 % and fades out within at most ~250 ms) instead of pausing first, and a cancelled swipe returns it to its place. An editor opened from a card is only held by the finger: it shrinks a little, rounds its corners and drifts, on a spring and up to a limit (rubber band), however far you drag, with the calendar visible behind it; it never morphs into the card under the finger. On release it flies into its card from where it was held (on a calm spring, ~5 % longer than a normal close) in plain view all the way: its content fades out early, the card's own look fades in on the shrinking container and lands exactly in the card's place. This happens on every back, however quick the flick (even one released before predictive back has started) and with the system back button; the editor's own close/save/delete buttons keep the normal container transform. Normal open/close keeps the container transform springs. Icon-only bottom bar built from M3 Expressive toggle buttons |
-| Storage | Room 2.8 (jobs, shifts, bonuses; auto-migrations with exported schemas) + DataStore (settings); money stored as `Long` minor units of each job's currency (the `*_grosze` names predate other currencies); pay settings history per job |
+| Storage | Room 2.8 (jobs, shifts, bonuses, received-pay payouts; exported schemas, auto-migrations up to v6, a manual v6 → v7 that adds sync metadata: a UUID `sync_id`, `updated_at`, and deletions kept as hidden tombstones, and an auto-migration v7 → v8 that adds `bonuses.whole_month` and the `payouts` table) + DataStore (settings); money stored as `Long` minor units of each job's currency (the `*_grosze` names predate other currencies); pay settings history per job |
+| Cloud sync (optional) | Firebase Auth (Google sign-in through Credential Manager) + Cloud Firestore; Room stays the source of truth |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
 | Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English) |
@@ -141,6 +275,9 @@ app/src/main/java/com/vkurylo/shifttracker/
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
 app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
-                   import planner, DB migration from v1, JSON backup (validation, versions, rollback),
-                   time-dial haptics, predictive back frame by frame, and an end-to-end UI smoke test
+                   import planner, DB migrations from v1, v6 and v7, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
+                   time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
+                   engine (last write wins, first sign-in, several phones) and its Firestore documents
+firebase/          firestore.rules, its tests (rules-test/) and the emulator test runner
+docs/cloud-sync.md cloud sync's limitations, phone tests, moving the everyday app, your own release key
 ```

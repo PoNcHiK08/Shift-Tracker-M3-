@@ -11,6 +11,8 @@ import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
@@ -18,7 +20,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import java.time.YearMonth
 
-@Entity(tableName = "jobs")
+@Entity(tableName = "jobs", indices = [Index(value = ["sync_id"], unique = true)])
 data class JobEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
@@ -30,6 +32,14 @@ data class JobEntity(
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
     /** ISO 4217 code; amounts of the job, its shifts and bonuses are minor units of it. Added in DB version 4. */
     @ColumnInfo(defaultValue = "PLN") val currency: String = "PLN",
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 @Entity(
@@ -42,7 +52,7 @@ data class JobEntity(
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("job_id"), Index("date_epoch_day"), Index("external_uid")],
+    indices = [Index("job_id"), Index("date_epoch_day"), Index("external_uid"), Index(value = ["sync_id"], unique = true)],
 )
 data class ShiftEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -59,6 +69,14 @@ data class ShiftEntity(
     @ColumnInfo(name = "second_rate_grosze") val secondRateGrosze: Long? = null,
     @ColumnInfo(name = "second_rate_from_minute", defaultValue = "1380") val secondRateFromMinute: Int = 1380,
     @ColumnInfo(name = "second_rate_to_minute", defaultValue = "360") val secondRateToMinute: Int = 360,
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 data class ShiftWithJobRow(
@@ -133,7 +151,7 @@ fun ShiftWithJobRow.toDomain() = ShiftWithJob(shift = shift.toDomain(), job = jo
             onDelete = ForeignKey.CASCADE,
         ),
     ],
-    indices = [Index("job_id"), Index("date_epoch_day")],
+    indices = [Index("job_id"), Index("date_epoch_day"), Index(value = ["sync_id"], unique = true)],
 )
 data class BonusEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -141,6 +159,19 @@ data class BonusEntity(
     @ColumnInfo(name = "date_epoch_day") val dateEpochDay: Long,
     @ColumnInfo(name = "amount_grosze") val amountGrosze: Long,
     val note: String?,
+    /**
+     * True: the bonus belongs to the whole month of [dateEpochDay] (stored as the 1st of it), not to that day.
+     * Every bonus before DB version 8 is false. Added in DB version 8.
+     */
+    @ColumnInfo(name = "whole_month", defaultValue = "0") val wholeMonth: Boolean = false,
+    /** Same record on every device; see SyncMetadata.kt. Added in DB version 7. */
+    @ColumnInfo(name = "sync_id", defaultValue = "''") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. Added in DB version 7. */
+    @ColumnInfo(name = "updated_at", defaultValue = "0") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "0") val deleted: Boolean = false,
+    /** Changed since the last upload. Added in DB version 7. */
+    @ColumnInfo(defaultValue = "1") val dirty: Boolean = true,
 )
 
 data class BonusWithJobRow(
@@ -154,17 +185,85 @@ fun BonusEntity.toDomain() = Bonus(
     date = LocalDate.ofEpochDay(dateEpochDay),
     amountGrosze = amountGrosze,
     note = note,
+    wholeMonth = wholeMonth,
 )
 
 fun Bonus.toEntity() = BonusEntity(
     id = id,
     jobId = jobId,
-    dateEpochDay = date.toEpochDay(),
+    // A whole-month bonus has no day of its own: it is kept on the 1st of its month.
+    dateEpochDay = (if (wholeMonth) date.withDayOfMonth(1) else date).toEpochDay(),
     amountGrosze = amountGrosze,
     note = note?.takeIf { it.isNotBlank() },
+    wholeMonth = wholeMonth,
 )
 
 fun BonusWithJobRow.toDomain() = BonusWithJob(bonus = bonus.toDomain(), job = job.toDomain())
+
+/**
+ * The salary that actually arrived for one job and the month it was earned for. Added in DB version 8.
+ *
+ * It is only compared with the calculated pay; it is never part of any earnings total. Several rows per job
+ * and month are allowed (they are summed). [month] is yyyymm (202611), like [JobPaySettingsEntity.fromMonth],
+ * and is always a real month (never 0). [receivedEpochDay] is the day it arrived, when the user entered it.
+ */
+@Entity(
+    tableName = "payouts",
+    foreignKeys = [
+        ForeignKey(
+            entity = JobEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["job_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("job_id"), Index("month"), Index(value = ["sync_id"], unique = true)],
+)
+data class PayoutEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    @ColumnInfo(name = "job_id") val jobId: Long,
+    val month: Int,
+    /** Minor units of the job's currency. */
+    @ColumnInfo(name = "amount_minor") val amountMinor: Long,
+    val note: String?,
+    @ColumnInfo(name = "received_epoch_day") val receivedEpochDay: Long?,
+    /** Same record on every device; see SyncMetadata.kt. */
+    @ColumnInfo(name = "sync_id") val syncId: String = newSyncId(),
+    /** Wall-clock UTC millis of the last change. */
+    @ColumnInfo(name = "updated_at") val updatedAt: Long = 0,
+    /** Tombstone: deleted, but kept so the deletion can sync. */
+    val deleted: Boolean = false,
+    /** Changed since the last upload. */
+    val dirty: Boolean = true,
+)
+
+data class PayoutWithJobRow(
+    @Embedded val payout: PayoutEntity,
+    @Embedded(prefix = "j_") val job: JobEntity,
+)
+
+/** Null for a row whose month is not a real month (never written by the app; keeps one bad row from crashing a screen). */
+fun PayoutEntity.toDomain(): Payout? = Payout.monthFromKey(month)?.let { yearMonth ->
+    Payout(
+        id = id,
+        jobId = jobId,
+        month = yearMonth,
+        amountMinor = amountMinor,
+        note = note,
+        receivedOn = receivedEpochDay?.let { LocalDate.ofEpochDay(it) },
+    )
+}
+
+fun Payout.toEntity() = PayoutEntity(
+    id = id,
+    jobId = jobId,
+    month = Payout.keyOf(month),
+    amountMinor = amountMinor,
+    note = note?.takeIf { it.isNotBlank() },
+    receivedEpochDay = receivedOn?.toEpochDay(),
+)
+
+fun PayoutWithJobRow.toDomain(): PayoutWithJob? = payout.toDomain()?.let { PayoutWithJob(it, job.toDomain()) }
 
 /**
  * One entry of a job's pay settings history (see [PaySettings]). Added in DB version 5.

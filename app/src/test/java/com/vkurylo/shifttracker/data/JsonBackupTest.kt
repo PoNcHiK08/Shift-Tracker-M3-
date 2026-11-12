@@ -6,6 +6,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.data.backup.BackupFile
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
+import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
 import com.vkurylo.shifttracker.data.local.toDomain
 import com.vkurylo.shifttracker.data.local.toEntity
@@ -13,12 +14,18 @@ import com.vkurylo.shifttracker.domain.model.Bonus
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.TimedRate
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.repository.BackupCounts
 import com.vkurylo.shifttracker.domain.repository.InvalidBackupException
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -30,6 +37,7 @@ import org.junit.runner.RunWith
 import org.robolectric.annotation.Config
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.YearMonth
 
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35])
@@ -92,6 +100,43 @@ class JsonBackupTest {
         assertThrows(InvalidBackupException::class.java) {
             runBlocking { JsonBackupRepository(newDb()).importJson(bad) }
         }
+    }
+
+    @Test
+    fun beforeReplaceRunsOnlyForAValidFileWithSyncHeldOffAndAFailureChangesNothing() = runBlocking {
+        val source = newDb()
+        source.jobDao().upsert(Job(id = 1, name = "Biuro", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val json = JsonBackupRepository(source).exportJson()
+        val db = newDb()
+        db.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val lock = com.vkurylo.shifttracker.data.sync.SyncLock()
+        val repository = JsonBackupRepository(db, syncLock = lock)
+
+        // An invalid file never gets that far.
+        var calls = 0
+        assertThrows(InvalidBackupException::class.java) {
+            runBlocking { repository.importJson("""{"format":"other"}""") { calls++ } }
+        }
+        assertEquals(0, calls)
+
+        // It runs before the data is replaced (it still sees the old data), with syncs held off.
+        repository.importJson(json) {
+            calls++
+            assertTrue("a sync can't run meanwhile", lock.mutex.isLocked)
+            assertEquals(listOf("Kawiarnia"), db.jobDao().getAll().map { it.name })
+        }
+        assertEquals(1, calls)
+        assertEquals(listOf("Biuro"), db.jobDao().getAll().map { it.name })
+
+        // If it fails, nothing is replaced.
+        val other = newDb()
+        other.jobDao().upsert(Job(id = 1, name = "Kawiarnia", hourlyRateGrosze = 3300, color = 1).toEntity())
+        val otherLock = com.vkurylo.shifttracker.data.sync.SyncLock()
+        assertThrows(java.io.IOException::class.java) {
+            runBlocking { JsonBackupRepository(other, syncLock = otherLock).importJson(json) { throw java.io.IOException("disk full") } }
+        }
+        assertEquals(listOf("Kawiarnia"), other.jobDao().getAll().map { it.name })
+        assertTrue(!otherLock.mutex.isLocked)
     }
 
     // --- Versions -------------------------------------------------------------------------------
@@ -243,8 +288,275 @@ class JsonBackupTest {
 
         val again = newDb()
         JsonBackupRepository(again).importJson(JsonBackupRepository(db).exportJson())
-        assertEquals(db.jobDao().getAll(), again.jobDao().getAll())
+        // Same jobs; sync ids and change times are the importing database's own (backup v4 carries none).
+        assertEquals(db.jobDao().getAll().map { it.withoutSyncMetadata() }, again.jobDao().getAll().map { it.withoutSyncMetadata() })
         assertTrue(JsonBackupRepository(db).exportJson().contains("\"currency\": \"KWD\""))
+    }
+
+    // --- Sync ids (version 5) ----------------------------------------------------------------------
+
+    @Test
+    fun exportWritesVersion6WithEveryRecordsSyncId() = runBlocking {
+        val db = seededDb()
+        db.payoutDao().upsert(Payout(jobId = 7, month = YearMonth.of(2026, 10), amountMinor = 250_000).toEntity())
+        val file = Json.parseToJsonElement(JsonBackupRepository(db).exportJson()).jsonObject
+        assertEquals(6, file["version"]!!.jsonPrimitive.int)
+        assertEquals(db.payoutDao().getAll().map { it.syncId }, file["payouts"]!!.jsonArray.map { it.jsonObject["sync_id"]!!.jsonPrimitive.content })
+        fun ids(list: String) = file[list]!!.jsonArray.map { it.jsonObject["sync_id"]!!.jsonPrimitive.content }
+        assertEquals(db.jobDao().getAll().map { it.syncId }, ids("jobs"))
+        assertEquals(db.shiftDao().getAll().map { it.syncId }, ids("shifts"))
+        assertEquals(db.bonusDao().getAll().map { it.syncId }, ids("bonuses"))
+    }
+
+    /** Restoring a backup on another phone gives the same records (same sync ids), not look-alike copies. */
+    @Test
+    fun version5ImportKeepsSyncIdsAndMarksEverythingChanged() = runBlocking {
+        val source = seededDb()
+        val target = newDb()
+        JsonBackupRepository(target, clock = { 42_000L }).importJson(JsonBackupRepository(source).exportJson())
+
+        assertEquals(source.jobDao().getAll().map { it.syncId }, target.jobDao().getAll().map { it.syncId })
+        assertEquals(source.shiftDao().getAll().map { it.syncId }, target.shiftDao().getAll().map { it.syncId })
+        assertEquals(source.bonusDao().getAll().map { it.syncId }, target.bonusDao().getAll().map { it.syncId })
+        val stamps = target.jobDao().getAll().map { it.updatedAt to it.dirty } +
+            target.shiftDao().getAll().map { it.updatedAt to it.dirty } + target.bonusDao().getAll().map { it.updatedAt to it.dirty }
+        assertEquals(List(3) { 42_000L to true }, stamps)
+    }
+
+    /**
+     * Importing into a phone that has data: what the file doesn't have becomes tombstones (so the import
+     * replaces it on the other phones too); records the file has are updated in place (same row, same id).
+     */
+    @Test
+    fun importReplacesDataWithTombstonesAndUpdatesMatchingRecordsInPlace() = runBlocking {
+        val db = seededDb()
+        val backup = JsonBackupRepository(db).exportJson()
+        val (jobsBefore, shiftsBefore, bonusesBefore) = snapshot(db)
+        // After the backup: the job is renamed and a second job with a shift is added.
+        db.jobDao().upsert(jobsBefore.single().copy(name = "Renamed"))
+        val extraJob = db.jobDao().upsert(Job(name = "Extra", hourlyRateGrosze = 3000, color = 2).toEntity())
+        val extraShift = db.shiftDao().upsert(
+            Shift(jobId = extraJob, date = LocalDate.of(2026, 10, 3), start = LocalTime.of(9, 0), end = LocalTime.of(17, 0), hourlyRateGrosze = 3000).toEntity(),
+        )
+
+        val now = 5_000_000_000_000L
+        assertEquals(BackupCounts(1, 1, 1), JsonBackupRepository(db, clock = { now }).importJson(backup))
+
+        // The backup's records: same rows (ids and sync ids), contents from the file, changed now.
+        val (jobs, shifts, bonuses) = snapshot(db)
+        assertEquals(jobsBefore.map { it.id to it.syncId }, jobs.map { it.id to it.syncId })
+        assertEquals("Kawiarnia", jobs.single().name)
+        assertEquals(shiftsBefore.map { it.id to it.syncId }, shifts.map { it.id to it.syncId })
+        assertEquals(bonusesBefore.map { it.id to it.syncId }, bonuses.map { it.id to it.syncId })
+        (jobs.map { it.updatedAt to it.dirty } + shifts.map { it.updatedAt to it.dirty } + bonuses.map { it.updatedAt to it.dirty })
+            .forEach { assertEquals(now to true, it) }
+        // What the backup didn't have is deleted, as tombstones that will sync.
+        listOf(db.jobDao().getAny(extraJob)!!.let { it.deleted to it.dirty }, db.shiftDao().getAny(extraShift)!!.let { it.deleted to it.dirty })
+            .forEach { assertEquals(true to true, it) }
+        assertEquals(listOf("Kawiarnia"), db.jobDao().getAll().map { it.name })
+    }
+
+    @Test
+    fun olderVersionsGetNewSyncIdsAndStillReplaceTheData() = runBlocking {
+        val db = seededDb()
+        val (oldJobs, oldShifts, _) = snapshot(db)
+        JsonBackupRepository(db).importJson(backup(version = 4))
+
+        val (jobs, shifts, bonuses) = snapshot(db)
+        assertEquals(listOf("Job 1"), jobs.map { it.name })
+        listOf(jobs.single().syncId, shifts.single().syncId, bonuses.single().syncId).forEach {
+            assertEquals(it, java.util.UUID.fromString(it).toString())
+        }
+        assertTrue(jobs.single().syncId != oldJobs.single().syncId)
+        assertTrue(db.jobDao().getAny(oldJobs.single().id)!!.deleted)
+        assertTrue(db.shiftDao().getAny(oldShifts.single().id)!!.deleted)
+        assertEquals(jobs.single().id, shifts.single().jobId)
+        assertEquals(jobs.single().id, bonuses.single().jobId)
+    }
+
+    @Test
+    fun rejectsBadOrRepeatedSyncIdsAndKeepsTheDatabase() = runBlocking {
+        val db = seededDb()
+        val before = snapshot(db)
+        val id = "0b6f4f52-55a2-4f61-8d6e-3d0bd5c5a1f7"
+        val cases = listOf(
+            backup(version = 5, shifts = shift(syncId = "not-a-uuid")),
+            backup(version = 5, shifts = shift(syncId = id) + "," + shift(date = "2026-10-06", syncId = id)),
+            backup(version = 5, jobs = job(1, syncId = id) + "," + job(2, syncId = id.uppercase())),
+        )
+        cases.forEach { json -> rejected(db, json) }
+        assertEquals(before, snapshot(db))
+
+        // Letter case alone doesn't matter: it is stored as the app writes it.
+        JsonBackupRepository(db).importJson(backup(version = 5, shifts = shift(syncId = id.uppercase())))
+        assertEquals(id, db.shiftDao().getAll().single().syncId)
+    }
+
+    // --- Whole-month bonuses and received pay (version 6) ----------------------------------------------
+
+    private val october = YearMonth.of(2026, 10)
+
+    /** A database with a month bonus and received pay in two currencies, to export and bring back. */
+    private suspend fun databaseWithMonthBonusAndPayouts(): ShiftDatabase = seededDb().also { db ->
+        db.jobDao().upsert(Job(id = 8, name = "Biuro", hourlyRateGrosze = 0, color = 4, currency = "EUR").toEntity())
+        db.bonusDao().upsert(Bonus(jobId = 7, date = october.atDay(1), amountGrosze = 50_000, note = "Premia kwartalna", wholeMonth = true).toEntity())
+        db.payoutDao().upsert(Payout(jobId = 7, month = october, amountMinor = 250_000, note = "Przelew", receivedOn = LocalDate.of(2026, 11, 2)).toEntity())
+        db.payoutDao().upsert(Payout(jobId = 7, month = october, amountMinor = 5_000).toEntity()) // a second one for the same month
+        db.payoutDao().upsert(Payout(jobId = 8, month = YearMonth.of(2026, 9), amountMinor = 123_456).toEntity())
+    }
+
+    @Test
+    fun monthBonusesAndPayoutsRoundTripWithTheirSyncIds() = runBlocking {
+        val source = databaseWithMonthBonusAndPayouts()
+        val json = JsonBackupRepository(source).exportJson()
+
+        val file = Json.parseToJsonElement(json).jsonObject
+        assertEquals(listOf(true, false), file["bonuses"]!!.jsonArray.map { it.jsonObject["whole_month"]!!.jsonPrimitive.content.toBoolean() }.sorted().reversed())
+        val exported = file["payouts"]!!.jsonArray.map { it.jsonObject }
+        assertEquals("ordered by the month earned for", listOf("2026-09", "2026-10", "2026-10"), exported.map { it["month"]!!.jsonPrimitive.content })
+        assertEquals(listOf(null, "2026-11-02", null), exported.map { it["received_on"]?.jsonPrimitive?.content?.takeIf { text -> text != "null" } })
+
+        val target = newDb()
+        val counts = JsonBackupRepository(target).importJson(json)
+
+        assertEquals(BackupCounts(jobs = 2, shifts = 1, bonuses = 2, payouts = 3), counts)
+        // The same payouts (same sync ids, same job by its sync id), in rows of the importing database's own.
+        suspend fun content(db: ShiftDatabase): List<List<Any?>> {
+            val jobSync = db.jobDao().getAll().associate { it.id to it.syncId }
+            return db.payoutDao().getAll().map { listOf(it.syncId, jobSync[it.jobId], it.month, it.amountMinor, it.note, it.receivedEpochDay) }
+        }
+        assertEquals(content(source), content(target))
+        assertEquals(3, content(target).size)
+        assertEquals(source.bonusDao().getAll().map { it.syncId to it.wholeMonth }, target.bonusDao().getAll().map { it.syncId to it.wholeMonth })
+        assertEquals(JsonBackupRepository(source).countsOf(json), counts)
+    }
+
+    @Test
+    fun aBonusForTheWholeMonthIsKeptOnTheFirstEvenIfTheFileHasAnotherDay() = runBlocking {
+        val db = newDb()
+        JsonBackupRepository(db).importJson(
+            backup(version = 6, bonuses = bonus(date = "2026-10-17", wholeMonth = true) + "," + bonus(date = "2026-10-17", wholeMonth = false)),
+        )
+        val stored = db.bonusDao().getAll().associate { it.wholeMonth to LocalDate.ofEpochDay(it.dateEpochDay) }
+        assertEquals(mapOf(true to LocalDate.of(2026, 10, 1), false to LocalDate.of(2026, 10, 17)), stored)
+    }
+
+    @Test
+    fun filesOfEveryOlderVersionImportAsBonusesOnTheirDayWithNoPayouts() = runBlocking {
+        for (version in 1..5) {
+            val db = newDb()
+            val counts = JsonBackupRepository(db).importJson(backup(version = version, bonuses = if (version < 3) "" else bonus()))
+            assertEquals("v$version", 0, counts.payouts)
+            assertTrue("v$version", db.payoutDao().getAll().isEmpty())
+            assertTrue("v$version", db.bonusDao().getAll().none { it.wholeMonth })
+        }
+        // A file that says nothing of whole_month or payouts, as every version before 6 wrote it.
+        val noFields = """{"format":"shift-tracker-backup","version":5,"exported_at":"x",
+            "jobs":[{"id":1,"name":"Kawiarnia","hourly_rate_grosze":3300,"color":1,"sync_id":"0b6f4f52-55a2-4f61-8d6e-3d0bd5c5a1f7"}],
+            "shifts":[],"bonuses":[{"job_id":1,"date":"2026-10-06","amount_grosze":7500,"sync_id":"1c6f4f52-55a2-4f61-8d6e-3d0bd5c5a1f7"}]}"""
+        val db = newDb()
+        assertEquals(BackupCounts(1, 0, 1, 0), JsonBackupRepository(db).importJson(noFields))
+        assertEquals(false, db.bonusDao().getAll().single().wholeMonth)
+    }
+
+    /** Restoring a file made before payouts existed replaces everything, payouts included, like any other record. */
+    @Test
+    fun anOlderFileReplacesPayoutsToo() = runBlocking {
+        val db = databaseWithMonthBonusAndPayouts()
+        val payoutIds = db.payoutDao().getAll().map { it.id }
+
+        JsonBackupRepository(db, clock = { 77_000L }).importJson(backup(version = 5))
+
+        assertTrue(db.payoutDao().getAll().isEmpty())
+        payoutIds.forEach { id ->
+            val tombstone = db.payoutDao().getAny(id)!!
+            assertEquals("deleted so the deletion syncs", true to true, tombstone.deleted to tombstone.dirty)
+            assertEquals(77_000L, tombstone.updatedAt)
+        }
+    }
+
+    @Test
+    fun importUpdatesMatchingPayoutsInPlaceAndTombstonesTheOthers() = runBlocking {
+        val db = databaseWithMonthBonusAndPayouts()
+        val backup = JsonBackupRepository(db).exportJson()
+        val before = db.payoutDao().getAll()
+        // After the backup: one payout is edited and another one is added.
+        db.payoutDao().upsert(before.first().copy(amountMinor = 1))
+        val added = db.payoutDao().upsert(Payout(jobId = 7, month = october, amountMinor = 99).toEntity())
+
+        val now = 5_000_000_000_000L
+        assertEquals(3, JsonBackupRepository(db, clock = { now }).importJson(backup).payouts)
+
+        val after = db.payoutDao().getAll()
+        assertEquals("same rows, same sync ids", before.map { it.id to it.syncId }, after.map { it.id to it.syncId })
+        assertEquals("values from the file", before.map { it.amountMinor }, after.map { it.amountMinor })
+        after.forEach { assertEquals(now to true, it.updatedAt to it.dirty) }
+        assertEquals(true to true, db.payoutDao().getAny(added)!!.let { it.deleted to it.dirty })
+    }
+
+    @Test
+    fun rejectsInvalidPayoutsAndKeepsTheDatabase() = runBlocking {
+        val maxAmount = MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS)
+        val id = "0b6f4f52-55a2-4f61-8d6e-3d0bd5c5a1f7"
+        val cases = mapOf(
+            "payout for an unknown job" to backup(version = 6, payouts = payout(jobId = 9)),
+            "month 13" to backup(version = 6, payouts = payout(month = "2026-13")),
+            "month that is no month" to backup(version = 6, payouts = payout(month = "listopad")),
+            "month without a year" to backup(version = 6, payouts = payout(month = "11")),
+            "a year after 9999" to backup(version = 6, payouts = payout(month = "+10000-01")),
+            "a year before 1000" to backup(version = 6, payouts = payout(month = "0999-12")),
+            "zero amount" to backup(version = 6, payouts = payout(amount = 0)),
+            "negative amount" to backup(version = 6, payouts = payout(amount = -5)),
+            "amount above max" to backup(version = 6, payouts = payout(amount = maxAmount + 1)),
+            "JPY amount above max" to backup(version = 6, jobs = job(1, currency = "JPY"), payouts = payout(amount = MoneyParser.maxMinor(0, MoneyParser.AMOUNT_WHOLE_DIGITS) + 1)),
+            "received date that is no date" to backup(version = 6, payouts = payout(receivedOn = "2026-02-30")),
+            "received date after year 9999" to backup(version = 6, payouts = payout(receivedOn = "+12345-01-01")),
+            "a sync id that is no UUID" to backup(version = 6, payouts = payout(syncId = "not-a-uuid")),
+            "two payouts with the same sync id" to backup(version = 6, payouts = payout(syncId = id) + "," + payout(amount = 1, syncId = id)),
+        )
+        val db = seededDb()
+        db.payoutDao().upsert(Payout(jobId = 7, month = october, amountMinor = 250_000).toEntity())
+        val before = snapshot(db)
+        for ((name, json) in cases) {
+            val e = rejected(db, json, name)
+            assertEquals(name, InvalidBackupException.Reason.INVALID, e.reason)
+            assertEquals("database changed after: $name", before, snapshot(db))
+        }
+    }
+
+    @Test
+    fun acceptsBoundaryPayouts() = runBlocking {
+        val maxAmount = MoneyParser.maxMinor(2, MoneyParser.AMOUNT_WHOLE_DIGITS)
+        val json = backup(
+            version = 6,
+            payouts = payout(month = "1000-01", amount = 1) + "," + payout(month = "9999-12", amount = maxAmount, receivedOn = "9999-12-31") +
+                "," + payout(month = "2026-10", receivedOn = "0001-01-01") + "," + payout(month = "2026-10"),
+        )
+        val db = newDb()
+        assertEquals(4, JsonBackupRepository(db).importJson(json).payouts)
+        assertEquals(listOf(100001, 202610, 202610, 999912), db.payoutDao().getAll().map { it.month })
+    }
+
+    @Test
+    fun aFailedWriteOfPayoutsRollsBackToTheOldData() = runBlocking {
+        val db = databaseWithMonthBonusAndPayouts()
+        val json = JsonBackupRepository(db).exportJson()
+        db.openHelper.writableDatabase.execSQL("DELETE FROM payouts") // the phone changes after the backup
+        db.payoutDao().upsert(Payout(jobId = 7, month = october, amountMinor = 777).toEntity())
+        val before = snapshot(db)
+        db.openHelper.writableDatabase.execSQL(
+            "CREATE TRIGGER fail_payout_insert BEFORE INSERT ON payouts BEGIN SELECT RAISE(ABORT, 'simulated failure'); END",
+        )
+        try {
+            JsonBackupRepository(db).importJson(json)
+            fail("the simulated write failure was not reported")
+        } catch (e: InvalidBackupException) {
+            fail("valid backup was rejected: ${e.message}")
+        } catch (e: Exception) {
+            assertTrue(e.message.orEmpty(), e.message.orEmpty().contains("simulated failure"))
+        }
+        assertEquals(before, snapshot(db))
+        assertEquals(listOf(777L), db.payoutDao().getAll().map { it.amountMinor })
     }
 
     // --- Atomicity ------------------------------------------------------------------------------
@@ -266,10 +578,12 @@ class JsonBackupTest {
             assertTrue(e.message.orEmpty(), e.message.orEmpty().contains("simulated failure"))
         }
         assertEquals(before, snapshot(db))
-        assertNotEquals(0, before.first.size)
+        assertNotEquals(0, before.jobs.size)
     }
 
     // --- Helpers --------------------------------------------------------------------------------
+
+    private fun JobEntity.withoutSyncMetadata() = copy(syncId = "", updatedAt = 0)
 
     private suspend fun seededDb(): ShiftDatabase = newDb().also { db ->
         db.jobDao().upsert(Job(id = 7, name = "Kawiarnia", hourlyRateGrosze = 3050, color = 3).toEntity())
@@ -279,8 +593,15 @@ class JsonBackupTest {
         db.bonusDao().upsert(Bonus(jobId = 7, date = LocalDate.of(2026, 10, 2), amountGrosze = 5000).toEntity())
     }
 
+    private data class Rows(
+        val jobs: List<JobEntity>,
+        val shifts: List<com.vkurylo.shifttracker.data.local.ShiftEntity>,
+        val bonuses: List<com.vkurylo.shifttracker.data.local.BonusEntity>,
+        val payouts: List<com.vkurylo.shifttracker.data.local.PayoutEntity>,
+    )
+
     private suspend fun snapshot(db: ShiftDatabase) =
-        Triple(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll())
+        Rows(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll(), db.payoutDao().getAll())
 
     private suspend fun rejected(db: ShiftDatabase, json: String, case: String = json): InvalidBackupException = try {
         JsonBackupRepository(db).importJson(json)
@@ -294,7 +615,9 @@ class JsonBackupTest {
         jobs: String = job(1),
         shifts: String = shift(),
         bonuses: String = bonus(),
-    ) = """{"format":"shift-tracker-backup","version":$version,"exported_at":"x","jobs":[$jobs],"shifts":[$shifts],"bonuses":[$bonuses]}"""
+        payouts: String? = null,
+    ) = """{"format":"shift-tracker-backup","version":$version,"exported_at":"x","jobs":[$jobs],"shifts":[$shifts],"bonuses":[$bonuses]""" +
+        (payouts?.let { ",\"payouts\":[$it]" } ?: "") + "}"
 
     private fun job(
         id: Long,
@@ -303,8 +626,10 @@ class JsonBackupTest {
         second: String? = null,
         currency: String? = null,
         pay: String? = null,
+        syncId: String? = null,
     ) = """{"id":$id,"name":"$name","hourly_rate_grosze":$rate,"color":1${second?.let { ",\"second_rate\":$it" } ?: ""}""" +
-        (currency?.let { ",\"currency\":\"$it\"" } ?: "") + (pay?.let { ",\"pay_history\":$it" } ?: "") + "}"
+        (currency?.let { ",\"currency\":\"$it\"" } ?: "") + (pay?.let { ",\"pay_history\":$it" } ?: "") +
+        (syncId?.let { ",\"sync_id\":\"$it\"" } ?: "") + "}"
 
     private fun shift(
         jobId: Long = 1,
@@ -313,8 +638,20 @@ class JsonBackupTest {
         end: String = "16:00",
         breakMinutes: Int = 30,
         rate: Long = 3300,
-    ) = """{"job_id":$jobId,"date":"$date","start":"$start","end":"$end","unpaid_break_minutes":$breakMinutes,"hourly_rate_grosze":$rate}"""
+        syncId: String? = null,
+    ) = """{"job_id":$jobId,"date":"$date","start":"$start","end":"$end","unpaid_break_minutes":$breakMinutes,"hourly_rate_grosze":$rate""" +
+        (syncId?.let { ",\"sync_id\":\"$it\"" } ?: "") + "}"
 
-    private fun bonus(jobId: Long = 1, amount: Long = 7500) =
-        """{"job_id":$jobId,"date":"2026-10-06","amount_grosze":$amount}"""
+    private fun bonus(jobId: Long = 1, amount: Long = 7500, date: String = "2026-10-06", wholeMonth: Boolean? = null) =
+        """{"job_id":$jobId,"date":"$date","amount_grosze":$amount""" + (wholeMonth?.let { ",\"whole_month\":$it" } ?: "") + "}"
+
+    private fun payout(
+        jobId: Long = 1,
+        month: String = "2026-10",
+        amount: Long = 450_000,
+        receivedOn: String? = null,
+        note: String? = null,
+        syncId: String? = null,
+    ) = """{"job_id":$jobId,"month":"$month","amount_minor":$amount""" + (receivedOn?.let { ",\"received_on\":\"$it\"" } ?: "") +
+        (note?.let { ",\"note\":\"$it\"" } ?: "") + (syncId?.let { ",\"sync_id\":\"$it\"" } ?: "") + "}"
 }
