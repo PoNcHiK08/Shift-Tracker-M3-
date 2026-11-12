@@ -29,9 +29,27 @@ UI in **Ukrainian** by default with **English** as an alternative.
   vibration settings apply.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
-  earnings (the editor offers "use current rate" when they differ).
+  earnings (the editor offers "use current rate" when they differ). **"Apply to all shifts of this job…"** next to it
+  puts the job's current rates on all its other shifts, or on those from that shift's date on: a dialog first shows
+  how many shifts change and the money it moves, a safety backup is saved, and a snackbar offers Undo.
 - **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
   calendar and summary, but not towards hours or the average hourly rate.
+  - **For the whole month**: the bonus editor has a switch, *On a specific day* / *For the whole month*. A month bonus
+    counts in that month's earnings (calendar tiles, Summary month and year, "By job"; reduced by the job's
+    deductions in Net mode) but has no day: it is not in the calendar grid or the day panel, and **not in weekly
+    totals** (a week can span two months). The calendar has a "Month bonuses" row under the month tiles when the month
+    has any, and Summary → Month lists them in a section of their own, where you edit, delete (with Undo) or add one.
+- **Received pay** — per job and per month the pay was earned for, the salary that actually arrived: one or several
+  payments (amount, an optional "received on" date and note). Summary → Month shows it next to the calculated pay of
+  that month **after deductions (net, whatever the Gross / Net display is)**, with the difference (received minus
+  calculated); Summary → Year has a line per job. **It counts as the real pay of its job and month:** once a job has
+  at least one payment for a month, that job's money for the month is the sum of its payments, and it **replaces**
+  the calculated shift pay, bonuses (for a day and for the whole month) and fixed salary of that job-month (it is
+  never added on top). This is the same in Gross and Net. The calendar's month tile, Summary → Month (total and
+  "By job") and Summary → Year (month rows and total) show it with a **Received** tag ("Incl. received" when the
+  figure mixes received and calculated pay). Hours, shift counts, the average hourly rate, the day panel and dots,
+  and **weekly totals stay calculated**. Several payments for a month are summed, so entering only an advance makes
+  the month show just that amount until the rest is entered. Delete the payments and the calculated figure is back.
 - **Calendar** — swipeable month grid with colored dots per job. Tapping a day morphs its cell from a circle into an
   M3 Expressive squircle and shows that day in a Bento panel right under the grid (shift/bonus cards, day total,
   "Add shift" / "Bonus"), so you can tap through days without opening and closing a sheet. The month's earnings,
@@ -52,12 +70,14 @@ UI in **Ukrainian** by default with **English** as an alternative.
   and on clock / time zone / locale changes (so a new day or a finished shift can take up to 30 min to show).
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
-  Exports are format version 5 (every job, shift and bonus carries its sync id, so a backup restored on another phone
-  holds the same records rather than look-alike copies).
-  An import checks the whole file before touching anything (format versions 1–5; files older than 4 import as PLN,
+  Exports are format version 6 (every job, shift, bonus and received payment carries its sync id, so a backup restored
+  on another phone holds the same records rather than look-alike copies; bonuses say whether they are for the whole
+  month, and the received payments are a list of their own).
+  An import checks the whole file before touching anything (format versions 1–6; files older than 4 import as PLN,
   hourly, no deductions; currency codes, pay types, months, salaries and percentages are validated; a file from a newer app version
   gets its own message; unique job IDs and sync ids, amounts within what the editors accept, a break shorter than the shift, a
-  second-rate window that isn't empty, bonuses above zero) and replaces the data in one transaction, so a bad or
+  second-rate window that isn't empty, bonuses and received payments above zero, a real month and date for every payment)
+  and replaces the data in one transaction, so a bad or
   half-written file leaves the existing data exactly as it was. Records the file doesn't have are kept as deleted
   (tombstones), records it does have are updated in place, so the replacement can later reach other devices.
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
@@ -206,6 +226,11 @@ lets nobody in. To publish: **Firestore Database → Rules**, paste the whole fi
 with your Google account's address **there, in the console only**, then **Publish**. (With the Firebase CLI:
 deploy a local copy with your address in it, never a committed one.) Republish whenever the file changes.
 
+**Publish the rules before installing a build that adds a kind of record** (the whole-month bonus flag and the
+received-pay `payouts` collection came this way). The rules accept both the previous app version's documents and the
+new ones, so publishing early is safe for a phone that has not updated yet. A new build against old rules is refused
+(Settings says the cloud refused access and to publish the latest rules); nothing is lost, the changes wait.
+
 What protects your data is these rules, not the app's fingerprints: the dev key's password is public, so
 anyone can build an APK that Firebase accepts as this app, and the `google-services.json` values end up
 inside every APK anyway. With the rules, such an app can only sign in with the stranger's own Google
@@ -226,7 +251,7 @@ firebase/run-emulator-tests.sh                 # the app's Firestore code and sy
 | Motion | Springs (MotionScheme.expressive; screen transitions use them ~15 % quicker — same damping, stiffness × 1.38): bouncy spatial springs for position/size/shape, non-overshooting effects springs for colour/alpha; press feedback that squeezes and morphs shapes (segmented list items round their inner corners, day cells become squircles, button groups and icon buttons morph); circle -> squircle cell morph (graphics-shapes `Morph` of `MaterialShapes.Circle`/`Square`); odometer-style rolling digits for money and hours; container transform (`SharedTransitionLayout` + `sharedBounds`) from shift/bonus cards and "add" buttons into the full-screen editors, also driven by predictive back |
 | Architecture | Single activity, MVVM + unidirectional data flow (ViewModel + StateFlow) |
 | Navigation | Navigation Compose 2.10, type-safe `@Serializable` routes. Two levels: a root stack (home + detail screens) and a nested tab host. Material 3 transition patterns on M3 Expressive springs: shared axis X (30 dp) for forward/back, fade through for tabs, container transform for card -> editor, and M3 predictive back: while you drag, the closing screen shrinks to 90 %, rounds its corners, casts a shadow and drifts towards the swiping edge; when you let go it keeps going from that exact point (shrinks to 85 % and fades out within at most ~250 ms) instead of pausing first, and a cancelled swipe returns it to its place. An editor opened from a card is only held by the finger: it shrinks a little, rounds its corners and drifts, on a spring and up to a limit (rubber band), however far you drag, with the calendar visible behind it; it never morphs into the card under the finger. On release it flies into its card from where it was held (on a calm spring, ~5 % longer than a normal close) in plain view all the way: its content fades out early, the card's own look fades in on the shrinking container and lands exactly in the card's place. This happens on every back, however quick the flick (even one released before predictive back has started) and with the system back button; the editor's own close/save/delete buttons keep the normal container transform. Normal open/close keeps the container transform springs. Icon-only bottom bar built from M3 Expressive toggle buttons |
-| Storage | Room 2.8 (jobs, shifts, bonuses; exported schemas, auto-migrations up to v6 and a manual v6 → v7 that adds sync metadata: a UUID `sync_id`, `updated_at`, and deletions kept as hidden tombstones) + DataStore (settings); money stored as `Long` minor units of each job's currency (the `*_grosze` names predate other currencies); pay settings history per job |
+| Storage | Room 2.8 (jobs, shifts, bonuses, received-pay payouts; exported schemas, auto-migrations up to v6, a manual v6 → v7 that adds sync metadata: a UUID `sync_id`, `updated_at`, and deletions kept as hidden tombstones, and an auto-migration v7 → v8 that adds `bonuses.whole_month` and the `payouts` table) + DataStore (settings); money stored as `Long` minor units of each job's currency (the `*_grosze` names predate other currencies); pay settings history per job |
 | Cloud sync (optional) | Firebase Auth (Google sign-in through Credential Manager) + Cloud Firestore; Room stays the source of truth |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
@@ -250,7 +275,7 @@ app/src/main/java/com/vkurylo/shifttracker/
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
 app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
-                   import planner, DB migrations from v1 and v6, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
+                   import planner, DB migrations from v1, v6 and v7, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
                    time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
                    engine (last write wins, first sign-in, several phones) and its Firestore documents
 firebase/          firestore.rules, its tests (rules-test/) and the emulator test runner

@@ -7,6 +7,7 @@ import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
 import com.vkurylo.shifttracker.data.local.ParentChildRule
+import com.vkurylo.shifttracker.data.local.PayoutEntity
 import com.vkurylo.shifttracker.data.local.monthKeyToYearMonth
 import com.vkurylo.shifttracker.data.local.toEntity
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
@@ -20,6 +21,7 @@ import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.PaySettings
 import com.vkurylo.shifttracker.domain.model.PayType
+import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.repository.BackupRepository
 import com.vkurylo.shifttracker.domain.repository.InvalidBackupException
@@ -38,6 +40,8 @@ data class BackupFile(
     val shifts: List<BackupShift>,
     /** Added in backup version 3; older files simply have none. */
     val bonuses: List<BackupBonus> = emptyList(),
+    /** Added in backup version 6; older files simply have none. */
+    val payouts: List<BackupPayout> = emptyList(),
 ) {
     companion object {
         const val FORMAT = "shift-tracker-backup"
@@ -45,11 +49,12 @@ data class BackupFile(
         /**
          * Every exporter so far wrote its version explicitly: 1 (jobs + shifts), 2 (+ second rates),
          * 3 (+ bonuses), 4 (+ a currency and a pay settings history with deductions per job), 5 (+ a sync id
-         * per job, shift and bonus). All of them decode into these classes (newer fields have defaults: an
-         * older file's jobs are PLN and hourly, and its records get new sync ids when imported).
+         * per job, shift and bonus), 6 (+ whole-month bonuses and the received-pay payouts). All of them decode
+         * into these classes (newer fields have defaults: an older file's jobs are PLN and hourly, its bonuses are
+         * on their day, it has no payouts, and its records get new sync ids when imported).
          */
         const val MIN_VERSION = 1
-        const val CURRENT_VERSION = 5
+        const val CURRENT_VERSION = 6
     }
 }
 
@@ -115,6 +120,26 @@ data class BackupBonus(
     val note: String? = null,
     /** The record's id on every device (a UUID). Added in backup version 5; older files have none. */
     @SerialName("sync_id") val syncId: String? = null,
+    /**
+     * True: the bonus is for the whole month of [date] (kept on its 1st), not for that day.
+     * Added in backup version 6; older files' bonuses are all on their day.
+     */
+    @SerialName("whole_month") val wholeMonth: Boolean = false,
+)
+
+/**
+ * The salary that actually arrived for a job, for the month it was earned for ([month], "2026-11"). A job can
+ * have several for a month. Amounts are minor units of the job's currency. Added in backup version 6.
+ */
+@Serializable
+data class BackupPayout(
+    @SerialName("job_id") val jobId: Long,
+    val month: String,
+    @SerialName("amount_minor") val amountMinor: Long,
+    val note: String? = null,
+    /** ISO date it arrived, when the user entered it. */
+    @SerialName("received_on") val receivedOn: String? = null,
+    @SerialName("sync_id") val syncId: String? = null,
 )
 
 @Singleton
@@ -133,7 +158,7 @@ class JsonBackupRepository @Inject constructor(
     override suspend fun exportJson(): String {
         // One read transaction, so the lists are a consistent snapshot.
         val snapshot = db.withTransaction {
-            Snapshot(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll(), db.paySettingsDao().getAll())
+            Snapshot(db.jobDao().getAll(), db.shiftDao().getAll(), db.bonusDao().getAll(), db.paySettingsDao().getAll(), db.payoutDao().getAll())
         }
         val (jobs, shifts, bonuses) = snapshot
         val history = snapshot.payHistory.groupBy { it.jobId }
@@ -179,7 +204,21 @@ class JsonBackupRepository @Inject constructor(
                     amountGrosze = it.amountGrosze,
                     note = it.note,
                     syncId = it.syncId,
+                    wholeMonth = it.wholeMonth,
                 )
+            },
+            payouts = snapshot.payouts.mapNotNull { payout ->
+                // A row whose month isn't a real month can't be written (the app never creates one).
+                Payout.monthFromKey(payout.month)?.let { month ->
+                    BackupPayout(
+                        jobId = payout.jobId,
+                        month = month.toString(),
+                        amountMinor = payout.amountMinor,
+                        note = payout.note,
+                        receivedOn = payout.receivedEpochDay?.let { java.time.LocalDate.ofEpochDay(it).toString() },
+                        syncId = payout.syncId,
+                    )
+                }
             },
         )
         return json.encodeToString(BackupFile.serializer(), file)
@@ -189,7 +228,7 @@ class JsonBackupRepository @Inject constructor(
     fun countsOf(json: String): BackupCounts? =
         runCatching { this.json.decodeFromString(BackupFile.serializer(), json) }.getOrNull()
             ?.takeIf { it.format == BackupFile.FORMAT }
-            ?.let { BackupCounts(jobs = it.jobs.size, shifts = it.shifts.size, bonuses = it.bonuses.size) }
+            ?.let { BackupCounts(jobs = it.jobs.size, shifts = it.shifts.size, bonuses = it.bonuses.size, payouts = it.payouts.size) }
 
     /** Whether this phone holds any job (shifts and bonuses always belong to one). */
     suspend fun hasData(): Boolean = db.jobDao().getAll().isNotEmpty()
@@ -217,20 +256,22 @@ class JsonBackupRepository @Inject constructor(
         val digitsByJob = jobs.associate { it.id to Currencies.fractionDigits(it.currency) }
         val shifts = convert("shifts") { file.shifts.map { toShift(it, digitsByJob) } }
         val bonuses = convert("bonuses") { file.bonuses.map { toBonus(it, digitsByJob) } }
+        val payouts = convert("received pay") { file.payouts.map { toPayout(it, digitsByJob) } }
 
         convert("sync ids") {
             requireUniqueSyncIds("job", jobs.map { it.syncId })
             requireUniqueSyncIds("shift", shifts.map { it.syncId })
             requireUniqueSyncIds("bonus", bonuses.map { it.syncId })
+            requireUniqueSyncIds("payout", payouts.map { it.syncId })
         }
 
         // If any write fails, the transaction rolls back and the old data stays. A sync never runs in the middle
         // of it (SyncLock): it waits, then uploads the result.
         syncLock.mutex.withLock {
             beforeReplace()
-            db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, clock.nowMillis()) }
+            db.withTransaction { replaceAll(jobs, payHistory, shifts, bonuses, payouts, clock.nowMillis()) }
         }
-        return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size)
+        return BackupCounts(jobs = jobs.size, shifts = shifts.size, bonuses = bonuses.size, payouts = payouts.size)
     }
 
     /**
@@ -246,15 +287,19 @@ class JsonBackupRepository @Inject constructor(
         payHistory: List<JobPaySettingsEntity>,
         shifts: List<ShiftEntity>,
         bonuses: List<BonusEntity>,
+        payouts: List<PayoutEntity>,
         now: Long,
     ) {
         val jobDao = db.jobDao()
         val shiftDao = db.shiftDao()
         val bonusDao = db.bonusDao()
+        val payoutDao = db.payoutDao()
         val payDao = db.paySettingsDao()
+        val keepPayouts = payouts.mapTo(HashSet()) { it.syncId }
         val keepBonuses = bonuses.mapTo(HashSet()) { it.syncId }
         val keepShifts = shifts.mapTo(HashSet()) { it.syncId }
         val keepJobs = jobs.mapTo(HashSet()) { it.syncId }
+        payoutDao.liveKeys().filter { it.syncId !in keepPayouts }.forEach { payoutDao.markDeleted(it.id, now) }
         bonusDao.liveKeys().filter { it.syncId !in keepBonuses }.forEach { bonusDao.markDeleted(it.id, now) }
         shiftDao.liveKeys().filter { it.syncId !in keepShifts }.forEach { shiftDao.markDeleted(it.id, now) }
         jobDao.liveKeys().filter { it.syncId !in keepJobs }.forEach { jobDao.markDeleted(it.id, nextUpdatedAt(it.updatedAt, now)) }
@@ -274,6 +319,10 @@ class JsonBackupRepository @Inject constructor(
         for (bonus in bonuses) {
             val existing = bonusDao.getBySyncId(bonus.syncId)
             bonusDao.upsert(bonus.copy(id = existing?.id ?: 0, jobId = rowIdByFileId.getValue(bonus.jobId)).stamped(existing, now))
+        }
+        for (payout in payouts) {
+            val existing = payoutDao.getBySyncId(payout.syncId)
+            payoutDao.upsert(payout.copy(id = existing?.id ?: 0, jobId = rowIdByFileId.getValue(payout.jobId)).stamped(existing, now))
         }
         ParentChildRule.enforce(jobDao)
     }
@@ -378,12 +427,35 @@ class JsonBackupRepository @Inject constructor(
         val digits = requireNotNull(digitsByJob[bonus.jobId]) { "bonus refers to unknown job ${bonus.jobId}" }
         require(bonus.amountGrosze <= MoneyParser.maxMinor(digits, MoneyParser.AMOUNT_WHOLE_DIGITS)) { "bonus out of range: ${bonus.amountGrosze}" }
         require(bonus.amountGrosze > 0) { "bonus of ${bonus.amountGrosze}" }
+        val date = java.time.LocalDate.parse(bonus.date)
         return BonusEntity(
             jobId = bonus.jobId,
-            dateEpochDay = java.time.LocalDate.parse(bonus.date).toEpochDay(),
+            // A bonus for the whole month has no day of its own: it is kept on the 1st.
+            dateEpochDay = (if (bonus.wholeMonth) date.withDayOfMonth(1) else date).toEpochDay(),
             amountGrosze = bonus.amountGrosze,
             note = bonus.note,
+            wholeMonth = bonus.wholeMonth,
             syncId = syncIdOf(bonus.syncId),
+        )
+    }
+
+    /** Received pay: for a job of the file, a real month, an amount like a bonus's, and a real date if any. */
+    private fun toPayout(payout: BackupPayout, digitsByJob: Map<Long, Int>): PayoutEntity {
+        val digits = requireNotNull(digitsByJob[payout.jobId]) { "received pay refers to unknown job ${payout.jobId}" }
+        val month = java.time.YearMonth.parse(payout.month)
+        val key = Payout.keyOf(month)
+        require(Payout.monthFromKey(key) == month) { "received pay month ${payout.month} out of range" }
+        require(payout.amountMinor <= MoneyParser.maxMinor(digits, MoneyParser.AMOUNT_WHOLE_DIGITS)) { "received pay out of range: ${payout.amountMinor}" }
+        require(payout.amountMinor > 0) { "received pay of ${payout.amountMinor}" }
+        val receivedOn = payout.receivedOn?.let { java.time.LocalDate.parse(it) }
+        require(receivedOn == null || receivedOn.year in 1..9999) { "received date ${payout.receivedOn} out of range" }
+        return PayoutEntity(
+            jobId = payout.jobId,
+            month = key,
+            amountMinor = payout.amountMinor,
+            note = payout.note,
+            receivedEpochDay = receivedOn?.toEpochDay(),
+            syncId = syncIdOf(payout.syncId),
         )
     }
 
@@ -394,6 +466,7 @@ class JsonBackupRepository @Inject constructor(
         val shifts: List<ShiftEntity>,
         val bonuses: List<BonusEntity>,
         val payHistory: List<JobPaySettingsEntity>,
+        val payouts: List<PayoutEntity>,
     )
 
     /** A second rate: amount in range and a non-empty window (the job editor rejects from == to). */

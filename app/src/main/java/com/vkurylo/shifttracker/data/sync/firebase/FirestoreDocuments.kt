@@ -4,6 +4,7 @@ import com.vkurylo.shifttracker.data.sync.DOC_SCHEMA
 import com.vkurylo.shifttracker.data.sync.RemoteBonus
 import com.vkurylo.shifttracker.data.sync.RemoteJob
 import com.vkurylo.shifttracker.data.sync.RemotePaySettings
+import com.vkurylo.shifttracker.data.sync.RemotePayout
 import com.vkurylo.shifttracker.data.sync.RemoteRecord
 import com.vkurylo.shifttracker.data.sync.RemoteShift
 import com.vkurylo.shifttracker.data.sync.RemoteTimedRate
@@ -18,10 +19,16 @@ import com.vkurylo.shifttracker.data.sync.RemoteTimedRate
  *                                  secondRate, currency, payHistory }
  *   users/{uid}/shifts/{syncId}  { v, updatedAt, serverUpdatedAt, deleted, jobId, dateEpochDay, startMinute,
  *                                  endMinute, unpaidBreakMinutes, hourlyRateGrosze, note, externalUid, secondRate }
- *   users/{uid}/bonuses/{syncId} { v, updatedAt, serverUpdatedAt, deleted, jobId, dateEpochDay, amountGrosze, note }
+ *   users/{uid}/bonuses/{syncId} { v, updatedAt, serverUpdatedAt, deleted, jobId, dateEpochDay, amountGrosze, note,
+ *                                  wholeMonth }
+ *   users/{uid}/payouts/{syncId} { v, updatedAt, serverUpdatedAt, deleted, jobId, month, amountMinor, note,
+ *                                  receivedEpochDay }
+ *
+ * `wholeMonth` is optional when reading (a bonus written by an app version without month bonuses has none: false),
+ * and always written. Everything else is required. firestore.rules accepts a bonus with or without it.
  *
  * Every number is a whole number (Firestore integer): money in minor units (grosze), times in UTC millis, minutes
- * of the day, days since 1970-01-01. `jobId` is the job's sync id (its document id). `serverUpdatedAt` is set by
+ * of the day, days since 1970-01-01, months as yyyymm. `jobId` is the job's sync id (its document id). `serverUpdatedAt` is set by
  * the server on every write and only used to find changes; `updatedAt` (the phone's clock) decides conflicts.
  */
 
@@ -46,6 +53,11 @@ internal object Fields {
     const val NOTE = "note"
     const val EXTERNAL_UID = "externalUid"
     const val AMOUNT = "amountGrosze"
+    const val WHOLE_MONTH = "wholeMonth"
+
+    const val MONTH = "month"
+    const val AMOUNT_MINOR = "amountMinor"
+    const val RECEIVED = "receivedEpochDay"
 
     const val RATE = "rateGrosze"
     const val FROM_MINUTE = "fromMinute"
@@ -60,13 +72,14 @@ internal object Fields {
     const val CREATED_AT = "createdAt"
 }
 
-internal enum class CloudCollection(val path: String) { JOBS("jobs"), SHIFTS("shifts"), BONUSES("bonuses") }
+internal enum class CloudCollection(val path: String) { JOBS("jobs"), SHIFTS("shifts"), BONUSES("bonuses"), PAYOUTS("payouts") }
 
 internal val RemoteRecord.collection: CloudCollection
     get() = when (this) {
         is RemoteJob -> CloudCollection.JOBS
         is RemoteShift -> CloudCollection.SHIFTS
         is RemoteBonus -> CloudCollection.BONUSES
+        is RemotePayout -> CloudCollection.PAYOUTS
     }
 
 /**
@@ -110,6 +123,14 @@ internal fun RemoteRecord.toFields(): Map<String, Any?> {
             Fields.DATE to dateEpochDay,
             Fields.AMOUNT to amountGrosze,
             Fields.NOTE to note,
+            Fields.WHOLE_MONTH to wholeMonth,
+        )
+        is RemotePayout -> mapOf(
+            Fields.JOB_ID to jobSyncId,
+            Fields.MONTH to month.toLong(),
+            Fields.AMOUNT_MINOR to amountMinor,
+            Fields.NOTE to note,
+            Fields.RECEIVED to receivedEpochDay,
         )
     }
 }
@@ -130,6 +151,7 @@ internal fun readRecord(collection: CloudCollection, id: String, data: Map<Strin
             CloudCollection.JOBS -> reader.job(id)
             CloudCollection.SHIFTS -> reader.shift(id)
             CloudCollection.BONUSES -> reader.bonus(id)
+            CloudCollection.PAYOUTS -> reader.payout(id)
         }
     } catch (e: UnreadableField) {
         unreadable(collection, id, (data[Fields.UPDATED_AT] as? Long) ?: Long.MAX_VALUE)
@@ -138,7 +160,8 @@ internal fun readRecord(collection: CloudCollection, id: String, data: Map<Strin
 private fun unreadable(collection: CloudCollection, id: String, updatedAt: Long): RemoteRecord = when (collection) {
     CloudCollection.JOBS -> RemoteJob(id, updatedAt, false, "", 0, 0, null, "", emptyList(), UNREADABLE_SCHEMA)
     CloudCollection.SHIFTS -> RemoteShift(id, updatedAt, false, "", 0, 0, 0, 0, 0, null, null, null, UNREADABLE_SCHEMA)
-    CloudCollection.BONUSES -> RemoteBonus(id, updatedAt, false, "", 0, 0, null, UNREADABLE_SCHEMA)
+    CloudCollection.BONUSES -> RemoteBonus(id, updatedAt, false, "", 0, 0, null, schema = UNREADABLE_SCHEMA)
+    CloudCollection.PAYOUTS -> RemotePayout(id, updatedAt, false, "", 0, 0, null, null, UNREADABLE_SCHEMA)
 }
 
 private class UnreadableField(name: String) : Exception(name)
@@ -190,6 +213,19 @@ private class FieldReader(private val data: Map<String, Any?>) {
         dateEpochDay = long(Fields.DATE),
         amountGrosze = long(Fields.AMOUNT),
         note = optionalString(Fields.NOTE),
+        wholeMonth = boolOrFalse(Fields.WHOLE_MONTH),
+        schema = schema(),
+    )
+
+    fun payout(id: String) = RemotePayout(
+        syncId = id,
+        updatedAt = long(Fields.UPDATED_AT),
+        deleted = bool(Fields.DELETED),
+        jobSyncId = string(Fields.JOB_ID),
+        month = int(Fields.MONTH),
+        amountMinor = long(Fields.AMOUNT_MINOR),
+        note = optionalString(Fields.NOTE),
+        receivedEpochDay = optionalLong(Fields.RECEIVED),
         schema = schema(),
     )
 
@@ -215,6 +251,15 @@ private class FieldReader(private val data: Map<String, Any?>) {
     }
 
     fun bool(name: String): Boolean = data[name] as? Boolean ?: throw UnreadableField(name)
+
+    /** Missing: false (written by an app version that doesn't know the field). Present: must be a boolean. */
+    fun boolOrFalse(name: String): Boolean = if (data.containsKey(name)) bool(name) else false
+
+    /** Present and null, or a whole number. A missing key is unreadable: this app always writes it. */
+    fun optionalLong(name: String): Long? {
+        if (!data.containsKey(name)) throw UnreadableField(name)
+        return if (data[name] == null) null else long(name)
+    }
 
     fun string(name: String): String = data[name] as? String ?: throw UnreadableField(name)
 

@@ -46,3 +46,15 @@ data class ShiftWithJob(
     val shift: Shift,
     val job: Job,
 )
+
+/** The rates a shift's pay is worked out with: the base rate and the optional timed second rate. */
+data class ShiftRates(val hourlyRateGrosze: Long, val secondRate: TimedRate?)
+
+/** The job's current rates: what "Use current rate" puts on a shift (one or many). */
+val Job.currentRates: ShiftRates get() = ShiftRates(hourlyRateGrosze, secondRate)
+
+/** The rates saved with the shift. */
+val Shift.rates: ShiftRates get() = ShiftRates(hourlyRateGrosze, secondRate)
+
+/** The shift with [rates] instead of its own; nothing else changes. */
+fun Shift.withRates(rates: ShiftRates): Shift = copy(hourlyRateGrosze = rates.hourlyRateGrosze, secondRate = rates.secondRate)

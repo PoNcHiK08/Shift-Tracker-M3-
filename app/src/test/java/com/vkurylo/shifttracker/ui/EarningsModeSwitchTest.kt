@@ -116,7 +116,7 @@ class EarningsModeSwitchTest {
 
     @Test
     fun calendarMonthTotalFollowsTheSwitch() {
-        val vm = CalendarViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        val vm = CalendarViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository, FakePayoutRepository(listOf(cafe, office)))
         val gross = vm.uiState.awaitValue { !it.loading }.monthSummary
         assertEquals(mapOf("PLN" to 29_000L, "EUR" to 300_000L), gross.totalEarnings.byCurrency.filterValues { it > 0 })
 
@@ -129,7 +129,7 @@ class EarningsModeSwitchTest {
 
     @Test
     fun summaryFollowsTheSwitch() {
-        val vm = SummaryViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository)
+        val vm = SummaryViewModel(SavedStateHandle(), shiftRepository, bonusRepository, jobRepository, preferencesRepository, FakePayoutRepository(listOf(cafe, office)))
         vm.setPeriod(SummaryPeriod.YEAR)
         val gross = vm.uiState.awaitValue { !it.loading && it.range.period == SummaryPeriod.YEAR }
         val monthEntry = gross.breakdown[month.monthValue - 1]

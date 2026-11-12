@@ -43,6 +43,21 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
   you (the project owner, in the Firebase console) and Google can read the documents.
 - **Deleting your Google account doesn't delete the Firestore data.** Use **Delete my cloud data** first.
 - **Needs Google Play services** for signing in.
+- **Weekly totals leave out bonuses for a whole month.** A week can span two months, so such a bonus is part of
+  its month and of the year, never of a week or of a day (it is not in the calendar grid or the day panel).
+- **Received pay replaces the calculated pay of its job and month.** Once a job has a payment for a month, the
+  month tile, Summary → Month and Year count what arrived for that job instead of its calculated shifts, bonuses
+  and salary (never on top), marked **Received**, in Gross and in Net. Several payments for one month are summed,
+  so an advance alone shows as the whole month until the rest is entered. Hours, shifts, the average rate, the
+  day panel and **weeks stay calculated**. The **Received pay** section still compares what arrived with the
+  calculated pay after deductions (net). A payment belongs to the month it was earned for, not the month it
+  arrived. Nothing is stored differently for this: older app versions on another phone keep showing the
+  calculated pay.
+- **Restoring a backup replaces received pay too.** A backup made before received pay existed has none, so
+  importing it deletes the payments (as deletions that sync, like every other record). The safety backup taken
+  first has them.
+- **"Delete my cloud data" from a phone on an older app version leaves the received pay** in the cloud, because
+  that version doesn't know the `payouts` collection. Do it from an updated phone.
 
 ## Testing on phones
 
@@ -104,6 +119,37 @@ Both phones run the debug APK and are signed in with the same account. A has dat
    - B: **Sync now** → "This account's cloud data was deleted…". Tap the row → **Upload again** (B's data goes
      up) or **Turn sync off**.
 9. **Write counter.** "today N" in the status grows only when records are sent.
+
+### Month bonuses and received pay
+
+Needs the rules from this version published first (README, "Security rules"). With one phone, or with two for the
+last check.
+
+1. **Month bonus.** Add a bonus, switch to **For the whole month**, pick the month, save.
+   - **Calendar:** the month tiles include it and a **Month bonuses** row shows under them. The grid dots and the
+     day panel don't show it, and the row opens the list.
+   - **Summary → Month:** it is in the totals, in **By job** and in the **Month bonuses** section, where it opens
+     in the editor. **Summary → Week** (any week of that month) doesn't include it. **Year** counts it in its month.
+   - **Gross / Net:** in Net it is reduced by the job's deductions.
+   - **Delete** it from the editor and tap **Undo**: it comes back as it was.
+2. **Received pay.** Summary → Month → **Received pay**.
+   - A job's row shows **Calculated (net)**, **Received** ("not entered" at first) and, once something is
+     entered, the **Difference** (received minus calculated).
+   - Tap a job → **Add payment**: amount, the month it was earned for, an optional received date and note.
+     Add a second payment for the same month: they are summed ("2 payments").
+   - **The totals now count what arrived for that job and month.** The calendar's month tile, the hero card,
+     the job in **By job** and the month's row in **Year** (and its total) show the received sum with a
+     **Received** tag ("Incl. received" when another job is still calculated). The job's bonuses and salary are
+     not added on top.
+   - **Week** and the **day panel** are unchanged, and so are hours, shifts and the average rate.
+   - Switch Gross / Net: the received figure stays the same; the calculated figure in **Received pay** stays the
+     net one.
+   - Delete the payments: every figure is the calculated one again and the tags are gone. **Undo** brings them
+     back. **Year** shows a line per job with payments.
+3. **Two phones.** Do 1 and 2 on A, then **Sync now** on both: B shows the same month bonus (not on a day) and the
+   same payments. **Sync now** again on B: "0 received, 0 sent".
+4. **Backup.** **Export data** (the file says `"version": 6` and lists `payouts`), then **Import data** it back
+   (or on a second phone): the month bonus, the payments and the totals are the same.
 
 ## Moving my real app to sync
 
@@ -185,6 +231,39 @@ app untouched. Do this before the PR is merged, while `latest-build` still has t
 4. In that debug app, **Import data** the export.
 5. Install this branch's `ShiftTracker-debug.apk` over it, then open it and compare months and totals with
    the real app. Leave sync off there, so your real data goes to the cloud from the real app only.
+
+## Updating to whole-month bonuses and received pay (database v8)
+
+This update adds a flag to bonuses and a table for received pay. Do it in this order.
+
+1. **Publish the new `firestore.rules`** (with your address) in the Firebase console, *before* installing the
+   update on any phone. They accept the previous version's documents as well as the new ones, so a phone that
+   hasn't updated yet keeps syncing. If you install first, the new version's sync is refused until you publish:
+   Settings says "The cloud refused access…", nothing is lost, and the changes wait.
+2. **Export your data** from the app you have now (Settings → **Export data**), as before any update.
+3. **Install the update over the old app.** The database goes from v7 to v8 in one step: one new column
+   (`whole_month`, 0 for every existing bonus, so they stay bonuses on their day) and an empty `payouts` table.
+   No existing row is touched or marked as changed, so nothing uploads again. Check a few months: same totals.
+4. Backups from now on are **format 6**. Files of formats 1–5 still import (their bonuses are on their day and
+   they have no received pay).
+
+### While one phone is updated and another is not
+
+- The phone on the previous version keeps syncing and keeps working.
+- It shows a month bonus as a bonus **on the 1st** of that month: the month's totals there are right, but the
+  bonus appears on that day and in that week there. When that phone edits such a bonus, the "whole month" mark
+  survives (uploads merge fields).
+- It doesn't see received pay at all. If it deletes a job, the updated phone deletes that job's payments when the
+  deletion reaches it.
+- Update the other phone too; there is nothing else to do.
+
+### Rolling back
+
+As for the sync update: Android can't install an older version over a newer one, so go through uninstall,
+reinstall and import. The format-6 file imports into the previous app after you open it in a text editor and
+change `"version": 6` to `"version": 4` (or 5): the month bonuses become bonuses on the 1st and the payments are
+dropped, because that version ignores fields it doesn't know. Nothing in the cloud needs undoing; payments stay in
+the cloud for when you update again.
 
 ## Optional: your own release key
 

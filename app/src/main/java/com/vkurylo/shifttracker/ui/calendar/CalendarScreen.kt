@@ -19,6 +19,8 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -60,6 +62,8 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
@@ -91,6 +95,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vkurylo.shifttracker.R
 import androidx.compose.ui.text.style.TextOverflow
+import com.vkurylo.shifttracker.ui.util.ReceivedTag
 import com.vkurylo.shifttracker.ui.util.earningsModeLabel
 import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
@@ -135,6 +140,8 @@ fun CalendarScreen(
     onAddBonus: (LocalDate) -> Unit,
     onEditBonus: (Long) -> Unit,
     onManageJobs: () -> Unit,
+    onAddMonthBonus: (YearMonth) -> Unit = {},
+    onEditMonthBonus: (Long) -> Unit = {},
     viewModel: CalendarViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -157,6 +164,7 @@ fun CalendarScreen(
         scope.launch { pagerState.animateScrollToPage(page.coerceIn(0, PAGE_COUNT - 1)) }
     }
 
+    var showMonthBonuses by rememberSaveable { mutableStateOf(false) }
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hasJobs = state.jobs.isNotEmpty()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
@@ -210,6 +218,16 @@ fun CalendarScreen(
                     )
                 }
             }
+            // Bonuses for the whole month have no day, so they are not in the grid; they have a row of their own.
+            if (state.monthBonuses.isNotEmpty()) {
+                item(key = "month-bonuses") {
+                    MonthBonusesRow(
+                        items = state.monthBonuses,
+                        onClick = { showMonthBonuses = true },
+                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
+                    )
+                }
+            }
             item(key = "weekdays") { WeekdayHeader() }
             item(key = "grid") {
                 HorizontalPager(
@@ -258,6 +276,25 @@ fun CalendarScreen(
                 }
             }
         }
+    }
+
+    // The last one can be deleted (or the month changed) while the list is open: then there is nothing to list.
+    val hasMonthBonuses = state.monthBonuses.isNotEmpty()
+    LaunchedEffect(hasMonthBonuses) { if (!hasMonthBonuses) showMonthBonuses = false }
+    if (showMonthBonuses && hasMonthBonuses) {
+        MonthBonusesSheet(
+            month = state.month,
+            items = state.monthBonuses,
+            onDismiss = { showMonthBonuses = false },
+            onEdit = { id ->
+                showMonthBonuses = false
+                onEditMonthBonus(id)
+            },
+            onAdd = {
+                showMonthBonuses = false
+                onAddMonthBonus(state.month)
+            },
+        )
     }
 }
 
@@ -594,6 +631,9 @@ internal const val CALENDAR_LIST_TAG = "calendar-list"
 private const val DAY_CELL_ASPECT = 1.15f
 
 internal const val MONTH_TILE_EARNINGS = "month-tile-earnings"
+
+/** The amount inside the earnings tile. */
+internal const val MONTH_TILE_AMOUNT = "month-tile-amount"
 internal const val MONTH_TILE_HOURS = "month-tile-hours"
 internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
 
@@ -602,7 +642,7 @@ internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
  * (segments 2 dp apart, large outer and small inner corners, like the app's segmented lists). All
  * three share one height (whichever needs more, e.g. with a large font), so they always line up.
  */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier: Modifier = Modifier) {
     val locale = currentLocale()
@@ -613,7 +653,8 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
         Tile(
             container = colors.primaryContainer,
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
-            modifier = Modifier.weight(1.7f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
+            // A little wider than the others: the amount and its "Received" tag share a row.
+            modifier = Modifier.weight(1.8f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
         ) {
             // "Earned this month · Net" when jobs have deductions, so it's never ambiguous.
             val tag = earningsModeLabel()
@@ -624,13 +665,23 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            // One line per currency (several only when jobs are paid in different currencies).
-            RollingAmounts(
-                amounts = summary.totalEarnings,
-                fallbackCurrency = defaultCurrency,
-                style = MaterialTheme.typography.titleMediumEmphasized,
-                color = colors.onPrimaryContainer,
-            )
+            // The amount, and right of it the "Received" tag when the month counts what arrived for a job instead
+            // of its calculated pay. The amount is measured first at full width, so it is never squeezed; when the
+            // tag doesn't fit beside it (a long amount, a big font, a longer translation) it wraps under it.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                itemVerticalAlignment = Alignment.CenterVertically,
+            ) {
+                // One line per currency (several only when jobs are paid in different currencies).
+                RollingAmounts(
+                    amounts = summary.totalEarnings,
+                    fallbackCurrency = defaultCurrency,
+                    style = MaterialTheme.typography.titleMediumEmphasized,
+                    color = colors.onPrimaryContainer,
+                    modifier = Modifier.testTag(MONTH_TILE_AMOUNT),
+                )
+                ReceivedTag(summary.receivedPart, color = colors.onPrimaryContainer, horizontalPadding = 4.dp)
+            }
         }
         Tile(
             container = colors.secondaryContainer,

@@ -9,6 +9,7 @@ import androidx.room.Room
 import com.vkurylo.shifttracker.data.backup.JsonBackupRepository
 import com.vkurylo.shifttracker.data.local.BonusDao
 import com.vkurylo.shifttracker.data.local.PaySettingsDao
+import com.vkurylo.shifttracker.data.local.PayoutDao
 import com.vkurylo.shifttracker.data.local.JobDao
 import com.vkurylo.shifttracker.data.local.ShiftDao
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
@@ -17,6 +18,8 @@ import com.vkurylo.shifttracker.data.repository.AppCompatLanguageRepository
 import com.vkurylo.shifttracker.data.repository.DataStorePreferencesRepository
 import com.vkurylo.shifttracker.data.repository.RoomBonusRepository
 import com.vkurylo.shifttracker.data.repository.RoomJobRepository
+import com.vkurylo.shifttracker.data.repository.RoomPayoutRepository
+import com.vkurylo.shifttracker.data.repository.RoomShiftRatesRepository
 import com.vkurylo.shifttracker.data.repository.RoomShiftRepository
 import com.vkurylo.shifttracker.data.sync.FileSafetyBackup
 import com.vkurylo.shifttracker.data.sync.FirestoreHostClock
@@ -34,7 +37,9 @@ import com.vkurylo.shifttracker.domain.repository.BackupRepository
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.LanguageRepository
+import com.vkurylo.shifttracker.domain.repository.PayoutRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
+import com.vkurylo.shifttracker.domain.repository.ShiftRatesRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import dagger.Binds
 import dagger.Module
@@ -68,6 +73,9 @@ object DataModule {
     fun provideBonusDao(db: ShiftDatabase): BonusDao = db.bonusDao()
 
     @Provides
+    fun providePayoutDao(db: ShiftDatabase): PayoutDao = db.payoutDao()
+
+    @Provides
     fun providePaySettingsDao(db: ShiftDatabase): PaySettingsDao = db.paySettingsDao()
 
     @Provides
@@ -81,7 +89,9 @@ object DataModule {
 abstract class RepositoryModule {
     @Binds abstract fun bindJobRepository(impl: RoomJobRepository): JobRepository
     @Binds abstract fun bindShiftRepository(impl: RoomShiftRepository): ShiftRepository
+    @Binds abstract fun bindShiftRatesRepository(impl: RoomShiftRatesRepository): ShiftRatesRepository
     @Binds abstract fun bindBonusRepository(impl: RoomBonusRepository): BonusRepository
+    @Binds abstract fun bindPayoutRepository(impl: RoomPayoutRepository): PayoutRepository
     @Binds abstract fun bindPreferencesRepository(impl: DataStorePreferencesRepository): PreferencesRepository
     @Binds abstract fun bindLanguageRepository(impl: AppCompatLanguageRepository): LanguageRepository
     @Binds abstract fun bindBackupRepository(impl: JsonBackupRepository): BackupRepository

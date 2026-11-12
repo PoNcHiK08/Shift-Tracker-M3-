@@ -13,6 +13,7 @@ import com.vkurylo.shifttracker.domain.model.payFor
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.TimedRate
+import com.vkurylo.shifttracker.domain.model.currentRates
 import com.vkurylo.shifttracker.domain.model.paysHourly
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import com.vkurylo.shifttracker.domain.repository.ShiftRepository
@@ -35,6 +36,8 @@ import javax.inject.Inject
 data class EditShiftUiState(
     val loading: Boolean = true,
     val isNew: Boolean = true,
+    /** The stored shift being edited; null for a new one. */
+    val shiftId: Long? = null,
     val jobs: List<Job> = emptyList(),
     val jobId: Long? = null,
     val date: LocalDate = LocalDate.now(),
@@ -107,6 +110,7 @@ class EditShiftViewModel @Inject constructor(
                 EditShiftUiState(
                     loading = false,
                     isNew = false,
+                    shiftId = existing.id,
                     jobs = jobs,
                     jobId = existing.jobId,
                     date = existing.date,
@@ -158,8 +162,9 @@ class EditShiftViewModel @Inject constructor(
     fun setEnd(time: LocalTime) = _uiState.update { it.copy(end = time) }
     fun setBreak(text: String) = _uiState.update { it.copy(breakMinutes = text.filter(Char::isDigit).take(4)) }
     fun setNote(text: String) = _uiState.update { it.copy(note = TextLimits.limitInput(it.note, text)) }
+    /** The job's current rates on this shift (the same rates "Apply to all shifts" puts on the others). */
     fun useCurrentRate() = _uiState.update { s ->
-        s.selectedJob?.let { s.copy(rateGrosze = it.hourlyRateGrosze, secondRate = it.secondRate) } ?: s
+        s.selectedJob?.currentRates?.let { s.copy(rateGrosze = it.hourlyRateGrosze, secondRate = it.secondRate) } ?: s
     }
 
     fun save() {

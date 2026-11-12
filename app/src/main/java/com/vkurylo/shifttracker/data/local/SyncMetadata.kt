@@ -6,7 +6,8 @@ import java.time.LocalTime
 import java.util.UUID
 
 /*
- * Sync bookkeeping of jobs, shifts and bonuses (DB version 7). Every such row carries:
+ * Sync bookkeeping of jobs, shifts and bonuses (DB version 7) and payouts (DB version 8, created with it).
+ * Every such row carries:
  *
  * - `sync_id`: a UUID (random, or for a shift imported from a calendar derived from the event, see
  *   [calendarSyncId]), fixed for the life of the record and the same on every device. The local
@@ -78,6 +79,13 @@ internal fun ShiftEntity.stamped(existing: ShiftEntity?, now: Long) = copy(
 )
 
 internal fun BonusEntity.stamped(existing: BonusEntity?, now: Long) = copy(
+    syncId = existing?.syncId ?: syncId,
+    updatedAt = nextUpdatedAt(existing?.updatedAt, now),
+    deleted = false,
+    dirty = true,
+)
+
+internal fun PayoutEntity.stamped(existing: PayoutEntity?, now: Long) = copy(
     syncId = existing?.syncId ?: syncId,
     updatedAt = nextUpdatedAt(existing?.updatedAt, now),
     deleted = false,

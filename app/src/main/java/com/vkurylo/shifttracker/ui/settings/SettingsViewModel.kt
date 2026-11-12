@@ -403,7 +403,7 @@ class SettingsViewModel @Inject constructor(
                     throw SafetyBackupFailedException(e)
                 }
             }
-            _messages.send(UiMessage(R.string.import_backup_done, listOf(counts.jobs, counts.shifts, counts.bonuses)))
+            _messages.send(UiMessage(R.string.import_backup_done, listOf(counts.jobs, counts.shifts, counts.bonuses, counts.payouts)))
         }
     }
 

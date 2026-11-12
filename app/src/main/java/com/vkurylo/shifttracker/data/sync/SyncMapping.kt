@@ -3,10 +3,12 @@ package com.vkurylo.shifttracker.data.sync
 import com.vkurylo.shifttracker.data.local.BonusEntity
 import com.vkurylo.shifttracker.data.local.JobEntity
 import com.vkurylo.shifttracker.data.local.JobPaySettingsEntity
+import com.vkurylo.shifttracker.data.local.PayoutEntity
 import com.vkurylo.shifttracker.data.local.ShiftEntity
 import com.vkurylo.shifttracker.domain.calc.MoneyParser
 import com.vkurylo.shifttracker.domain.calc.ShiftCalculator
 import com.vkurylo.shifttracker.domain.model.Currencies
+import com.vkurylo.shifttracker.domain.model.Payout
 import com.vkurylo.shifttracker.domain.model.TextLimits
 import java.time.LocalTime
 
@@ -60,6 +62,18 @@ fun BonusEntity.toRemote(jobSyncId: String) = RemoteBonus(
     dateEpochDay = dateEpochDay,
     amountGrosze = amountGrosze,
     note = note?.let(TextLimits::cut),
+    wholeMonth = wholeMonth,
+)
+
+fun PayoutEntity.toRemote(jobSyncId: String) = RemotePayout(
+    syncId = syncId,
+    updatedAt = updatedAt,
+    deleted = deleted,
+    jobSyncId = jobSyncId,
+    month = month,
+    amountMinor = amountMinor,
+    note = note?.let(TextLimits::cut),
+    receivedEpochDay = receivedEpochDay,
 )
 
 /** The cloud's version as a row (already uploaded, so not dirty), keeping the local [id]. */
@@ -107,6 +121,20 @@ fun RemoteBonus.toEntity(id: Long, jobId: Long) = BonusEntity(
     dateEpochDay = dateEpochDay,
     amountGrosze = amountGrosze,
     note = note,
+    wholeMonth = wholeMonth,
+    syncId = syncId,
+    updatedAt = updatedAt,
+    deleted = deleted,
+    dirty = false,
+)
+
+fun RemotePayout.toEntity(id: Long, jobId: Long) = PayoutEntity(
+    id = id,
+    jobId = jobId,
+    month = month,
+    amountMinor = amountMinor,
+    note = note,
+    receivedEpochDay = receivedEpochDay,
     syncId = syncId,
     updatedAt = updatedAt,
     deleted = deleted,
@@ -118,6 +146,7 @@ fun RemoteRecord.sameContentAs(other: RemoteRecord): Boolean = when {
     this is RemoteJob && other is RemoteJob -> copy(schema = 0) == other.copy(schema = 0)
     this is RemoteShift && other is RemoteShift -> copy(schema = 0) == other.copy(schema = 0)
     this is RemoteBonus && other is RemoteBonus -> copy(schema = 0) == other.copy(schema = 0)
+    this is RemotePayout && other is RemotePayout -> copy(schema = 0) == other.copy(schema = 0)
     else -> false
 }
 
@@ -148,6 +177,7 @@ fun RemoteRecord.isUsable(): Boolean = schema <= DOC_SCHEMA && isUuid(syncId) &&
     is RemoteJob -> isUsableJob()
     is RemoteShift -> isUsableShift()
     is RemoteBonus -> isUsableBonus()
+    is RemotePayout -> isUsablePayout()
 }
 
 private fun RemoteJob.isUsableJob(): Boolean {
@@ -179,4 +209,12 @@ private fun RemoteShift.isUsableShift(): Boolean {
 private fun RemoteBonus.isUsableBonus(): Boolean =
     isUuid(jobSyncId) && dateEpochDay in EPOCH_DAYS &&
         amountGrosze in 1..MoneyParser.maxMinor(MAX_FRACTION_DIGITS, MoneyParser.AMOUNT_WHOLE_DIGITS) &&
+        (note?.length ?: 0) <= MAX_TEXT
+
+// A payout's month must be a real month in the years the cloud rules accept, its amount positive and within the
+// limit of a monthly amount, and its received date a real date.
+private fun RemotePayout.isUsablePayout(): Boolean =
+    isUuid(jobSyncId) && Payout.monthFromKey(month) != null &&
+        amountMinor in 1..MoneyParser.maxMinor(MAX_FRACTION_DIGITS, MoneyParser.AMOUNT_WHOLE_DIGITS) &&
+        (receivedEpochDay == null || receivedEpochDay in EPOCH_DAYS) &&
         (note?.length ?: 0) <= MAX_TEXT

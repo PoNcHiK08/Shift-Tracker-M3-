@@ -200,6 +200,14 @@ fun BonusCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            if (bonus.wholeMonth) {
+                Text(
+                    stringResource(R.string.bonus_for_whole_month),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f),
+                    maxLines = 1,
+                )
+            }
             if (!bonus.note.isNullOrBlank()) {
                 Text(
                     bonus.note,

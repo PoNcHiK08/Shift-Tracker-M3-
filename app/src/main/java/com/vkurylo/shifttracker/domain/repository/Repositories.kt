@@ -6,7 +6,10 @@ import com.vkurylo.shifttracker.domain.model.BonusWithJob
 import com.vkurylo.shifttracker.domain.model.EarningsMode
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
+import com.vkurylo.shifttracker.domain.model.ShiftRates
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.ThemeMode
 import com.vkurylo.shifttracker.domain.model.UserPreferences
@@ -28,7 +31,7 @@ interface JobRepository {
     suspend fun delete(job: Job)
     suspend fun shiftCount(jobId: Long): Int
 
-    /** Shifts + bonuses of the job; a job with entries keeps its currency. */
+    /** Shifts + bonuses + received-pay payouts of the job; a job with entries keeps its currency. */
     suspend fun entryCount(jobId: Long): Int
 
     /** Currency of the most recently created job, or null when there is none. */
@@ -55,12 +58,32 @@ interface ShiftRepository {
     suspend fun delete(shift: Shift)
 }
 
+/** The rates saved on shifts, changed for many shifts of a job at once ("Apply to all shifts of this job"). */
+interface ShiftRatesRepository {
+    /** The job's shifts that are not deleted. */
+    suspend fun liveShiftsOf(jobId: Long): List<Shift>
+
+    /**
+     * Writes [rates] (shift id → rates) in one transaction, each shift stamped like any edit so it syncs. Only live
+     * shifts of [jobId] are touched; any other id is skipped. Returns how many shifts were written.
+     */
+    suspend fun setRates(jobId: Long, rates: Map<Long, ShiftRates>): Int
+}
+
 interface BonusRepository {
     /** Bonuses (with their job) dated within [from]..[to], ordered by date. */
     fun observeBonuses(from: LocalDate, to: LocalDate): Flow<List<BonusWithJob>>
     suspend fun getBonus(id: Long): Bonus?
     suspend fun upsert(bonus: Bonus): Long
     suspend fun delete(bonus: Bonus)
+}
+
+interface PayoutRepository {
+    /** Payouts (with their job) earned for the months [from]..[to], ordered by month. */
+    fun observePayouts(from: YearMonth, to: YearMonth): Flow<List<PayoutWithJob>>
+    suspend fun getPayout(id: Long): Payout?
+    suspend fun upsert(payout: Payout): Long
+    suspend fun delete(payout: Payout)
 }
 
 interface PreferencesRepository {
@@ -89,7 +112,7 @@ interface LanguageRepository {
     val changes: kotlinx.coroutines.flow.Flow<String?>
 }
 
-/** JSON export/import of all jobs, shifts and bonuses. */
+/** JSON export/import of all jobs, shifts, bonuses and received-pay payouts. */
 interface BackupRepository {
     suspend fun exportJson(): String
 
@@ -119,4 +142,4 @@ class InvalidBackupException(
     }
 }
 
-data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int)
+data class BackupCounts(val jobs: Int, val shifts: Int, val bonuses: Int, val payouts: Int = 0)

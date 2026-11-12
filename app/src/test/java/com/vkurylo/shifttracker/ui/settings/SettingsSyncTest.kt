@@ -256,7 +256,7 @@ class SettingsSyncTest {
         viewModel.requestImport(backupFile("Biuro"))
         waitForText(str(R.string.import_backup_title_everywhere))
         composeRule.onNodeWithText(str(R.string.replace_data_everywhere)).performClick()
-        waitFor { str(R.string.import_backup_done, 1, 2, 0) in shownMessages }
+        waitFor { str(R.string.import_backup_done, 1, 2, 0, 0) in shownMessages }
 
         // The data that was replaced is in a safety backup.
         val saved = java.io.File(context.filesDir, FileSafetyBackup.DIR).listFiles().orEmpty().single()

@@ -1,12 +1,12 @@
 package com.vkurylo.shifttracker.data.sync
 
 /*
- * The records as the cloud stores them, under users/{uid}/jobs, /shifts and /bonuses, one document per
+ * The records as the cloud stores them, under users/{uid}/jobs, /shifts, /bonuses and /payouts, one document per
  * record keyed by its sync id. Independent of the cloud SDK: the Firestore store maps these to and from
  * documents. Money is Long minor units (grosze for PLN), exactly as in Room; never a floating-point number.
  *
  * A deleted record stays as a document with `deleted = true` (a tombstone) and its last content, so the
- * deletion reaches every phone. A shift or bonus refers to its job by the job's sync id.
+ * deletion reaches every phone. A shift, bonus or payout refers to its job by the job's sync id.
  */
 
 /** Layout version of the documents this app writes. Documents with a higher one are left alone. */
@@ -66,6 +66,27 @@ data class RemoteBonus(
     val dateEpochDay: Long,
     val amountGrosze: Long,
     val note: String?,
+    /**
+     * True: belongs to the whole month of [dateEpochDay] (the 1st). Absent in a document written by an app version
+     * that doesn't know month bonuses, which reads as false: a bonus on its day.
+     */
+    val wholeMonth: Boolean = false,
+    override val schema: Int = DOC_SCHEMA,
+) : RemoteRecord
+
+/**
+ * The salary that actually arrived for a job, for the month it was earned for ([month], yyyymm). The app counts it
+ * as that job-month's pay when computing totals; nothing about it is stored or synced differently for that.
+ */
+data class RemotePayout(
+    override val syncId: String,
+    override val updatedAt: Long,
+    override val deleted: Boolean,
+    val jobSyncId: String,
+    val month: Int,
+    val amountMinor: Long,
+    val note: String?,
+    val receivedEpochDay: Long?,
     override val schema: Int = DOC_SCHEMA,
 ) : RemoteRecord
 
@@ -81,6 +102,7 @@ data class RemoteChanges(
     val jobs: List<RemoteJob> = emptyList(),
     val shifts: List<RemoteShift> = emptyList(),
     val bonuses: List<RemoteBonus> = emptyList(),
+    val payouts: List<RemotePayout> = emptyList(),
     val newestServerTime: Long? = null,
 )
 

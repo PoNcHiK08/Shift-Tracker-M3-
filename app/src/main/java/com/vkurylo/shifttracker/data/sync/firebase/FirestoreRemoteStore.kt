@@ -14,6 +14,7 @@ import com.vkurylo.shifttracker.data.sync.PushResult
 import com.vkurylo.shifttracker.data.sync.RemoteBonus
 import com.vkurylo.shifttracker.data.sync.RemoteChanges
 import com.vkurylo.shifttracker.data.sync.RemoteJob
+import com.vkurylo.shifttracker.data.sync.RemotePayout
 import com.vkurylo.shifttracker.data.sync.RemoteRecord
 import com.vkurylo.shifttracker.data.sync.RemoteShift
 import com.vkurylo.shifttracker.data.sync.RemoteStore
@@ -67,6 +68,7 @@ class FirestoreRemoteStore internal constructor(private val firestore: () -> Fir
             jobs = records.filterIsInstance<RemoteJob>(),
             shifts = records.filterIsInstance<RemoteShift>(),
             bonuses = records.filterIsInstance<RemoteBonus>(),
+            payouts = records.filterIsInstance<RemotePayout>(),
             newestServerTime = changed.mapNotNull { it.second }.maxOrNull(),
         )
     }

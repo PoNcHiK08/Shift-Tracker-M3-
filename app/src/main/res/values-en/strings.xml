@@ -138,6 +138,15 @@
     <string name="rate_used">Rate: %1$s</string>
     <string name="rate_changed_hint">This job\'s current rate is different: %1$s</string>
     <string name="use_current_rate">Use current rate</string>
+    <string name="apply_rate_all">Apply to all shifts of this job…</string>
+    <string name="apply_rate_title">Apply the current rate?</string>
+    <string name="apply_rate_scope_all">All shifts of this job</string>
+    <string name="apply_rate_scope_from">This shift\'s date (%1$s) and later</string>
+    <string name="apply_rate_none">No other shift needs it: they already have this rate.</string>
+    <string name="apply_rate_warning">This rewrites the earnings of past shifts, including months you may already have been paid for. This shift gets the rate on screen: tap Save to keep it. A safety backup of all your data is saved first.</string>
+    <string name="apply_rate_confirm">Apply</string>
+    <string name="apply_rate_failed">Couldn\'t apply the rate. Nothing was changed.</string>
+    <string name="apply_rate_undo_failed">Couldn\'t undo the rate change.</string>
     <string name="error_job_required">Choose a job</string>
     <string name="error_break_too_long">The break is longer than the shift</string>
     <string name="delete_shift">Delete shift</string>
@@ -181,14 +190,15 @@
     <string name="safety_backups_summary">Saved before your data was replaced: %1$d. Tap to save one to a file.</string>
     <string name="safety_backups_message">The app saves these itself before it replaces the data on this phone (the newest %1$d are kept). Save one to a file or share it (Drive, a messenger, email); restore it with Import data.</string>
     <string name="safety_backup_reason_import">Before importing a file</string>
+    <string name="safety_backup_reason_rates">Before applying the current rate to many shifts</string>
     <string name="safety_backup_reason_cloud">Before taking an account\'s data</string>
-    <string name="safety_backup_counts">%1$d jobs, %2$d shifts, %3$d bonuses</string>
+    <string name="safety_backup_counts">%1$d jobs, %2$d shifts, %3$d bonuses, %4$d received payments</string>
     <string name="safety_backup_unreadable">Can\'t be read</string>
     <string name="safety_backup_save">Save to a file</string>
     <string name="safety_backup_share">Share</string>
     <string name="safety_backup_saved">Safety backup saved</string>
     <string name="import_safety_backup_failed">Couldn\'t save a safety backup of the current data, so nothing was imported. Your data is unchanged.</string>
-    <string name="import_backup_done">Restored %1$d jobs, %2$d shifts and %3$d bonuses</string>
+    <string name="import_backup_done">Restored %1$d jobs, %2$d shifts, %3$d bonuses and %4$d received payments</string>
     <string name="error_file_operation">Couldn\'t process the file</string>
     <string name="error_backup_invalid">This isn\'t a valid Shift Tracker backup. Your current data is unchanged.</string>
     <string name="error_backup_newer_version">This backup was made by a newer version of the app. Update Shift Tracker and try again. Your current data is unchanged.</string>
@@ -204,7 +214,7 @@
     <string name="cloud_google_account">Google account</string>
     <string name="cloud_access_checking">Checking access to the cloud…</string>
     <string name="cloud_access_ok">Cloud is reachable</string>
-    <string name="cloud_access_denied">The cloud refused access. Check that this address is in the Firestore rules. Tap to try again.</string>
+    <string name="cloud_access_denied">The cloud refused access. Check that this address is in the Firestore rules and that the latest firestore.rules are published. Tap to try again.</string>
     <string name="cloud_access_offline">Can\'t reach the cloud. Tap to try again.</string>
     <string name="cloud_access_error">Cloud error: %1$s</string>
     <string name="cloud_sign_out">Sign out</string>
@@ -272,6 +282,14 @@
     <string name="import_empty_message">The file has no events with a start and end time. All-day events are skipped.</string>
     <string name="import_needs_job">To import a schedule, first create the job these shifts belong to.</string>
 
+    <plurals name="apply_rate_summary">
+        <item quantity="one">%1$d shift will change · %2$s</item>
+        <item quantity="other">%1$d shifts will change · %2$s</item>
+    </plurals>
+    <plurals name="apply_rate_done">
+        <item quantity="one">Rate updated on %1$d shift</item>
+        <item quantity="other">Rate updated on %1$d shifts</item>
+    </plurals>
     <plurals name="shift_count">
         <item quantity="one">%1$d shift</item>
         <item quantity="other">%1$d shifts</item>
@@ -338,4 +356,40 @@
     <string name="widget_preview_month">November</string>
     <string name="widget_preview_calendar">"Mo Tu We Th Fr Sa Su\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30"</string>
     <string name="widget_preview_when">Tomorrow · 18:30–01:30</string>
+    <string name="bonus_kind_day">On a specific day</string>
+    <string name="bonus_kind_month">For the whole month</string>
+    <string name="bonus_month">Month</string>
+    <string name="bonus_hint_month">The bonus counts in this month\'s earnings, but isn\'t shown on any day or in weekly totals. It doesn\'t change hours or the average rate.</string>
+    <string name="bonus_for_whole_month">For the whole month</string>
+    <string name="month_bonuses_title">Month bonuses</string>
+    <string name="month_bonuses_row">Month bonuses · %1$d</string>
+    <string name="month_bonuses_sheet_title">Month bonuses · %1$s</string>
+    <string name="month_bonuses_none">No bonuses for the whole month</string>
+    <string name="add_month_bonus">Add a bonus for the month</string>
+    <string name="received_pay_title">Received pay</string>
+    <string name="received_pay_caption">What actually arrived, next to the calculated pay after deductions (net). A job\'s month with payments counts what arrived instead of the calculated pay: those totals are marked “Received”.</string>
+    <string name="received_pay_year_caption">What arrived, against the calculated net pay of the months you entered payments for. In the totals those months count what arrived.</string>
+    <string name="received_tag_all">Received</string>
+    <string name="received_tag_part">Incl. received</string>
+    <string name="received_pay_calculated">Calculated (net)</string>
+    <string name="received_pay_received">Received</string>
+    <string name="received_pay_not_entered">not entered</string>
+    <string name="received_pay_difference">Difference</string>
+    <string name="received_pay_sheet_title">Received pay · %1$s</string>
+    <string name="received_pay_add">Add payment</string>
+    <string name="received_pay_new">New payment</string>
+    <string name="received_pay_edit">Payment</string>
+    <string name="received_pay_amount">Amount received</string>
+    <string name="received_pay_month">For the month</string>
+    <string name="received_pay_month_hint">The month it was earned for</string>
+    <string name="received_pay_received_on">Received on (optional)</string>
+    <string name="received_pay_received_on_value">Received %1$s</string>
+    <string name="received_pay_received_on_clear">Clear the date</string>
+    <string name="received_pay_note">Note (optional)</string>
+    <string name="received_pay_saved">Payment saved</string>
+    <string name="received_pay_deleted">Payment deleted</string>
+    <plurals name="received_pay_count">
+        <item quantity="one">%d payment</item>
+        <item quantity="other">%d payments</item>
+    </plurals>
 </resources>

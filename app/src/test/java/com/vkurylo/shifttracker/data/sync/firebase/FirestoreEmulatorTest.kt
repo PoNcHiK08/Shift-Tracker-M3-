@@ -10,8 +10,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.memoryCacheSettings
 import com.google.firebase.firestore.firestoreSettings
 import com.vkurylo.shifttracker.data.local.ShiftDatabase
@@ -25,6 +27,7 @@ import com.vkurylo.shifttracker.data.sync.InMemorySyncStateStore
 import com.vkurylo.shifttracker.data.sync.PushResult
 import com.vkurylo.shifttracker.data.sync.RemoteBonus
 import com.vkurylo.shifttracker.data.sync.RemoteJob
+import com.vkurylo.shifttracker.data.sync.RemotePayout
 import com.vkurylo.shifttracker.data.sync.RemoteShift
 import com.vkurylo.shifttracker.data.sync.SignInChoice
 import com.vkurylo.shifttracker.data.sync.SignInPlan
@@ -128,6 +131,73 @@ class FirestoreEmulatorTest {
         assertEquals(PushResult.Kept(job(jobId, 1_000)), older.single())
         assertEquals(listOf(PushResult.Written), store.push(account.uid, listOf(job(jobId, 1_100, name = "New"))))
         assertEquals(listOf(job(jobId, 1_100, name = "New")), store.jobs(account.uid, listOf(jobId, id())))
+    }
+
+    @Test
+    fun monthBonusesAndPayoutsAreAcceptedByTheRulesAndReadBack() = onBackground {
+        val jobId = id()
+        val monthBonus = RemoteBonus(id(), 1_000, false, jobId, 20_393, 50_000, null, wholeMonth = true)
+        val payout = RemotePayout(id(), 1_000, false, jobId, 202_611, 450_000, "Przelew", 20_420)
+        val bare = RemotePayout(id(), 1_000, false, jobId, 202_612, 1, null, null)
+        val written = store.push(account.uid, listOf(job(jobId, 1_000), monthBonus, payout, bare))
+        assertEquals(List(4) { PushResult.Written }, written)
+
+        val all = store.changesSince(account.uid, null)
+        assertEquals(listOf(monthBonus), all.bonuses)
+        assertEquals(setOf(payout, bare), all.payouts.toSet())
+        assertTrue(store.hasRecords(account.uid))
+
+        // A later version replaces a payout, an older one is kept out; a deletion is a later version too.
+        val edited = payout.copy(updatedAt = 2_000, amountMinor = 460_000)
+        assertEquals(listOf(PushResult.Written), store.push(account.uid, listOf(edited)))
+        assertEquals(PushResult.Kept(edited), store.push(account.uid, listOf(payout.copy(updatedAt = 1_500))).single())
+        assertEquals(listOf(PushResult.Written), store.push(account.uid, listOf(edited.copy(updatedAt = 3_000, deleted = true))))
+        assertTrue(store.changesSince(account.uid, null).payouts.single { it.syncId == payout.syncId }.deleted)
+
+        assertEquals("every record deleted, payouts included", 4, store.deleteAll(account.uid))
+        assertTrue(!store.hasRecords(account.uid))
+    }
+
+    @Test
+    fun theRulesRefuseAPayoutWithAnImpossibleMonthOrAnExtraField() = onBackground {
+        val jobId = id()
+        for (bad in listOf(202_613L, 0L, 99_912L)) {
+            val error = runCatching { store.push(account.uid, listOf(RemotePayout(id(), 1_000, false, jobId, bad.toInt(), 1, null, null))) }.exceptionOrNull()
+            assertTrue("month $bad: $error", error is WriteRefusedException)
+        }
+        val good = RemotePayout(id(), 1_000, false, jobId, 202_611, 1, null, null)
+        val extra = mapOf(
+            "v" to 1L, "updatedAt" to 1_000L, "deleted" to false, "jobId" to jobId, "month" to 202_611L, "amountMinor" to 1L,
+            "note" to null, "receivedEpochDay" to null, "wholeMonth" to true, "serverUpdatedAt" to FieldValue.serverTimestamp(),
+        )
+        val error = runCatching {
+            firestore.collection("users").document(account.uid).collection("payouts").document(good.syncId).set(extra).await()
+        }.exceptionOrNull()
+        assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, (error as FirebaseFirestoreException).code)
+        assertEquals(listOf(PushResult.Written), store.push(account.uid, listOf(good)))
+    }
+
+    /** The previous app version writes bonuses without `wholeMonth` (merged); the rules take both, the mark survives. */
+    @Test
+    fun aBonusFromThePreviousAppVersionIsADayBonusAndItsEditsKeepAMonthMark() = onBackground {
+        val jobId = id()
+        val bonusId = id()
+        val bonuses = firestore.collection("users").document(account.uid).collection("bonuses")
+        fun previousVersion(updatedAt: Long, amount: Long) = mapOf(
+            "v" to 1L, "updatedAt" to updatedAt, "deleted" to false, "jobId" to jobId, "dateEpochDay" to 20_400L,
+            "amountGrosze" to amount, "note" to null, "serverUpdatedAt" to FieldValue.serverTimestamp(),
+        )
+
+        bonuses.document(bonusId).set(previousVersion(1_000, 5_000), SetOptions.merge()).await()
+        assertEquals(RemoteBonus(bonusId, 1_000, false, jobId, 20_400, 5_000, null), store.changesSince(account.uid, null).bonuses.single())
+
+        // This version turns it into a month bonus; then the previous version edits the amount, knowing nothing of the mark.
+        assertEquals(listOf(PushResult.Written), store.push(account.uid, listOf(RemoteBonus(bonusId, 2_000, false, jobId, 20_393, 5_000, null, wholeMonth = true))))
+        bonuses.document(bonusId).set(previousVersion(3_000, 7_000), SetOptions.merge()).await()
+
+        val read = store.changesSince(account.uid, null).bonuses.single()
+        assertEquals(7_000L, read.amountGrosze)
+        assertTrue("the mark survives the previous version's edit", read.wholeMonth)
     }
 
     @Test

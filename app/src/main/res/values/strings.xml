@@ -141,6 +141,15 @@
     <string name="rate_used">Ставка: %1$s</string>
     <string name="rate_changed_hint">Поточна ставка цієї роботи вже інша: %1$s</string>
     <string name="use_current_rate">Застосувати поточну ставку</string>
+    <string name="apply_rate_all">Застосувати до всіх змін цієї роботи…</string>
+    <string name="apply_rate_title">Застосувати поточну ставку?</string>
+    <string name="apply_rate_scope_all">Усі зміни цієї роботи</string>
+    <string name="apply_rate_scope_from">Від дати цієї зміни (%1$s) і пізніші</string>
+    <string name="apply_rate_none">Інших змін змінювати не треба: у них уже ця ставка.</string>
+    <string name="apply_rate_warning">Це перерахує заробіток минулих змін, зокрема за місяці, за які вам, можливо, уже заплатили. Ця зміна отримує ставку на екрані: натисніть «Зберегти», щоб її залишити. Спершу зберігається резервна копія всіх даних.</string>
+    <string name="apply_rate_confirm">Застосувати</string>
+    <string name="apply_rate_failed">Не вдалося застосувати ставку. Нічого не змінено.</string>
+    <string name="apply_rate_undo_failed">Не вдалося скасувати зміну ставки.</string>
     <string name="error_job_required">Обери роботу</string>
     <string name="error_break_too_long">Перерва довша за саму зміну</string>
     <string name="delete_shift">Видалити зміну</string>
@@ -184,14 +193,15 @@
     <string name="safety_backups_summary">Збережено перед заміною даних: %1$d. Торкнися, щоб зберегти копію у файл.</string>
     <string name="safety_backups_message">Застосунок зберігає їх сам перед тим, як замінити дані на цьому телефоні (лишаються останні %1$d). Збережи копію у файл або поділися нею (Диск, месенджер, пошта); відновити її можна через «Імпорт даних».</string>
     <string name="safety_backup_reason_import">Перед імпортом файлу</string>
+    <string name="safety_backup_reason_rates">Перед застосуванням поточної ставки до багатьох змін</string>
     <string name="safety_backup_reason_cloud">Перед заміною даними акаунта</string>
-    <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
+    <string name="safety_backup_counts">Робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="safety_backup_unreadable">Не вдається прочитати</string>
     <string name="safety_backup_save">Зберегти у файл</string>
     <string name="safety_backup_share">Поділитися</string>
     <string name="safety_backup_saved">Страхувальну копію збережено</string>
     <string name="import_safety_backup_failed">Не вдалося зберегти страхувальну копію поточних даних, тому нічого не імпортовано. Дані не змінилися.</string>
-    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d</string>
+    <string name="import_backup_done">Відновлено: робіт — %1$d, змін — %2$d, бонусів — %3$d, виплат — %4$d</string>
     <string name="error_file_operation">Не вдалося обробити файл</string>
     <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
     <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Оновіть Shift Tracker і спробуйте ще раз. Поточні дані не змінено.</string>
@@ -207,7 +217,7 @@
     <string name="cloud_google_account">Акаунт Google</string>
     <string name="cloud_access_checking">Перевірка доступу до хмари…</string>
     <string name="cloud_access_ok">Хмара доступна</string>
-    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore. Торкнися, щоб спробувати ще раз.</string>
+    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore і що опубліковано найновіший firestore.rules. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_offline">Немає зв’язку з хмарою. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_error">Помилка хмари: %1$s</string>
     <string name="cloud_sign_out">Вийти</string>
@@ -275,6 +285,18 @@
     <string name="import_empty_message">У файлі немає подій з часом початку й кінця. Події на весь день пропускаються.</string>
     <string name="import_needs_job">Щоб імпортувати графік, спершу створи роботу, до якої належать ці зміни.</string>
 
+    <plurals name="apply_rate_summary">
+        <item quantity="one">Зміниться %1$d зміна · %2$s</item>
+        <item quantity="few">Зміняться %1$d зміни · %2$s</item>
+        <item quantity="many">Зміниться %1$d змін · %2$s</item>
+        <item quantity="other">Зміниться %1$d зміни · %2$s</item>
+    </plurals>
+    <plurals name="apply_rate_done">
+        <item quantity="one">Ставку оновлено на %1$d зміні</item>
+        <item quantity="few">Ставку оновлено на %1$d змінах</item>
+        <item quantity="many">Ставку оновлено на %1$d змінах</item>
+        <item quantity="other">Ставку оновлено на %1$d зміни</item>
+    </plurals>
     <plurals name="shift_count">
         <item quantity="one">%1$d зміна</item>
         <item quantity="few">%1$d зміни</item>
@@ -357,4 +379,42 @@
     <string name="widget_preview_month">Листопад</string>
     <string name="widget_preview_calendar">"Пн Вт Ср Чт Пт Сб Нд\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30"</string>
     <string name="widget_preview_when">Завтра · 18:30–01:30</string>
+    <string name="bonus_kind_day">На певний день</string>
+    <string name="bonus_kind_month">На весь місяць</string>
+    <string name="bonus_month">Місяць</string>
+    <string name="bonus_hint_month">Бонус входить у заробіток цього місяця, але не показується в жодному дні й не входить у тижневі підсумки. Години й середню ставку не змінює.</string>
+    <string name="bonus_for_whole_month">На весь місяць</string>
+    <string name="month_bonuses_title">Бонуси за місяць</string>
+    <string name="month_bonuses_row">Бонуси за місяць · %1$d</string>
+    <string name="month_bonuses_sheet_title">Бонуси за місяць · %1$s</string>
+    <string name="month_bonuses_none">У цьому місяці немає бонусів на весь місяць</string>
+    <string name="add_month_bonus">Додати бонус за місяць</string>
+    <string name="received_pay_title">Отримана зарплата</string>
+    <string name="received_pay_caption">Скільки реально надійшло — поруч із розрахунковою сумою після відрахувань (нетто). Місяць роботи з виплатами рахується за отриманою сумою замість розрахункової — такі підсумки позначені «Отримано».</string>
+    <string name="received_pay_year_caption">Отримане порівняно з розрахунковою сумою (нетто) за ті місяці, де вказано виплати. У підсумках ці місяці рахуються за отриманою сумою.</string>
+    <string name="received_tag_all">Отримано</string>
+    <string name="received_tag_part">З отриманим</string>
+    <string name="received_pay_calculated">Розрахунково (нетто)</string>
+    <string name="received_pay_received">Отримано</string>
+    <string name="received_pay_not_entered">не вказано</string>
+    <string name="received_pay_difference">Різниця</string>
+    <string name="received_pay_sheet_title">Отримана зарплата · %1$s</string>
+    <string name="received_pay_add">Додати виплату</string>
+    <string name="received_pay_new">Нова виплата</string>
+    <string name="received_pay_edit">Виплата</string>
+    <string name="received_pay_amount">Отримана сума</string>
+    <string name="received_pay_month">За місяць</string>
+    <string name="received_pay_month_hint">Місяць, за який нараховано</string>
+    <string name="received_pay_received_on">Дата отримання (необов\'язково)</string>
+    <string name="received_pay_received_on_value">Отримано %1$s</string>
+    <string name="received_pay_received_on_clear">Прибрати дату</string>
+    <string name="received_pay_note">Примітка (необов\'язково)</string>
+    <string name="received_pay_saved">Виплату збережено</string>
+    <string name="received_pay_deleted">Виплату видалено</string>
+    <plurals name="received_pay_count">
+        <item quantity="one">%d виплата</item>
+        <item quantity="few">%d виплати</item>
+        <item quantity="many">%d виплат</item>
+        <item quantity="other">%d виплати</item>
+    </plurals>
 </resources>

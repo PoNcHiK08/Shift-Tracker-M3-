@@ -14,7 +14,11 @@ class LookAlikesTest {
     private fun shift(n: Int, job: Int, day: Long = 20_400, start: Int = 480, end: Int = 960, deleted: Boolean = false) =
         RemoteShift(id(n), 1, deleted, id(job), day, start, end, 0, 3300, null, null, null)
 
-    private fun bonus(n: Int, job: Int, amount: Long = 5000) = RemoteBonus(id(n), 1, false, id(job), 20_400, amount, null)
+    private fun bonus(n: Int, job: Int, amount: Long = 5000, wholeMonth: Boolean = false) =
+        RemoteBonus(id(n), 1, false, id(job), 20_400, amount, null, wholeMonth = wholeMonth)
+
+    private fun payout(n: Int, job: Int, month: Int = 202_611, amount: Long = 450_000) =
+        RemotePayout(id(n), 1, false, id(job), month, amount, null, null)
 
     @Test
     fun `jobs with the same name and currency are linked, and their entries through them`() {
@@ -61,5 +65,34 @@ class LookAlikesTest {
         )
         assertTrue(links.jobs.isEmpty())
         assertTrue(links.shifts.isEmpty())
+    }
+
+    @Test
+    fun `payouts are linked by job, month and amount`() {
+        val cloud = RemoteChanges(
+            jobs = listOf(job(1, "Kawiarnia")),
+            payouts = listOf(payout(30, job = 1), payout(31, job = 1, month = 202_610), payout(32, job = 1, amount = 1)),
+        )
+        val links = LookAlikes.find(
+            localJobs = listOf(job(101, "Kawiarnia")),
+            localShifts = emptyList(),
+            localBonuses = emptyList(),
+            cloud = cloud,
+            localPayouts = listOf(payout(130, job = 101), payout(131, job = 101, month = 202_612)),
+        )
+        assertEquals(mapOf(id(130) to id(30)), links.payouts)
+        assertEquals(2, links.size) // the job and the payout
+    }
+
+    @Test
+    fun `a bonus for the whole month is not a look-alike of a bonus on a day`() {
+        val cloud = RemoteChanges(jobs = listOf(job(1, "Sklep")), bonuses = listOf(bonus(20, job = 1, wholeMonth = true)))
+        val links = LookAlikes.find(
+            localJobs = listOf(job(101, "Sklep")),
+            localShifts = emptyList(),
+            localBonuses = listOf(bonus(120, job = 101), bonus(121, job = 101, wholeMonth = true)),
+            cloud = cloud,
+        )
+        assertEquals(mapOf(id(121) to id(20)), links.bonuses)
     }
 }

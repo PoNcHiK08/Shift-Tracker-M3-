@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import com.vkurylo.shifttracker.domain.model.TextLimits
 import java.time.LocalDate
+import java.time.YearMonth
 import javax.inject.Inject
 
 data class EditBonusUiState(
@@ -33,6 +34,8 @@ data class EditBonusUiState(
     val jobs: List<Job> = emptyList(),
     val jobId: Long? = null,
     val date: LocalDate = LocalDate.now(),
+    /** True: the bonus is for the whole [month] of [date]; it has no day. */
+    val wholeMonth: Boolean = false,
     val amount: String = "",
     val note: String = "",
     val showErrors: Boolean = false,
@@ -43,6 +46,7 @@ data class EditBonusUiState(
     val amountGrosze: Long? get() =
         MoneyParser.parseMinor(amount, Currencies.fractionDigits(currency), MoneyParser.AMOUNT_WHOLE_DIGITS)?.takeIf { it > 0 }
     val jobMissing: Boolean get() = jobs.none { it.id == jobId }
+    val month: YearMonth get() = YearMonth.from(date)
     /** A note saved before the length limit, still over it: shorten it to save. */
     val noteTooLong: Boolean get() = note.length > TextLimits.MAX_LENGTH
     val canSave: Boolean get() = !jobMissing && amountGrosze != null && !noteTooLong
@@ -82,6 +86,7 @@ class EditBonusViewModel @Inject constructor(
                     jobs = jobs,
                     jobId = existing.jobId,
                     date = existing.date,
+                    wholeMonth = existing.wholeMonth,
                     amount = MoneyParser.toInput(
                         existing.amountGrosze,
                         Currencies.fractionDigits(jobs.firstOrNull { it.id == existing.jobId }?.currency ?: Currencies.DEFAULT),
@@ -95,6 +100,7 @@ class EditBonusViewModel @Inject constructor(
                     jobId = jobs.firstOrNull()?.id,
                     date = route.dateEpochDay.takeIf { it != EditShiftRoute.NO_DATE }?.let(LocalDate::ofEpochDay)
                         ?: LocalDate.now(),
+                    wholeMonth = route.wholeMonth,
                 )
             }
         }
@@ -110,6 +116,12 @@ class EditBonusViewModel @Inject constructor(
 
     fun selectJob(job: Job) = _uiState.update { it.copy(jobId = job.id) }
     fun setDate(date: LocalDate) = _uiState.update { it.copy(date = date) }
+
+    /** "On a specific day" or "For the whole month". The date is kept, so switching back and forth loses nothing. */
+    fun setWholeMonth(value: Boolean) = _uiState.update { it.copy(wholeMonth = value) }
+
+    /** The month of a bonus for the whole month (its date becomes the 1st). */
+    fun setMonth(month: YearMonth) = _uiState.update { it.copy(date = month.atDay(1)) }
     fun setAmount(text: String) = _uiState.update { it.copy(amount = text) }
     fun setNote(text: String) = _uiState.update { it.copy(note = TextLimits.limitInput(it.note, text)) }
 
@@ -124,9 +136,11 @@ class EditBonusViewModel @Inject constructor(
         val bonus = Bonus(
             id = original?.id ?: 0,
             jobId = jobId,
-            date = state.date,
+            // A bonus for the whole month has no day of its own: it is the 1st of its month.
+            date = if (state.wholeMonth) state.date.withDayOfMonth(1) else state.date,
             amountGrosze = amount,
             note = state.note.trim().ifEmpty { null },
+            wholeMonth = state.wholeMonth,
         )
         viewModelScope.launch {
             bonusRepository.upsert(bonus)

@@ -113,7 +113,7 @@ class SettingsSafetyBackupTest {
 
         composeRule.onNodeWithText(str(R.string.safety_backups)).performClick()
         waitForText(str(R.string.safety_backups_message, FileSafetyBackup.KEEP))
-        composeRule.onNodeWithText(str(R.string.safety_backup_reason_import) + "\n" + str(R.string.safety_backup_counts, 1, 0, 0)).assertExists()
+        composeRule.onNodeWithText(str(R.string.safety_backup_reason_import) + "\n" + str(R.string.safety_backup_counts, 1, 0, 0, 0)).assertExists()
 
         // What the system picker returns, saved as it is.
         val name = runBlocking { backups.list() }.single().name

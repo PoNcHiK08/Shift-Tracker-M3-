@@ -10,8 +10,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /** Live records on one side. */
-data class Counts(val jobs: Int, val shifts: Int, val bonuses: Int) {
-    val isEmpty: Boolean get() = jobs == 0 && shifts == 0 && bonuses == 0
+data class Counts(val jobs: Int, val shifts: Int, val bonuses: Int, val payouts: Int = 0) {
+    val isEmpty: Boolean get() = jobs == 0 && shifts == 0 && bonuses == 0 && payouts == 0
 }
 
 /** What signing in needs. */
@@ -83,6 +83,7 @@ class SyncEngine @Inject constructor(
     private val jobDao get() = db.jobDao()
     private val shiftDao get() = db.shiftDao()
     private val bonusDao get() = db.bonusDao()
+    private val payoutDao get() = db.payoutDao()
     private val payDao get() = db.paySettingsDao()
     private val syncDao get() = db.syncDao()
 
@@ -102,7 +103,10 @@ class SyncEngine @Inject constructor(
         val phone = phoneCounts()
         if (phone.isEmpty) return SignInPlan.Ready(SignInChoice.DOWNLOAD)
         val cloud = if (remote.hasRecords(account.uid)) remote.changesSince(account.uid, null) else RemoteChanges()
-        val cloudCounts = Counts(cloud.jobs.count { !it.deleted }, cloud.shifts.count { !it.deleted }, cloud.bonuses.count { !it.deleted })
+        val cloudCounts = Counts(
+            cloud.jobs.count { !it.deleted }, cloud.shifts.count { !it.deleted },
+            cloud.bonuses.count { !it.deleted }, cloud.payouts.count { !it.deleted },
+        )
         return when {
             saved.boundUid != null -> SignInPlan.AskAccountSwitch(saved.boundEmail, phone, cloudCounts)
             cloudCounts.isEmpty -> SignInPlan.Ready(SignInChoice.UPLOAD)
@@ -202,18 +206,20 @@ class SyncEngine @Inject constructor(
         val jobs = changes.jobs.filter { it.isUsable() }
         val shifts = changes.shifts.filter { it.isUsable() }
         val bonuses = changes.bonuses.filter { it.isUsable() }
-        var skipped = (changes.jobs.size - jobs.size) + (changes.shifts.size - shifts.size) + (changes.bonuses.size - bonuses.size)
+        val payouts = changes.payouts.filter { it.isUsable() }
+        var skipped = (changes.jobs.size - jobs.size) + (changes.shifts.size - shifts.size) +
+            (changes.bonuses.size - bonuses.size) + (changes.payouts.size - payouts.size)
 
-        // A shift or bonus can arrive without its job (the job changed before the last download, but this
-        // phone doesn't have it): fetch those jobs first.
+        // A shift, bonus or payout can arrive without its job (the job changed before the last download, but
+        // this phone doesn't have it): fetch those jobs first.
         val inBatch = jobs.mapTo(HashSet()) { it.syncId }
-        val missing = (shifts.map { it.jobSyncId } + bonuses.map { it.jobSyncId })
+        val missing = (shifts.map { it.jobSyncId } + bonuses.map { it.jobSyncId } + payouts.map { it.jobSyncId })
             .filterTo(HashSet()) { it !in inBatch && jobDao.getBySyncId(it) == null }
         val parents = if (missing.isEmpty()) emptyList() else remote.jobs(uid, missing).filter { it.isUsable() }
 
         var applied = 0
         db.withTransaction {
-            for (record in parents + jobs + shifts + bonuses) {
+            for (record in parents + jobs + shifts + bonuses + payouts) {
                 when (applyRecord(record)) {
                     Applied.CHANGED -> applied++
                     Applied.UNCHANGED -> Unit
@@ -232,7 +238,8 @@ class SyncEngine @Inject constructor(
             // Jobs first, so the cloud never has a shift or bonus without its job for long.
             syncDao.dirtyJobs().map { it.toRemote(payDao.forJob(it.id)) } +
                 syncDao.dirtyShifts().map { it.shift.toRemote(it.jobSyncId) } +
-                syncDao.dirtyBonuses().map { it.bonus.toRemote(it.jobSyncId) }
+                syncDao.dirtyBonuses().map { it.bonus.toRemote(it.jobSyncId) } +
+                syncDao.dirtyPayouts().map { it.payout.toRemote(it.jobSyncId) }
         }
         if (dirty.isEmpty()) return Upload(0, 0, 0, limited = false)
         // Each record sent can be one write: never send more than may still be written.
@@ -269,6 +276,7 @@ class SyncEngine @Inject constructor(
         is RemoteJob -> applyJob(record)
         is RemoteShift -> applyShift(record)
         is RemoteBonus -> applyBonus(record)
+        is RemotePayout -> applyPayout(record)
     }
 
     private suspend fun applyJob(cloud: RemoteJob): Applied {
@@ -345,24 +353,51 @@ class SyncEngine @Inject constructor(
         }
     }
 
+    private suspend fun applyPayout(cloud: RemotePayout): Applied {
+        val jobId = jobDao.getBySyncId(cloud.jobSyncId)?.id ?: return Applied.NO_JOB
+        val local = payoutDao.getBySyncId(cloud.syncId)
+        if (local == null) {
+            payoutDao.upsert(cloud.toEntity(id = 0, jobId = jobId))
+            return Applied.CHANGED
+        }
+        val mine = local.toRemote(jobDao.getAny(local.jobId)!!.syncId)
+        return when (LastWriteWins.winner(local.updatedAt, cloud.updatedAt, mine.sameContentAs(cloud))) {
+            LastWriteWins.Winner.REMOTE -> {
+                payoutDao.upsert(cloud.toEntity(local.id, jobId))
+                Applied.CHANGED
+            }
+            LastWriteWins.Winner.LOCAL -> {
+                if (!local.dirty) syncDao.markPayoutDirty(local.syncId)
+                Applied.UNCHANGED
+            }
+            LastWriteWins.Winner.SAME -> {
+                if (local.dirty) syncDao.markPayoutUploaded(local.syncId, local.updatedAt)
+                Applied.UNCHANGED
+            }
+        }
+    }
+
     /** Uploaded: unless the row changed again meanwhile (then it has a later updated_at and stays dirty). */
     private suspend fun markUploaded(record: RemoteRecord) {
         when (record) {
             is RemoteJob -> syncDao.markJobUploaded(record.syncId, record.updatedAt)
             is RemoteShift -> syncDao.markShiftUploaded(record.syncId, record.updatedAt)
             is RemoteBonus -> syncDao.markBonusUploaded(record.syncId, record.updatedAt)
+            is RemotePayout -> syncDao.markPayoutUploaded(record.syncId, record.updatedAt)
         }
     }
 
     // --- Linking this phone's data to an account ------------------------------------------------------
 
-    private suspend fun phoneCounts() = Counts(jobDao.getAll().size, shiftDao.getAll().size, bonusDao.getAll().size)
+    private suspend fun phoneCounts() =
+        Counts(jobDao.getAll().size, shiftDao.getAll().size, bonusDao.getAll().size, payoutDao.getAll().size)
 
     private suspend fun lookAlikes(cloud: RemoteChanges): LookAlikes.Links {
         val jobs = jobDao.getAll().map { it.toRemote(payDao.forJob(it.id)) }
         val shifts = syncDao.liveShifts().map { it.shift.toRemote(it.jobSyncId) }
         val bonuses = syncDao.liveBonuses().map { it.bonus.toRemote(it.jobSyncId) }
-        return LookAlikes.find(jobs, shifts, bonuses, cloud)
+        val payouts = syncDao.livePayouts().map { it.payout.toRemote(it.jobSyncId) }
+        return LookAlikes.find(jobs, shifts, bonuses, cloud, payouts)
     }
 
     /** Gives each local look-alike its cloud twin's sync id (unless some local row already has that id). */
@@ -376,15 +411,20 @@ class SyncEngine @Inject constructor(
         for ((local, cloud) in links.bonuses) {
             if (syncDao.bonusSyncIdCount(cloud) == 0) bonusDao.getBySyncId(local)?.let { syncDao.setBonusSyncId(it.id, cloud) }
         }
+        for ((local, cloud) in links.payouts) {
+            if (syncDao.payoutSyncIdCount(cloud) == 0) payoutDao.getBySyncId(local)?.let { syncDao.setPayoutSyncId(it.id, cloud) }
+        }
     }
 
     private suspend fun markAllDirty() {
         syncDao.markAllJobsDirty()
         syncDao.markAllShiftsDirty()
         syncDao.markAllBonusesDirty()
+        syncDao.markAllPayoutsDirty()
     }
 
     private suspend fun deleteEverything() {
+        syncDao.deleteAllPayouts()
         syncDao.deleteAllBonuses()
         syncDao.deleteAllShifts()
         syncDao.deleteAllPaySettings()

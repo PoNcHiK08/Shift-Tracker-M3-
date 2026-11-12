@@ -27,12 +27,16 @@ data class EditShiftRoute(
 @Serializable
 data class ImportIcsRoute(val uri: String)
 
-/** [bonusId] = 0 creates a new bonus on [dateEpochDay] (or today when [EditShiftRoute.NO_DATE]). */
+/**
+ * [bonusId] = 0 creates a new bonus on [dateEpochDay] (or today when [EditShiftRoute.NO_DATE]). With [wholeMonth]
+ * the new bonus is for the whole month of that date (the editor opens in its "whole month" mode).
+ */
 @Serializable
 data class EditBonusRoute(
     val bonusId: Long = 0L,
     val dateEpochDay: Long = EditShiftRoute.NO_DATE,
     val sharedKey: String? = null,
+    val wholeMonth: Boolean = false,
 )
 
 /** Keys that tie a card or button to the editor it expands into. */
