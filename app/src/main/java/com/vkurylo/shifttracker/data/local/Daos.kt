@@ -302,6 +302,10 @@ interface PaySettingsDao {
     @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId AND from_month = :fromMonth")
     suspend fun deleteEntry(jobId: Long, fromMonth: Int)
 
+    /** The entries of the months after [fromMonth] (yyyymm). */
+    @Query("DELETE FROM job_pay_settings WHERE job_id = :jobId AND from_month > :fromMonth")
+    suspend fun deleteLaterThan(jobId: Long, fromMonth: Int)
+
     @Insert
     suspend fun insert(entry: JobPaySettingsEntity)
 

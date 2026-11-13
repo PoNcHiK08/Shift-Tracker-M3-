@@ -209,6 +209,24 @@ fun JobsScreen(
             dismissButton = { TextButton(onClick = viewModel::cancelDelete) { Text(stringResource(R.string.cancel)) } },
         )
     }
+
+    state.pendingPayReplace?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelPayReplace,
+            title = { Text(stringResource(R.string.pay_replace_later_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.pay_replace_later_message,
+                        Formatters.monthYear(pending.month, locale),
+                        pending.laterMonths.joinToString(", ") { Formatters.monthYear(it, locale) },
+                    ),
+                )
+            },
+            confirmButton = { TextButton(onClick = viewModel::confirmPayReplace) { Text(stringResource(R.string.pay_replace_later_confirm)) } },
+            dismissButton = { TextButton(onClick = viewModel::cancelPayReplace) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

@@ -356,6 +356,9 @@
     <string name="monthly_amount">Оклад за місяць</string>
     <string name="pay_applies_from">Діє з</string>
     <string name="pay_applies_from_hint">Попередні місяці лишаються як були.</string>
+    <string name="pay_replace_later_title">Замінити пізніші налаштування оплати?</string>
+    <string name="pay_replace_later_message">Для пізніших місяців уже збережено власні налаштування оплати: %2$s. Якщо застосувати нові з %1$s, вони діятимуть і в цих місяцях, а збережені для них налаштування буде видалено.</string>
+    <string name="pay_replace_later_confirm">Замінити</string>
     <string name="fixed_salary">Оклад</string>
     <string name="fixed_salary_per_month">Оклад %1$s/міс.</string>
     <string name="salary_value">оклад %1$s</string>
