@@ -29,6 +29,8 @@ data class JobsUiState(
      */
     val currencyLocked: Boolean = false,
     val pendingDelete: PendingJobDelete? = null,
+    /** Save was pressed and is being written: a second press must not store the job again. */
+    val saving: Boolean = false,
 )
 
 @HiltViewModel
@@ -39,14 +41,16 @@ class JobsViewModel @Inject constructor(
     private val editing = MutableStateFlow<Job?>(null)
     private val currencyLocked = MutableStateFlow(false)
     private val pendingDelete = MutableStateFlow<PendingJobDelete?>(null)
+    private val saving = MutableStateFlow(false)
 
     val uiState: StateFlow<JobsUiState> = combine(
         jobRepository.observeJobs(),
         editing,
         currencyLocked,
         pendingDelete,
-    ) { jobs, edit, locked, delete ->
-        JobsUiState(jobs = jobs, loading = false, editing = edit, currencyLocked = locked, pendingDelete = delete)
+        saving,
+    ) { jobs, edit, locked, delete, isSaving ->
+        JobsUiState(jobs = jobs, loading = false, editing = edit, currencyLocked = locked, pendingDelete = delete, saving = isSaving)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JobsUiState())
 
     /** A new job is paid in the currency of the most recently created one (PLN for the first). */
@@ -69,9 +73,16 @@ class JobsViewModel @Inject constructor(
 
     /** Saves the job with its [pay] settings (see [JobRepository.save] for how they enter its history). */
     fun save(job: Job, pay: PaySettings) {
+        if (saving.value) return
+        saving.value = true
         viewModelScope.launch {
-            jobRepository.save(job.copy(name = job.name.trim()), pay)
-            editing.update { null }
+            try {
+                jobRepository.save(job.copy(name = job.name.trim()), pay)
+                editing.update { null }
+            } finally {
+                // Saved (the editor is closed) or not (Save can be pressed again).
+                saving.value = false
+            }
         }
     }
 

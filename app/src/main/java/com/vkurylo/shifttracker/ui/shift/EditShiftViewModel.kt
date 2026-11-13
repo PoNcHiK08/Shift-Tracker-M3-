@@ -50,6 +50,8 @@ data class EditShiftUiState(
     val secondRate: TimedRate? = null,
     val showErrors: Boolean = false,
     val confirmDelete: Boolean = false,
+    /** Save was pressed and is being written: a second press must not store the shift again. */
+    val saving: Boolean = false,
 ) {
     val selectedJob: Job? get() = jobs.firstOrNull { it.id == jobId }
 
@@ -169,6 +171,7 @@ class EditShiftViewModel @Inject constructor(
 
     fun save() {
         val state = _uiState.value
+        if (state.saving) return
         if (!state.canSave) {
             _uiState.update { it.copy(showErrors = true) }
             return
@@ -186,8 +189,15 @@ class EditShiftViewModel @Inject constructor(
             externalUid = original?.externalUid,
             secondRate = state.secondRate,
         )
+        _uiState.update { it.copy(saving = true) }
         viewModelScope.launch {
-            shiftRepository.upsert(shift)
+            try {
+                shiftRepository.upsert(shift)
+            } catch (e: Throwable) {
+                // Not saved: Save can be pressed again.
+                _uiState.update { it.copy(saving = false) }
+                throw e
+            }
             _events.send(EditShiftEvent.Saved)
         }
     }

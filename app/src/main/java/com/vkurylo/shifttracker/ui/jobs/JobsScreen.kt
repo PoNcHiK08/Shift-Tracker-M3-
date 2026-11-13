@@ -183,6 +183,7 @@ fun JobsScreen(
         JobEditorSheet(
             job = job,
             currencyLocked = state.currencyLocked,
+            saving = state.saving,
             onDismiss = viewModel::dismissEditor,
             onSave = viewModel::save,
             onDelete = { viewModel.requestDelete(job) },
@@ -215,6 +216,7 @@ fun JobsScreen(
 private fun JobEditorSheet(
     job: Job,
     currencyLocked: Boolean,
+    saving: Boolean,
     onDismiss: () -> Unit,
     onSave: (Job, PaySettings) -> Unit,
     onDelete: () -> Unit,
@@ -487,6 +489,7 @@ private fun JobEditorSheet(
                             )
                         }
                     },
+                    enabled = !saving,
                     modifier = Modifier.weight(1f).height(52.dp),
                 ) {
                     Text(stringResource(R.string.save))
