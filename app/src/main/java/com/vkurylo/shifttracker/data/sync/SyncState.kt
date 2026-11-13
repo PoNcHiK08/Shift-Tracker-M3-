@@ -16,6 +16,8 @@ data class SyncState(
     val cursor: Long? = null,
     /** Wall-clock millis of the last complete sync. */
     val lastSyncedAt: Long? = null,
+    /** The [SYNC_FORMAT] [cursor] was reached with; null: none yet (never synced, or an app version before it). */
+    val format: String? = null,
 )
 
 interface SyncStateStore {

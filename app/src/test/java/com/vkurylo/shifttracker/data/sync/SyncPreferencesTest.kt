@@ -16,7 +16,7 @@ class SyncPreferencesTest {
     @Test
     fun theLinkTheSettingsAndTheLastOutcomeAreKept() = runBlocking {
         val prefs = testSyncPreferences()
-        val state = SyncState(boundUid = "uid", boundEmail = "a@example.com", epoch = "e1", cursor = 42, lastSyncedAt = 7)
+        val state = SyncState(boundUid = "uid", boundEmail = "a@example.com", epoch = "e1", cursor = 42, lastSyncedAt = 7, format = SYNC_FORMAT)
         prefs.update { state }
         val outcome = SyncOutcome(at = 9, downloaded = 1, uploaded = 2, skipped = 3, limited = true, problem = SyncProblem.CLOCK, detail = "30")
         prefs.updateSettings { SyncSettings(enabled = true, cloudReset = true, writesDay = 20_400, writesToday = 12, last = outcome) }
