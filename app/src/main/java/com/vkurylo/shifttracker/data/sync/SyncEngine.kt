@@ -178,7 +178,12 @@ class SyncEngine @Inject constructor(
         val meta = remote.readMeta(uid)
         if (meta == null || meta.epoch != saved.epoch) return SyncResult.CloudWasReset
 
-        val changes = remote.changesSince(uid, saved.cursor?.let { it - PULL_OVERLAP_MS })
+        // An app update changed what is synced (a new collection, a new document layout): read everything once, so
+        // records the previous version skipped or never asked for arrive. Safe: applying a known version changes nothing.
+        val cursor = if (saved.format == SYNC_FORMAT) saved.cursor else null
+        if (saved.format != SYNC_FORMAT) state.update { it.copy(cursor = null, format = SYNC_FORMAT) }
+
+        val changes = remote.changesSince(uid, cursor?.let { it - PULL_OVERLAP_MS })
         val download = apply(uid, changes)
         changes.newestServerTime?.let { newest -> state.update { it.copy(cursor = maxOf(it.cursor ?: newest, newest)) } }
 

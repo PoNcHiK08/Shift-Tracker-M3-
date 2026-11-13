@@ -351,7 +351,7 @@ private fun PaymentForm(draft: PayoutDraft, editor: PayoutEditorViewModel) {
             }
             Spacer(Modifier.weight(1f))
         }
-        Button(onClick = editor::save, modifier = Modifier.testTag(RECEIVED_PAY_SAVE_TAG)) { Text(stringResource(R.string.save)) }
+        Button(onClick = editor::save, enabled = !draft.saving, modifier = Modifier.testTag(RECEIVED_PAY_SAVE_TAG)) { Text(stringResource(R.string.save)) }
     }
 
     if (showDatePicker) {

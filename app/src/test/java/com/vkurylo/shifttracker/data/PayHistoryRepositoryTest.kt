@@ -62,6 +62,44 @@ class PayHistoryRepositoryTest {
         assertEquals(listOf(PaySettings(null, PayType.FIXED_MONTHLY, 100_000)), jobs.getJob(id)!!.payHistory)
     }
 
+    /**
+     * Regression: saving a job with entries always wrote a history entry for the chosen month, so changing only
+     * its name or colour in December left a silent December entry that later outranked a change "from November".
+     */
+    @Test
+    fun savingWithoutAPayChangeWritesNoHistoryEntry() = runBlocking {
+        val nov = YearMonth.of(2026, 11)
+        val dec = YearMonth.of(2026, 12)
+        val id = jobs.save(Job(name = "Office", hourlyRateGrosze = 4000, color = 0), PaySettings())
+        jobs.save(jobs.getJob(id)!!, PaySettings(nov, deductionBp = 1371))
+        val before = jobs.getJob(id)!!.payHistory
+
+        // December: only the colour changes; the form holds the settings in force (13.71 %), "from December".
+        jobs.save(jobs.getJob(id)!!.copy(color = 5), PaySettings(dec, deductionBp = 1371))
+
+        val after = jobs.getJob(id)!!
+        assertEquals(5, after.color)
+        assertEquals("no December entry", before, after.payHistory)
+    }
+
+    /** Applying new settings from a month replaces the entries of the months after it; earlier months keep theirs. */
+    @Test
+    fun applyingFromAMonthReplacesLaterEntriesAndKeepsEarlierOnes() = runBlocking {
+        val id = jobs.save(Job(name = "Office", hourlyRateGrosze = 4000, color = 0), PaySettings())
+        val job = jobs.getJob(id)!!
+        jobs.save(job, PaySettings(jul, deductionBp = 1000))
+        jobs.save(job, PaySettings(YearMonth.of(2026, 11), deductionBp = 1371))
+        jobs.save(job, PaySettings(YearMonth.of(2026, 12), PayType.FIXED_MONTHLY, 500_000, 1371))
+
+        jobs.save(job, PaySettings(oct, deductionBp = 1200))
+
+        val saved = jobs.getJob(id)!!
+        assertEquals(listOf(null, jul, oct), saved.payHistory.map { it.from })
+        assertEquals(1000, saved.payFor(YearMonth.of(2026, 9)).deductionBp)
+        assertEquals(1200, saved.payFor(YearMonth.of(2027, 1)).deductionBp)
+        assertEquals(PayType.HOURLY, saved.payFor(YearMonth.of(2027, 1)).payType)
+    }
+
     @Test
     fun observedShiftsCarryTheJobsHistoryAndActivity() = runBlocking {
         val id = jobs.save(Job(name = "Office", hourlyRateGrosze = 4000, color = 0), PaySettings(null, PayType.FIXED_MONTHLY, 500_000))

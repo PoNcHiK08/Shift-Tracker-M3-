@@ -40,6 +40,8 @@ data class EditBonusUiState(
     val note: String = "",
     val showErrors: Boolean = false,
     val confirmDelete: Boolean = false,
+    /** Save was pressed and is being written: a second press must not store the bonus again. */
+    val saving: Boolean = false,
 ) {
     /** The bonus is in its job's currency (decimals and limits follow it). */
     val currency: String get() = jobs.firstOrNull { it.id == jobId }?.currency ?: Currencies.DEFAULT
@@ -127,6 +129,7 @@ class EditBonusViewModel @Inject constructor(
 
     fun save() {
         val state = _uiState.value
+        if (state.saving) return
         val amount = state.amountGrosze
         val jobId = state.jobId
         if (!state.canSave || amount == null || jobId == null) {
@@ -142,8 +145,15 @@ class EditBonusViewModel @Inject constructor(
             note = state.note.trim().ifEmpty { null },
             wholeMonth = state.wholeMonth,
         )
+        _uiState.update { it.copy(saving = true) }
         viewModelScope.launch {
-            bonusRepository.upsert(bonus)
+            try {
+                bonusRepository.upsert(bonus)
+            } catch (e: Throwable) {
+                // Not saved: Save can be pressed again.
+                _uiState.update { it.copy(saving = false) }
+                throw e
+            }
             _events.send(EditBonusEvent.Saved)
         }
     }

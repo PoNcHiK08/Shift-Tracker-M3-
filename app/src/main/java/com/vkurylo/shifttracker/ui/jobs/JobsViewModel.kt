@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.PaySettings
+import com.vkurylo.shifttracker.domain.model.payChangesWith
 import com.vkurylo.shifttracker.domain.repository.JobRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,9 +15,16 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.YearMonth
 import javax.inject.Inject
 
 data class PendingJobDelete(val job: Job, val shiftCount: Int)
+
+/**
+ * New pay settings for [job] from [month] would replace those the job has for the [laterMonths] after it: saved only
+ * once the user confirms.
+ */
+data class PendingPayReplace(val job: Job, val pay: PaySettings, val month: YearMonth, val laterMonths: List<YearMonth>)
 
 data class JobsUiState(
     val jobs: List<Job> = emptyList(),
@@ -29,6 +37,9 @@ data class JobsUiState(
      */
     val currencyLocked: Boolean = false,
     val pendingDelete: PendingJobDelete? = null,
+    /** Save was pressed and is being written: a second press must not store the job again. */
+    val saving: Boolean = false,
+    val pendingPayReplace: PendingPayReplace? = null,
 )
 
 @HiltViewModel
@@ -39,14 +50,25 @@ class JobsViewModel @Inject constructor(
     private val editing = MutableStateFlow<Job?>(null)
     private val currencyLocked = MutableStateFlow(false)
     private val pendingDelete = MutableStateFlow<PendingJobDelete?>(null)
+    private val saving = MutableStateFlow(false)
+    private val pendingPayReplace = MutableStateFlow<PendingPayReplace?>(null)
 
     val uiState: StateFlow<JobsUiState> = combine(
         jobRepository.observeJobs(),
         editing,
         currencyLocked,
         pendingDelete,
-    ) { jobs, edit, locked, delete ->
-        JobsUiState(jobs = jobs, loading = false, editing = edit, currencyLocked = locked, pendingDelete = delete)
+        combine(saving, pendingPayReplace, ::Pair),
+    ) { jobs, edit, locked, delete, (isSaving, payReplace) ->
+        JobsUiState(
+            jobs = jobs,
+            loading = false,
+            editing = edit,
+            currencyLocked = locked,
+            pendingDelete = delete,
+            saving = isSaving,
+            pendingPayReplace = payReplace,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), JobsUiState())
 
     /** A new job is paid in the currency of the most recently created one (PLN for the first). */
@@ -69,11 +91,51 @@ class JobsViewModel @Inject constructor(
 
     /** Saves the job with its [pay] settings (see [JobRepository.save] for how they enter its history). */
     fun save(job: Job, pay: PaySettings) {
+        if (saving.value) return
+        saving.value = true
         viewModelScope.launch {
-            jobRepository.save(job.copy(name = job.name.trim()), pay)
-            editing.update { null }
+            try {
+                val later = laterMonthsReplaced(job, pay)
+                if (later.isNotEmpty()) {
+                    // Months after this one have settings of their own: ask before replacing them.
+                    pendingPayReplace.value = PendingPayReplace(job, pay, pay.from!!, later)
+                } else {
+                    jobRepository.save(job.copy(name = job.name.trim()), pay)
+                    editing.update { null }
+                }
+            } finally {
+                // Saved (the editor is closed), waiting for the answer, or not saved (Save can be pressed again).
+                saving.value = false
+            }
         }
     }
+
+    /** The months after [pay]'s month with settings of their own, which saving [pay] replaces; none if it changes nothing. */
+    private suspend fun laterMonthsReplaced(job: Job, pay: PaySettings): List<YearMonth> {
+        val from = pay.from ?: return emptyList()
+        val stored = jobRepository.getJob(job.id) ?: return emptyList()
+        if (!stored.payChangesWith(pay)) return emptyList()
+        return stored.payHistory.mapNotNull { it.from }.filter { it.isAfter(from) }
+    }
+
+    /** "Replace" in the question about later months' pay settings: saves as asked. */
+    fun confirmPayReplace() {
+        val pending = pendingPayReplace.value ?: return
+        if (saving.value) return
+        pendingPayReplace.value = null
+        saving.value = true
+        viewModelScope.launch {
+            try {
+                jobRepository.save(pending.job.copy(name = pending.job.name.trim()), pending.pay)
+                editing.update { null }
+            } finally {
+                saving.value = false
+            }
+        }
+    }
+
+    /** "Cancel" in that question: nothing is saved; the editor stays open with what was typed. */
+    fun cancelPayReplace() = pendingPayReplace.update { null }
 
     fun requestDelete(job: Job) {
         viewModelScope.launch {

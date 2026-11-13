@@ -28,6 +28,7 @@ import com.vkurylo.shifttracker.domain.model.PayoutWithJob
 import com.vkurylo.shifttracker.domain.model.Shift
 import com.vkurylo.shifttracker.domain.model.ShiftRates
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
+import com.vkurylo.shifttracker.domain.model.payChangesWith
 import com.vkurylo.shifttracker.domain.model.withRates
 import com.vkurylo.shifttracker.domain.repository.BonusRepository
 import com.vkurylo.shifttracker.domain.repository.JobRepository
@@ -87,8 +88,18 @@ class RoomJobRepository @Inject constructor(
     }
     override suspend fun save(job: Job, pay: PaySettings): Long = db.withTransaction {
         val id = upsert(job)
-        if (pay.from == null) payDao.deleteForJob(id) else payDao.deleteEntry(id, pay.from.toMonthKey())
-        payDao.insert(pay.toEntity(id))
+        val stored = job.copy(id = id, payHistory = payDao.forJob(id).map { it.toDomain() })
+        // Settings already in force in that month (a name or colour change): no entry, so none can outrank a later change.
+        if (stored.payChangesWith(pay)) {
+            if (pay.from == null) {
+                payDao.deleteForJob(id)
+            } else {
+                payDao.deleteEntry(id, pay.from.toMonthKey())
+                // From that month on: the months after it lose their own settings (the job editor asked first).
+                payDao.deleteLaterThan(id, pay.from.toMonthKey())
+            }
+            payDao.insert(pay.toEntity(id))
+        }
         id
     }
     /**

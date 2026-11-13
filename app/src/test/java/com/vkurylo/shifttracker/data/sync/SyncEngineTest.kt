@@ -618,6 +618,62 @@ class SyncEngineTest {
         assertEquals("Nowa praca", b.db.jobDao().getAll().single { it.name == "Nowa praca" }.name)
     }
 
+    // --- An app update that changes what is synced ---------------------------------------------------
+
+    /**
+     * Phone B synced with an app version that didn't read payouts while A, already updated, sent one: B's cursor
+     * went past it. Returns B, its cursor, and the payout B hasn't got.
+     */
+    private suspend fun phoneThatMissedAPayout(format: String?): Triple<Phone, Long, RemotePayout> {
+        val (a, b) = twoLinkedPhones()
+        val payout = RemotePayout(
+            "30000000-0000-4000-8000-000000000001", a.now, false, a.db.jobDao().getAll().single().syncId, 202611, 450_000, null, null,
+        )
+        cloud.put(ana.uid, payout)
+        val cursor = cloud.serverTime + SyncEngine.PULL_OVERLAP_MS + 1
+        b.state.current = b.state.current.copy(cursor = cursor, format = format)
+        return Triple(b, cursor, payout)
+    }
+
+    @Test
+    fun aChangedSyncFormatReadsEverythingOnceAndRemembersTheFormat() = runBlocking {
+        val (b, _, _) = phoneThatMissedAPayout(format = "jobs,shifts,bonuses/1")
+        val pullsBefore = cloud.pulls.size
+
+        b.sync()
+        assertEquals(SYNC_FORMAT, b.state.current.format)
+        assertEquals("the cursor is the newest server time read", cloud.serverTime, b.state.current.cursor)
+        b.sync()
+
+        // One full download, then from the cursor again.
+        assertEquals(listOf(null, cloud.serverTime - SyncEngine.PULL_OVERLAP_MS), cloud.pulls.drop(pullsBefore))
+    }
+
+    @Test
+    fun anUnchangedSyncFormatKeepsTheCursor() = runBlocking {
+        val (b, cursor, _) = phoneThatMissedAPayout(format = SYNC_FORMAT)
+        val pullsBefore = cloud.pulls.size
+
+        b.sync()
+
+        assertEquals(listOf<Long?>(cursor - SyncEngine.PULL_OVERLAP_MS), cloud.pulls.drop(pullsBefore))
+        assertEquals(cursor, b.state.current.cursor)
+        assertTrue("nothing behind the cursor is read", b.db.payoutDao().getAll().isEmpty())
+    }
+
+    @Test
+    fun recordsMissedBeforeAnUpdateArriveAfterIt() = runBlocking {
+        // A phone updated from a version without the sync format remembers none: the real case after this update.
+        val (b, _, payout) = phoneThatMissedAPayout(format = null)
+
+        b.sync()
+
+        val stored = b.db.payoutDao().getAll().single()
+        assertEquals(payout.syncId, stored.syncId)
+        assertEquals(450_000L, stored.amountMinor)
+        assertEquals(SYNC_FORMAT, b.state.current.format)
+    }
+
     @Test
     fun recordsThisAppCantUseAreSkippedAndNeverWritten() = runBlocking {
         val (a, _) = twoLinkedPhones()
