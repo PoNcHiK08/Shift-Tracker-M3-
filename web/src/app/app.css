@@ -1,0 +1,185 @@
+/*
+ * Layout of the app frame. Phone width: the screen with a bottom navigation bar (80 px, as M3). From 600 px: a
+ * navigation rail (80 px) on the left instead. Screens lay themselves out (the calendar puts its day beside the
+ * month from 840 px, M3's "expanded" width).
+ */
+st-app,
+st-shell {
+  display: block;
+  min-height: 100vh;
+}
+
+st-shell {
+  display: flex;
+}
+
+.frame {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+.top-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 64px;
+  padding: 0 4px 0 16px;
+  background: var(--md-sys-color-surface);
+}
+
+.top-bar-title {
+  flex: 1;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.screen {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0 24px;
+}
+
+/* Bottom navigation bar (M3): surface container, active indicator pill 64 x 32 in secondary container. */
+.nav-bar {
+  position: fixed;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: space-around;
+  height: 80px;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--md-sys-color-surface-container);
+}
+
+.nav-rail {
+  display: none;
+}
+
+.nav-item {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-decoration: none;
+  outline: none;
+  border-radius: var(--md-sys-shape-corner-medium);
+}
+
+.nav-indicator {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 32px;
+  border-radius: var(--md-sys-shape-corner-full);
+  --md-ripple-hover-color: var(--md-sys-color-on-surface);
+  --md-ripple-pressed-color: var(--md-sys-color-on-surface);
+}
+
+.nav-item[aria-current='page'] {
+  color: var(--md-sys-color-on-surface);
+}
+
+.nav-item[aria-current='page'] .nav-indicator {
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+}
+
+.nav-item[aria-current='page'] .nav-label {
+  font-weight: 700;
+}
+
+@media (min-width: 600px) {
+  .nav-bar {
+    display: none;
+  }
+
+  .frame {
+    padding-bottom: 0;
+  }
+
+  /* Navigation rail (M3): 80 px, destinations at the top. */
+  .nav-rail {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    width: 80px;
+    height: 100vh;
+    padding-top: 76px;
+    box-sizing: border-box;
+    background: var(--md-sys-color-surface);
+    flex-shrink: 0;
+  }
+
+  .nav-rail .nav-item {
+    flex: 0 0 auto;
+    padding: 4px 0;
+  }
+
+  .top-bar {
+    padding-left: 24px;
+  }
+}
+
+/* A strip above the top bar: the demo notice. */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+
+.banner a {
+  color: inherit;
+  font-weight: 500;
+}
+
+/* A centred message (signed out, loading, empty, error). */
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 480px;
+  margin: 48px auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.message md-icon {
+  --md-icon-size: 48px;
+  color: var(--md-sys-color-primary);
+}
+
+.message h2,
+.message p {
+  margin: 0;
+}

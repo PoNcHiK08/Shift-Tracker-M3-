@@ -1,0 +1,139 @@
+/*
+ * Shift Tracker's Material 3 theme, as the Android app has it (ui/theme/Color.kt, Theme.kt, Type.kt): the colour
+ * scheme generated from seed #0F5DA8 (light and dark, following the system), the app's shapes (6 / 10 / 16 / 24 /
+ * 32 dp) and the M3 type scale in Roboto with heavier display and headline weights. Material Web components read
+ * the --md-sys-* tokens; the app's own elements use the same tokens.
+ */
+:root {
+  color-scheme: light dark;
+
+  --md-ref-typeface-brand: 'Roboto', system-ui, sans-serif;
+  --md-ref-typeface-plain: 'Roboto', system-ui, sans-serif;
+
+  --md-sys-shape-corner-extra-small: 6px;
+  --md-sys-shape-corner-small: 10px;
+  --md-sys-shape-corner-medium: 16px;
+  --md-sys-shape-corner-large: 24px;
+  --md-sys-shape-corner-extra-large: 32px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* Light (LightColors). */
+  --md-sys-color-primary: #2e5f98;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #d4e3ff;
+  --md-sys-color-on-primary-container: #0e477f;
+  --md-sys-color-secondary: #545f71;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #d8e3f8;
+  --md-sys-color-on-secondary-container: #3c4758;
+  --md-sys-color-tertiary: #6e5676;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #f7d8ff;
+  --md-sys-color-on-tertiary-container: #553f5d;
+  --md-sys-color-error: #ba1a1a;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #ffdad6;
+  --md-sys-color-on-error-container: #93000a;
+  --md-sys-color-background: #f8f9ff;
+  --md-sys-color-on-background: #191c20;
+  --md-sys-color-surface: #f8f9ff;
+  --md-sys-color-on-surface: #191c20;
+  --md-sys-color-surface-variant: #dfe2eb;
+  --md-sys-color-on-surface-variant: #43474e;
+  --md-sys-color-outline: #73777f;
+  --md-sys-color-outline-variant: #c3c6cf;
+  --md-sys-color-inverse-surface: #2e3135;
+  --md-sys-color-inverse-on-surface: #eff0f7;
+  --md-sys-color-inverse-primary: #a4c9ff;
+  --md-sys-color-surface-dim: #d8dae0;
+  --md-sys-color-surface-bright: #f8f9ff;
+  --md-sys-color-surface-container-lowest: #ffffff;
+  --md-sys-color-surface-container-low: #f2f3fa;
+  --md-sys-color-surface-container: #eceef4;
+  --md-sys-color-surface-container-high: #e6e8ee;
+  --md-sys-color-surface-container-highest: #e1e2e8;
+  --md-sys-color-scrim: #000000;
+  --md-sys-color-shadow: #000000;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Dark (DarkColors). */
+    --md-sys-color-primary: #a4c9ff;
+    --md-sys-color-on-primary: #00315e;
+    --md-sys-color-primary-container: #0e477f;
+    --md-sys-color-on-primary-container: #d4e3ff;
+    --md-sys-color-secondary: #bcc7dc;
+    --md-sys-color-on-secondary: #263141;
+    --md-sys-color-secondary-container: #3c4758;
+    --md-sys-color-on-secondary-container: #d8e3f8;
+    --md-sys-color-tertiary: #dabde2;
+    --md-sys-color-on-tertiary: #3d2846;
+    --md-sys-color-tertiary-container: #553f5d;
+    --md-sys-color-on-tertiary-container: #f7d8ff;
+    --md-sys-color-error: #ffb4ab;
+    --md-sys-color-on-error: #690005;
+    --md-sys-color-error-container: #93000a;
+    --md-sys-color-on-error-container: #ffdad6;
+    --md-sys-color-background: #111318;
+    --md-sys-color-on-background: #e1e2e8;
+    --md-sys-color-surface: #111318;
+    --md-sys-color-on-surface: #e1e2e8;
+    --md-sys-color-surface-variant: #43474e;
+    --md-sys-color-on-surface-variant: #c3c6cf;
+    --md-sys-color-outline: #8d9199;
+    --md-sys-color-outline-variant: #43474e;
+    --md-sys-color-inverse-surface: #e1e2e8;
+    --md-sys-color-inverse-on-surface: #2e3135;
+    --md-sys-color-inverse-primary: #2e5f98;
+    --md-sys-color-surface-dim: #111318;
+    --md-sys-color-surface-bright: #37393e;
+    --md-sys-color-surface-container-lowest: #0c0e13;
+    --md-sys-color-surface-container-low: #191c20;
+    --md-sys-color-surface-container: #1d2024;
+    --md-sys-color-surface-container-high: #282a2f;
+    --md-sys-color-surface-container-highest: #33353a;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--md-ref-typeface-plain);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Money and hours: digits that line up. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* M3 type scale (Compose Typography defaults; AppTypography makes display and headline SemiBold, titleLarge Medium). */
+.display-small { font-size: 36px; line-height: 44px; font-weight: 600; letter-spacing: 0; }
+.headline-small { font-size: 24px; line-height: 32px; font-weight: 600; letter-spacing: 0; }
+.title-large { font-size: 22px; line-height: 28px; font-weight: 500; letter-spacing: 0; }
+.title-medium { font-size: 16px; line-height: 24px; font-weight: 500; letter-spacing: 0.15px; }
+.title-small { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+.body-large { font-size: 16px; line-height: 24px; font-weight: 400; letter-spacing: 0.5px; }
+.body-medium { font-size: 14px; line-height: 20px; font-weight: 400; letter-spacing: 0.25px; }
+.body-small { font-size: 12px; line-height: 16px; font-weight: 400; letter-spacing: 0.4px; }
+.label-large { font-size: 14px; line-height: 20px; font-weight: 500; letter-spacing: 0.1px; }
+.label-medium { font-size: 12px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
+.label-small { font-size: 11px; line-height: 16px; font-weight: 500; letter-spacing: 0.5px; }
+/* M3 Expressive "emphasized" styles: one step heavier. */
+.emphasized { font-weight: 600; }
+.display-small.emphasized { font-weight: 700; }
+
+.on-surface-variant { color: var(--md-sys-color-on-surface-variant); }
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
