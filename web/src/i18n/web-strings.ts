@@ -30,6 +30,8 @@ const uk = {
   calendar_title: 'Календар',
   day_total: 'За день',
   month_bonuses_count: 'Бонусів на весь місяць: %1$d',
+  earnings_shown: 'Показувати суми',
+  job_currency: 'Валюта: %1$s',
 };
 
 const en: Record<keyof typeof uk, string> = {
@@ -63,6 +65,8 @@ const en: Record<keyof typeof uk, string> = {
   calendar_title: 'Calendar',
   day_total: 'This day',
   month_bonuses_count: 'Bonuses for the whole month: %1$d',
+  earnings_shown: 'Show amounts',
+  job_currency: 'Currency: %1$s',
 };
 
 export type WebKey = keyof typeof uk;

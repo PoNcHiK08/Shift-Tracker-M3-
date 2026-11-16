@@ -11,6 +11,8 @@ import { createStore } from '../data/source';
 import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
 import '../screens/calendar';
+import '../screens/summary';
+import '../screens/jobs';
 
 /** The whole app: which screen is open, demo or signed-in, and the data the screens show. */
 @customElement('st-app')
@@ -208,8 +210,18 @@ export class App extends LitElement {
           .showModeTag=${showModeTag}
           .today=${this.today()}
         ></st-calendar>`;
-      default:
-        return html`<div class="screen-body" data-testid="screen-${this.route}"></div>`;
+      case 'summary':
+        return html`<st-summary
+          data-testid="screen-summary"
+          .strings=${this.strings}
+          .view=${s.view}
+          .mode=${this.mode}
+          .showModeTag=${showModeTag}
+          .today=${this.today()}
+          @mode-change=${(e: CustomEvent<EarningsMode>) => (this.mode = e.detail)}
+        ></st-summary>`;
+      case 'jobs':
+        return html`<st-jobs data-testid="screen-jobs" .strings=${this.strings} .view=${s.view} .today=${this.today()}></st-jobs>`;
     }
   }
 

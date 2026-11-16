@@ -20,7 +20,7 @@ export const KEYS = [
   'summary_empty_title', 'summary_empty_message', 'week_fixed_pay_note', 'no_shifts_this_day', 'day_free',
   'bonus', 'bonus_for_job', 'bonus_for_whole_month', 'break_short', 'overnight_shift', 'fixed_salary', 'hours_value',
   'jobs_title', 'no_jobs_title', 'fixed_salary_per_month', 'second_rate_summary', 'deduction_value',
-  'previous_month', 'next_month', 'today', 'current_period', 'nav_calendar', 'nav_summary', 'currency',
+  'previous_month', 'next_month', 'previous_period', 'next_period', 'today', 'current_period', 'nav_calendar', 'nav_summary', 'currency',
 ];
 export const PLURALS = ['shift_count', 'received_pay_count'];
 
