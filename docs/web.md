@@ -101,7 +101,6 @@ VITE_FIREBASE_APP_ID=the appId value
 cd web                 # from the repository root
 npm ci                 # first time, and after pulling changes to package-lock.json
 npm run build          # checks the types and writes the site to web\dist
-cd ..\firebase
 firebase login         # once per computer: a browser window opens, sign in with the project's Google account
 firebase deploy --only hosting --project PROJECT_ID
 ```
@@ -109,10 +108,12 @@ firebase deploy --only hosting --project PROJECT_ID
 The last command prints `Hosting URL: https://PROJECT_ID.web.app`. Open it, **Sign in with Google** with the
 account the app syncs with.
 
-> **Always `--only hosting`.** A plain `firebase deploy` in `firebase\` would also publish the committed
-> `firestore.rules`, whose placeholder address lets nobody in, and the app on your phone would be refused until
-> you publish your real rules again (README → Security rules). If that happens, nothing is lost: republish the
-> rules with your address in the console.
+Run it **in `web\`**: the site's Hosting settings are `web\firebase.json`, which has nothing but Hosting in it.
+
+> **Never run `firebase deploy` in `firebase\`.** That folder's `firebase.json` is for the rules: a deploy there
+> would publish the committed `firestore.rules`, whose placeholder address lets nobody in, and the app on your
+> phone would be refused until you publish your real rules again (README → Security rules). If that happens,
+> nothing is lost: republish the rules with your address in the console.
 
 To publish a newer version: `git pull`, then step 4 again (`npm ci`, `npm run build`, `firebase deploy --only
 hosting --project PROJECT_ID`). Firebase keeps earlier versions: **Hosting** → **Release history** → ⋮ →

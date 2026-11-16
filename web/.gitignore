@@ -7,3 +7,6 @@ dist/
 screenshots/
 .vitest-attachments/
 test/browser/__screenshots__/
+# Firebase CLI (firebase deploy from here).
+.firebase/
+firebase-debug.log
