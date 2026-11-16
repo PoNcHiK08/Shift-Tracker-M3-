@@ -183,3 +183,22 @@ st-shell {
 .message p {
   margin: 0;
 }
+
+/* A note above the screen: a refresh that failed, records that couldn't be shown. */
+.notice {
+  margin: 0 16px 12px;
+  padding: 12px 16px;
+  border-radius: var(--md-sys-shape-corner-medium);
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface-variant);
+}
+
+.notice[role='alert'],
+.error-text {
+  color: var(--md-sys-color-error);
+}
+
+.refresh-progress {
+  --md-circular-progress-size: 24px;
+  margin: 0 4px;
+}

@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from 'lit';
+import { html, nothing, type TemplateResult } from 'lit';
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
 // Material icons (Apache 2.0), the same set the app uses (Icons.Filled / Icons.Outlined), as inline SVG: no icon font.
 import calendarFilled from '@material-design-icons/svg/filled/calendar_month.svg?raw';
@@ -42,6 +42,7 @@ const ICONS = {
 export type IconName = keyof typeof ICONS;
 
 /** An icon as <md-icon> (sized and coloured by Material Web). Decorative: hidden from screen readers. */
-export function icon(name: IconName): TemplateResult {
-  return html`<md-icon aria-hidden="true">${unsafeSVG(ICONS[name])}</md-icon>`;
+/** A Material icon; [slot] puts it in a component's icon slot (e.g. a button's leading icon). */
+export function icon(name: IconName, slot?: string): TemplateResult {
+  return html`<md-icon aria-hidden="true" slot=${slot ?? nothing}>${unsafeSVG(ICONS[name])}</md-icon>`;
 }
