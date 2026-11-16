@@ -12,7 +12,7 @@ export const OUT = resolve(here, '../src/i18n/android-strings.json');
 /** The app's strings the web screens use. */
 export const KEYS = [
   'earnings_month', 'earnings_week', 'earnings_year', 'hours', 'shifts', 'average_rate',
-  'by_job', 'by_day', 'by_month', 'month_bonuses_title', 'month_bonuses_none', 'month_bonuses_row',
+  'by_job', 'by_day', 'by_month', 'month_bonuses_title', 'month_bonuses_none', 'month_bonuses_row', 'month_bonuses_sheet_title',
   'received_pay_title', 'received_pay_caption', 'received_pay_year_caption', 'received_pay_calculated',
   'received_pay_received', 'received_pay_difference', 'received_pay_not_entered', 'received_pay_received_on_value',
   'received_tag_part', 'received_tag_all', 'including_bonuses', 'salary_value', 'bonuses_value', 'share_of_earnings',

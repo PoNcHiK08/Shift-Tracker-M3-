@@ -1,12 +1,16 @@
 import { LitElement, html, nothing, type TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { browserStrings, type Strings } from '../i18n/i18n';
-import { isDemo } from '../demo/demo';
+import { DEMO_TODAY, isDemo } from '../demo/demo';
+import { hasDeductions } from '../domain/calc';
+import { parseDate, today } from '../domain/dates';
+import type { EarningsMode } from '../domain/model';
 import { routeOf, type Route } from './app-shell';
 import { icon } from '../ui/icons';
 import { createStore } from '../data/source';
 import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
+import '../screens/calendar';
 
 /** The whole app: which screen is open, demo or signed-in, and the data the screens show. */
 @customElement('st-app')
@@ -19,6 +23,8 @@ export class App extends LitElement {
   @property({ attribute: false }) reload: () => void = () => location.reload();
   @state() private route: Route = routeOf(typeof location === 'undefined' ? '' : location.hash);
   @state() protected snapshot: Snapshot | null = null;
+  /** Gross or net, as chosen on Summary (memory only; the app's default is gross). */
+  @state() mode: EarningsMode = 'GROSS';
   private unsubscribe: (() => void) | null = null;
 
   private readonly onHashChange = () => {
@@ -183,9 +189,28 @@ export class App extends LitElement {
     return html`${notes}${this.screen(s)}`;
   }
 
-  /** The open screen with the loaded data (the screens themselves come with their own commits). */
-  protected screen(_s: Snapshot): TemplateResult {
-    return html`<div class="screen-body" data-testid="screen-${this.route}"></div>`;
+  /** Today, as the screens see it: fixed in the demo, so it always shows the same months. */
+  private today() {
+    return this.demo ? parseDate(DEMO_TODAY) : today();
+  }
+
+  /** The open screen with the loaded data. */
+  protected screen(s: Snapshot): TemplateResult {
+    // The Gross / Net tag only when some job has deductions: otherwise both are the same.
+    const showModeTag = s.view.jobs.some(hasDeductions);
+    switch (this.route) {
+      case 'calendar':
+        return html`<st-calendar
+          data-testid="screen-calendar"
+          .strings=${this.strings}
+          .view=${s.view}
+          .mode=${this.mode}
+          .showModeTag=${showModeTag}
+          .today=${this.today()}
+        ></st-calendar>`;
+      default:
+        return html`<div class="screen-body" data-testid="screen-${this.route}"></div>`;
+    }
   }
 
   protected override render() {

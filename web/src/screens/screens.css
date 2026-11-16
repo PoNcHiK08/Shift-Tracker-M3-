@@ -1,0 +1,207 @@
+/*
+ * The screens' own layout (Calendar, Summary, Jobs), after the app's Compose screens: 12-16 px margins, tonal
+ * containers, segmented groups (2 px apart, 24 px outer and 6 px inner corners).
+ */
+
+.grow { flex: 1; min-width: 0; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.primary { color: var(--md-sys-color-primary); }
+
+/* Small tags: "Gross" / "Net", "Received". */
+.tag {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  white-space: nowrap;
+}
+.tag.received { color: var(--md-sys-color-tertiary); background: color-mix(in srgb, var(--md-sys-color-tertiary) 14%, transparent); }
+.tag.received.on-container { color: inherit; background: color-mix(in srgb, currentColor 14%, transparent); padding: 2px 4px; }
+
+.screen-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px 4px 16px;
+}
+.screen-toolbar h2 { flex: 1; margin: 0; }
+
+/* --- Calendar ------------------------------------------------------------------------------------------ */
+
+.calendar { display: flex; flex-direction: column; }
+.calendar-month, .calendar-day { min-width: 0; }
+
+.month-strip {
+  display: flex;
+  gap: 2px;
+  margin: 2px 12px 6px;
+}
+.tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 14px;
+  border-radius: 4px;
+}
+.tile-earnings {
+  flex: 1.8;
+  border-radius: 20px 4px 4px 20px;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+.tile-hours { flex: 1; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.tile-shifts {
+  flex: 0.85;
+  border-radius: 4px 20px 20px 4px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+}
+.tile-amount-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.tile-amount { display: flex; flex-direction: column; }
+
+.month-bonuses { margin: 0 12px 6px; }
+.month-bonuses-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px 10px 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+.month-bonuses-row md-icon { --md-icon-size: 20px; }
+.month-bonuses-row .chevron { display: flex; transition: transform 200ms; }
+.month-bonuses-row .chevron.open { transform: rotate(90deg); }
+.month-bonuses .entries { margin-top: 6px; }
+
+.weekdays, .month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  padding: 0 8px;
+}
+.weekdays { padding-top: 4px; padding-bottom: 4px; text-align: center; color: var(--md-sys-color-on-surface-variant); }
+.weekdays .weekend { color: var(--md-sys-color-primary); }
+
+.day-cell { aspect-ratio: 1.15; display: flex; align-items: center; justify-content: center; min-width: 0; }
+.day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: calc(100% - 6px);
+  aspect-ratio: 1;
+  max-width: calc(100% - 6px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  cursor: pointer;
+  outline: none;
+  isolation: isolate;
+}
+/* The round background: small for an empty day, larger with entries or today, a squircle when selected. */
+.day::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: 50%;
+  transform: scale(0.6);
+  background: transparent;
+  transition: transform 250ms cubic-bezier(0.2, 0, 0, 1.4), border-radius 250ms, background-color 150ms;
+}
+.day:hover::before, .day:focus-visible::before { transform: scale(0.92); border-radius: 32%; background: var(--md-sys-color-surface-container-highest); }
+.day:focus-visible { outline: 2px solid var(--md-sys-color-secondary); outline-offset: 0; border-radius: 32%; }
+.day.has-entries::before { transform: scale(0.86); background: var(--md-sys-color-surface-container-highest); }
+.day.today::before { transform: scale(0.86); background: var(--md-sys-color-primary-container); }
+.day.today { color: var(--md-sys-color-on-primary-container); }
+.day.selected::before { transform: scale(1); border-radius: 32%; background: var(--md-sys-color-primary); }
+.day.selected { color: var(--md-sys-color-on-primary); }
+.day.has-entries .day-number, .day.today .day-number, .day.selected .day-number { font-weight: 600; }
+.day-marks { display: flex; align-items: center; gap: 3px; height: 8px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; }
+.day.selected .dot { box-shadow: 0 0 0 1px var(--md-sys-color-on-primary); }
+.bonus-mark { display: flex; }
+.bonus-mark md-icon { --md-icon-size: 8px; }
+
+/* The selected day (bento panel). */
+.day-panel {
+  margin: 8px 12px;
+  padding: 16px;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: var(--md-sys-color-surface-container-low);
+}
+.day-head { display: flex; align-items: flex-start; gap: 12px; }
+.day-head h3, .day-head p { margin: 0; }
+.day-total { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.day-total > span:first-child { display: flex; flex-direction: column; align-items: flex-end; }
+.day-free {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
+  padding: 20px 0 8px;
+  color: var(--md-sys-color-outline);
+}
+
+/* Entries: one segmented group. */
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 6px;
+  background: var(--md-sys-color-surface-container-highest);
+}
+.entry.only { border-radius: 24px; }
+.entry.first { border-radius: 24px 24px 6px 6px; }
+.entry.last { border-radius: 6px 6px 24px 24px; }
+.entry.bonus { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+.entry .faded { opacity: 0.8; }
+.entry-text { flex: 1; min-width: 0; }
+.entry-details { display: flex; align-items: center; gap: 6px; }
+.entry-end { display: flex; flex-direction: column; align-items: flex-end; text-align: end; white-space: nowrap; }
+.overnight { display: flex; color: var(--md-sys-color-tertiary); }
+.overnight md-icon { --md-icon-size: 16px; }
+.avatar {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+.bonus-avatar { background: var(--md-sys-color-tertiary); color: var(--md-sys-color-on-tertiary); }
+
+/* Wide (M3 expanded, 840 px+): the day beside the month. */
+@media (min-width: 840px) {
+  .calendar {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 12px;
+    padding-right: 12px;
+  }
+  .calendar-month { flex: 1.25; max-width: 720px; }
+  .calendar-day { flex: 1; position: sticky; top: 72px; }
+  .calendar-day .day-panel { margin: 52px 0 8px; }
+}
