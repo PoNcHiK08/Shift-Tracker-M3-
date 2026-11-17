@@ -23,7 +23,8 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
 - **Deleted records stay as hidden markers** (tombstones), on the phone and in the cloud, so the deletion
   reaches every phone. They are never cleaned up; each takes a few hundred bytes.
 - **Quotas (Firebase free plan).** Each record sent is one write (20 000 a day free). Each record read is one
-  read (50 000 a day): the first link and a fresh download read everything, later syncs only what changed.
+  read (50 000 a day): the first link, a fresh download and the first sync after an update that changes what is
+  synced read everything, later syncs only what changed.
   - Automatic syncs stop at 5 000 writes a day per phone. **Sync now** has no limit, so after a big import
     you may need it.
 - **Text up to 20 000 characters** per job name or note; the editors stop there. Older or imported text that
@@ -255,7 +256,9 @@ This update adds a flag to bonuses and a table for received pay. Do it in this o
   survives (uploads merge fields).
 - It doesn't see received pay at all. If it deletes a job, the updated phone deletes that job's payments when the
   deletion reaches it.
-- Update the other phone too; there is nothing else to do.
+- Update the other phone too. Its first sync after the update reads all of the account's records once (one read
+  per record, like a fresh download) and so picks up the received pay and the month bonuses' "whole month" mark it
+  missed while on the previous version. Nothing else needs doing; later syncs again read only what changed.
 
 ### Rolling back
 

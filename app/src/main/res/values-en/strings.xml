@@ -333,6 +333,9 @@
     <string name="monthly_amount">Monthly salary</string>
     <string name="pay_applies_from">Applies from</string>
     <string name="pay_applies_from_hint">Earlier months keep their pay.</string>
+    <string name="pay_replace_later_title">Replace later pay settings?</string>
+    <string name="pay_replace_later_message">Later months already have pay settings of their own: %2$s. Applying the new ones from %1$s also covers those months, and their saved settings will be deleted.</string>
+    <string name="pay_replace_later_confirm">Replace</string>
     <string name="fixed_salary">Salary</string>
     <string name="fixed_salary_per_month">Salary %1$s/month</string>
     <string name="salary_value">salary %1$s</string>

@@ -1,6 +1,7 @@
 package com.vkurylo.shifttracker.data.sync.firebase
 
 import com.vkurylo.shifttracker.data.sync.DOC_SCHEMA
+import com.vkurylo.shifttracker.data.sync.SYNC_FORMAT
 import com.vkurylo.shifttracker.data.sync.RemoteBonus
 import com.vkurylo.shifttracker.data.sync.RemoteJob
 import com.vkurylo.shifttracker.data.sync.RemotePaySettings
@@ -44,6 +45,12 @@ class FirestoreDocumentsTest {
     private val bonus = RemoteBonus("33333333-3333-4333-8333-333333333333", 5, false, job.syncId, 20_400, 5_000, "Premia")
     private val monthBonus = RemoteBonus("66666666-6666-4666-8666-666666666666", 7, false, job.syncId, 20_393, 50_000, null, wholeMonth = true)
     private val payout = RemotePayout("55555555-5555-4555-8555-555555555555", 6, false, job.syncId, 202_611, 450_000, "Przelew", 20_420)
+
+    /** A new collection or document layout must change SYNC_FORMAT, or phones would never read what they skipped. */
+    @Test
+    fun `the sync format names every collection and the document layout`() {
+        assertEquals(CloudCollection.entries.joinToString(",") { it.path } + "/" + DOC_SCHEMA, SYNC_FORMAT)
+    }
 
     @Test
     fun `records come back from their fields unchanged`() {

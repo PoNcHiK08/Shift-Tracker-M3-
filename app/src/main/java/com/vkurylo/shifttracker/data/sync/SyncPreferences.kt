@@ -99,6 +99,7 @@ class SyncPreferences internal constructor(private val store: DataStore<Preferen
         epoch = this[EPOCH],
         cursor = this[CURSOR],
         lastSyncedAt = this[LAST_SYNCED_AT],
+        format = this[FORMAT],
     )
 
     private fun MutablePreferences.write(state: SyncState) {
@@ -107,6 +108,7 @@ class SyncPreferences internal constructor(private val store: DataStore<Preferen
         set(EPOCH, state.epoch)
         set(CURSOR, state.cursor)
         set(LAST_SYNCED_AT, state.lastSyncedAt)
+        set(FORMAT, state.format)
     }
 
     // --- SyncSettings ----------------------------------------------------------------------------------
@@ -165,6 +167,7 @@ class SyncPreferences internal constructor(private val store: DataStore<Preferen
         private val EPOCH = stringPreferencesKey("epoch")
         private val CURSOR = longPreferencesKey("cursor")
         private val LAST_SYNCED_AT = longPreferencesKey("last_synced_at")
+        private val FORMAT = stringPreferencesKey("format")
 
         private val ENABLED = booleanPreferencesKey("enabled")
         private val CLOUD_RESET = booleanPreferencesKey("cloud_reset")

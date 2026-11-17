@@ -43,6 +43,16 @@ fun Job.payFor(month: YearMonth): PaySettings =
 
 fun Job.payFor(date: LocalDate): PaySettings = payFor(YearMonth.from(date))
 
+/**
+ * Whether saving [pay] changes what the job is paid from its month on: false when those settings are already in
+ * force in that month (only the name or colour changed), and then there is nothing to store. Settings "from the
+ * beginning" (null) always replace the whole history.
+ */
+fun Job.payChangesWith(pay: PaySettings): Boolean {
+    val month = pay.from ?: return true
+    return payFor(month).copy(from = month) != pay
+}
+
 /** Any month of the job has deductions (then gross and net differ and screens say which is shown). */
 val Job.hasDeductions: Boolean get() = payHistory.any { it.deductionBp > 0 }
 

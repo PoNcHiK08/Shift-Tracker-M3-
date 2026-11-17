@@ -183,6 +183,7 @@ fun JobsScreen(
         JobEditorSheet(
             job = job,
             currencyLocked = state.currencyLocked,
+            saving = state.saving,
             onDismiss = viewModel::dismissEditor,
             onSave = viewModel::save,
             onDelete = { viewModel.requestDelete(job) },
@@ -208,6 +209,24 @@ fun JobsScreen(
             dismissButton = { TextButton(onClick = viewModel::cancelDelete) { Text(stringResource(R.string.cancel)) } },
         )
     }
+
+    state.pendingPayReplace?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelPayReplace,
+            title = { Text(stringResource(R.string.pay_replace_later_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.pay_replace_later_message,
+                        Formatters.monthYear(pending.month, locale),
+                        pending.laterMonths.joinToString(", ") { Formatters.monthYear(it, locale) },
+                    ),
+                )
+            },
+            confirmButton = { TextButton(onClick = viewModel::confirmPayReplace) { Text(stringResource(R.string.pay_replace_later_confirm)) } },
+            dismissButton = { TextButton(onClick = viewModel::cancelPayReplace) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -215,6 +234,7 @@ fun JobsScreen(
 private fun JobEditorSheet(
     job: Job,
     currencyLocked: Boolean,
+    saving: Boolean,
     onDismiss: () -> Unit,
     onSave: (Job, PaySettings) -> Unit,
     onDelete: () -> Unit,
@@ -487,6 +507,7 @@ private fun JobEditorSheet(
                             )
                         }
                     },
+                    enabled = !saving,
                     modifier = Modifier.weight(1f).height(52.dp),
                 ) {
                     Text(stringResource(R.string.save))

@@ -12,6 +12,14 @@ package com.vkurylo.shifttracker.data.sync
 /** Layout version of the documents this app writes. Documents with a higher one are left alone. */
 const val DOC_SCHEMA = 1
 
+/**
+ * What this app version reads from the cloud: the collections it syncs (one per record kind) and [DOC_SCHEMA].
+ * A phone remembers it with its cursor ([SyncState.format]); when an update changes it, the next sync reads
+ * everything once, so records the previous version skipped or didn't know (a new collection) are taken in.
+ * Change it together with the collections (FirestoreDocuments.kt) or [DOC_SCHEMA]; a test keeps them in step.
+ */
+const val SYNC_FORMAT = "jobs,shifts,bonuses,payouts/$DOC_SCHEMA"
+
 sealed interface RemoteRecord {
     val syncId: String
 

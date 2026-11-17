@@ -34,6 +34,8 @@ data class PayoutDraft(
     val receivedOn: LocalDate? = null,
     val note: String = "",
     val showErrors: Boolean = false,
+    /** Save was pressed and is being written: a second press must not store the payment again. */
+    val saving: Boolean = false,
 ) {
     val isNew: Boolean get() = id == 0L
 
@@ -104,6 +106,7 @@ class PayoutEditorViewModel @Inject constructor(
 
     fun save() {
         val draft = _draft.value ?: return
+        if (draft.saving) return
         val amount = draft.amountMinor
         if (!draft.canSave || amount == null) {
             _draft.update { it?.copy(showErrors = true) }
@@ -117,8 +120,15 @@ class PayoutEditorViewModel @Inject constructor(
             note = draft.note.trim().ifEmpty { null },
             receivedOn = draft.receivedOn,
         )
+        _draft.update { it?.copy(saving = true) }
         viewModelScope.launch {
-            payoutRepository.upsert(payout)
+            try {
+                payoutRepository.upsert(payout)
+            } catch (e: Throwable) {
+                // Not saved: Save can be pressed again.
+                _draft.update { it?.copy(saving = false) }
+                throw e
+            }
             original = null
             _draft.value = null
             _events.send(PayoutEvent.Saved)

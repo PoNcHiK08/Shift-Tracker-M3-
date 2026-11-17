@@ -107,7 +107,7 @@ fun EditBonusScreen(
                             Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_bonus))
                         }
                     }
-                    TextButton(onClick = viewModel::save, enabled = !state.loading && state.jobs.isNotEmpty()) {
+                    TextButton(onClick = viewModel::save, enabled = !state.loading && state.jobs.isNotEmpty() && !state.saving) {
                         Text(stringResource(R.string.save))
                     }
                 },

@@ -24,8 +24,9 @@ interface JobRepository {
 
     /**
      * Saves [job] and its [pay] settings in one transaction. With `pay.from == null` the settings apply
-     * from the beginning and replace the whole history (a job without entries); otherwise they replace
-     * only the entry of that month, so other months keep theirs.
+     * from the beginning and replace the whole history (a job without entries); otherwise they apply from
+     * that month on: they replace its entry and those of the months after it, and earlier months keep theirs.
+     * Settings already in force in that month store nothing (a change of name or colour only).
      */
     suspend fun save(job: Job, pay: PaySettings): Long
     suspend fun delete(job: Job)

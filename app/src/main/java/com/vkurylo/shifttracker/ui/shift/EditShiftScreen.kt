@@ -142,7 +142,7 @@ fun EditShiftScreen(
                             Icon(Icons.Filled.DeleteOutline, stringResource(R.string.delete_shift))
                         }
                     }
-                    TextButton(onClick = viewModel::save, enabled = !state.loading && state.jobs.isNotEmpty()) {
+                    TextButton(onClick = viewModel::save, enabled = !state.loading && state.jobs.isNotEmpty() && !state.saving) {
                         Text(stringResource(R.string.save))
                     }
                 },

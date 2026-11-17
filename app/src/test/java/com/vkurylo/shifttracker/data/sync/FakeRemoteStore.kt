@@ -37,6 +37,9 @@ class FakeRemoteStore : RemoteStore {
     var callsOnMainThread = 0
         private set
 
+    /** The `since` of every download asked for, in order (null: everything). */
+    val pulls = mutableListOf<Long?>()
+
     /** Records stored by pushes (each one write). */
     var writes = 0
         private set
@@ -67,6 +70,7 @@ class FakeRemoteStore : RemoteStore {
 
     override suspend fun changesSince(uid: String, since: Long?): RemoteChanges {
         online()
+        pulls += since
         val stored = accounts[uid]?.records?.values.orEmpty().filter { since == null || it.serverTime >= since }
         val records = stored.map { it.record }
         return RemoteChanges(
