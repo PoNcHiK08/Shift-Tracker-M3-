@@ -11,6 +11,12 @@ import { createStore } from '../data/source';
 import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
 import '../screens/calendar';
+import '../editors/shift-editor';
+import '../ui/snackbar';
+import type { ShiftEditor } from '../editors/shift-editor';
+import type { EditorDone } from '../editors/editor-base';
+import type { Snackbar } from '../ui/snackbar';
+import type { EpochDay } from '../domain/dates';
 import '../screens/summary';
 import '../screens/jobs';
 
@@ -27,6 +33,8 @@ export class App extends LitElement {
   @state() protected snapshot: Snapshot | null = null;
   /** Gross or net, as chosen on Summary (memory only; the app's default is gross). */
   @state() mode: EarningsMode = 'GROSS';
+  /** Editing is OFF at the start of every session; only the "Enable editing" switch turns it on (never stored). */
+  @state() editing = false;
   private unsubscribe: (() => void) | null = null;
 
   private readonly onHashChange = () => {
@@ -209,6 +217,9 @@ export class App extends LitElement {
           .mode=${this.mode}
           .showModeTag=${showModeTag}
           .today=${this.today()}
+          .editing=${this.editing}
+          @new-shift=${(e: CustomEvent<EpochDay>) => this.editor<ShiftEditor>('st-shift-editor')?.openNew(e.detail)}
+          @edit-shift=${(e: CustomEvent<string>) => this.editor<ShiftEditor>('st-shift-editor')?.openExisting(e.detail)}
         ></st-calendar>`;
       case 'summary':
         return html`<st-summary
@@ -225,14 +236,47 @@ export class App extends LitElement {
     }
   }
 
+  private editor<T extends Element>(tag: string): T | null {
+    return this.editing ? (this.querySelector(tag) as T | null) : null;
+  }
+
+  /** An editor closed after a write: say so, and offer Undo after a delete. */
+  private onEditorClosed(done: EditorDone | undefined) {
+    if (!done) return;
+    const snackbar = this.querySelector<Snackbar>('st-snackbar');
+    const undo = done.undo;
+    snackbar?.show(
+      done.message,
+      undo && this.store
+        ? {
+            label: this.strings.t('undo'),
+            run: () => {
+              void this.store!.write(undo).then(
+                (result) => snackbar.show(result.ok ? this.strings.t('restored') : this.strings.t('undo_failed', this.strings.t('conflict_changed'))),
+                (error) => snackbar.show(this.strings.t('undo_failed', String((error as { code?: string }).code ?? error))),
+              );
+            },
+          }
+        : null,
+    );
+  }
+
+  private editors() {
+    if (!this.editing || this.snapshot?.phase.kind !== 'ready') return nothing;
+    const showModeTag = this.snapshot.view.jobs.some(hasDeductions);
+    return html`<st-shift-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-shift-editor>`;
+  }
+
   protected override render() {
     return html`<st-shell
-      .strings=${this.strings}
-      .route=${this.route}
-      .banner=${this.banner()}
-      .actions=${this.actions()}
-      .content=${this.content()}
-    ></st-shell>`;
+        .strings=${this.strings}
+        .route=${this.route}
+        .banner=${this.banner()}
+        .actions=${this.actions()}
+        .content=${this.content()}
+      ></st-shell>
+      <div @editor-closed=${(e: CustomEvent<EditorDone | undefined>) => this.onEditorClosed(e.detail)}>${this.editors()}</div>
+      <st-snackbar></st-snackbar>`;
   }
 }
 

@@ -6,5 +6,6 @@ import '@fontsource/roboto/700.css';
 import './theme/theme.css';
 import './app/app.css';
 import './screens/screens.css';
+import './editors/editors.css';
 import './ui/material';
 import './app/app';

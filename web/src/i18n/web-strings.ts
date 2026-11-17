@@ -32,6 +32,19 @@ const uk = {
   month_bonuses_count: 'Бонусів на весь місяць: %1$d',
   earnings_shown: 'Показувати суми',
   job_currency: 'Валюта: %1$s',
+  conflict_changed: 'Це змінилося на іншому пристрої. Онови, щоб побачити останню версію.',
+  conflict_reload: 'Оновити',
+  refused_no_job: 'Цієї роботи вже немає серед даних. Онови сторінку даних.',
+  refused_unreadable: 'Цей запис збережено новішою версією застосунку: тут його змінити не можна.',
+  write_denied: 'Хмара відхилила зміну. Перевір дату й час на комп’ютері (не більше ніж на 10 хв уперед) і що правила Firestore опубліковані.',
+  write_failed: 'Не вдалося зберегти: %1$s',
+  discard_title: 'Скасувати зміни?',
+  discard_message: 'Зміни в цій формі не буде збережено.',
+  discard_confirm: 'Скасувати зміни',
+  keep_editing: 'Продовжити редагування',
+  saving: 'Зберігаємо…',
+  restored: 'Відновлено',
+  undo_failed: 'Не вдалося відновити: %1$s',
 };
 
 const en: Record<keyof typeof uk, string> = {
@@ -67,6 +80,19 @@ const en: Record<keyof typeof uk, string> = {
   month_bonuses_count: 'Bonuses for the whole month: %1$d',
   earnings_shown: 'Show amounts',
   job_currency: 'Currency: %1$s',
+  conflict_changed: 'This changed on another device. Reload to see the latest version.',
+  conflict_reload: 'Reload',
+  refused_no_job: 'This job is no longer in the data. Reload the data.',
+  refused_unreadable: 'This record was saved by a newer version of the app: it can’t be changed here.',
+  write_denied: 'The cloud refused the change. Check your computer’s date and time (at most 10 minutes ahead) and that the Firestore rules are published.',
+  write_failed: 'Couldn’t save: %1$s',
+  discard_title: 'Discard your changes?',
+  discard_message: 'What you changed in this form won’t be saved.',
+  discard_confirm: 'Discard',
+  keep_editing: 'Keep editing',
+  saving: 'Saving…',
+  restored: 'Restored',
+  undo_failed: 'Couldn’t undo: %1$s',
 };
 
 export type WebKey = keyof typeof uk;

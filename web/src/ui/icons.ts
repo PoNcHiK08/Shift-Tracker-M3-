@@ -18,6 +18,15 @@ import eventAvailable from '@material-design-icons/svg/filled/event_available.sv
 import queryStats from '@material-design-icons/svg/filled/query_stats.svg?raw';
 import login from '@material-design-icons/svg/filled/login.svg?raw';
 import payments from '@material-design-icons/svg/filled/payments.svg?raw';
+import add from '@material-design-icons/svg/filled/add.svg?raw';
+import close from '@material-design-icons/svg/filled/close.svg?raw';
+import deleteIcon from '@material-design-icons/svg/outlined/delete.svg?raw';
+import edit from '@material-design-icons/svg/filled/edit.svg?raw';
+import event from '@material-design-icons/svg/filled/event.svg?raw';
+import schedule from '@material-design-icons/svg/filled/schedule.svg?raw';
+import download from '@material-design-icons/svg/filled/download.svg?raw';
+import lock from '@material-design-icons/svg/filled/lock.svg?raw';
+import editNote from '@material-design-icons/svg/filled/edit_note.svg?raw';
 
 const ICONS = {
   calendar: calendarFilled,
@@ -37,6 +46,15 @@ const ICONS = {
   queryStats,
   login,
   payments,
+  add,
+  close,
+  delete: deleteIcon,
+  edit,
+  event,
+  schedule,
+  download,
+  lock,
+  editNote,
 };
 
 export type IconName = keyof typeof ICONS;
