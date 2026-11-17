@@ -8,6 +8,7 @@ import type { EarningsMode } from '../domain/model';
 import { routeOf, type Route } from './app-shell';
 import { icon } from '../ui/icons';
 import { createStore } from '../data/source';
+import { downloadSnapshot } from '../data/snapshot';
 import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
 import '../screens/calendar';
@@ -47,6 +48,12 @@ export class App extends LitElement {
     this.route = routeOf(location.hash);
   };
 
+  /** Closing or reloading the tab with unsaved changes in an editor asks first. */
+  private readonly onBeforeUnload = (event: BeforeUnloadEvent) => {
+    const editors = [...this.querySelectorAll<Element & { dirty?: boolean }>('st-shift-editor, st-bonus-editor, st-payout-editor')];
+    if (editors.some((e) => e.dirty)) event.preventDefault();
+  };
+
   private readonly onVisible = () => {
     if (document.visibilityState === 'visible') this.store?.onFocus();
   };
@@ -59,6 +66,7 @@ export class App extends LitElement {
     super.connectedCallback();
     window.addEventListener('hashchange', this.onHashChange);
     window.addEventListener('focus', this.onVisible);
+    window.addEventListener('beforeunload', this.onBeforeUnload);
     document.addEventListener('visibilitychange', this.onVisible);
     document.documentElement.lang = this.strings.lang;
     document.title = this.strings.t('app_name');
@@ -69,6 +77,7 @@ export class App extends LitElement {
   override disconnectedCallback() {
     window.removeEventListener('hashchange', this.onHashChange);
     window.removeEventListener('focus', this.onVisible);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
     document.removeEventListener('visibilitychange', this.onVisible);
     this.unsubscribe?.();
     this.unsubscribe = null;
@@ -202,7 +211,33 @@ export class App extends LitElement {
         'empty',
       )}`;
     }
-    return html`${notes}${this.screen(s)}`;
+    return html`${notes}${this.editingBar()}${this.screen(s)}`;
+  }
+
+  /**
+   * The editing switch: OFF at the start of every session, on for this session only (it is a field of this page,
+   * never stored). Next to it, the cloud snapshot to save before editing.
+   */
+  private editingBar() {
+    const t = this.strings;
+    const on = this.editing;
+    return html`<section class="editing-bar ${on ? 'on' : ''}" data-testid="editing-bar">
+      <label class="editing-switch">
+        ${icon(on ? 'editNote' : 'lock')}
+        <span class="title-small grow">${t.t('editing_switch')}</span>
+        <md-switch data-testid="editing-switch" ?selected=${on} aria-label=${t.t('editing_switch')}
+          @change=${(e: Event) => (this.editing = (e.target as HTMLInputElement & { selected: boolean }).selected)}></md-switch>
+      </label>
+      <p class="body-small on-surface-variant" data-testid="editing-state">
+        ${on ? t.t('editing_on') : t.t('editing_off')} ${this.demo ? t.t('editing_demo') : ''}
+      </p>
+      <div class="snapshot">
+        <md-text-button data-testid="snapshot" has-icon @click=${() => this.store && downloadSnapshot(this.store.documentsHeld)}
+          >${icon('download', 'icon')}${t.t('snapshot_button')}</md-text-button
+        >
+        <span class="body-small on-surface-variant">${t.t('snapshot_note')}</span>
+      </div>
+    </section>`;
   }
 
   /** Today, as the screens see it: fixed in the demo, so it always shows the same months. */

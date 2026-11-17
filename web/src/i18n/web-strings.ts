@@ -3,7 +3,7 @@ const uk = {
   app_name: 'Shift Tracker',
   nav_jobs: 'Роботи',
   sign_in_title: 'Перегляд твоїх змін',
-  sign_in_message: 'Увійди тим самим акаунтом Google, що й у застосунку на телефоні. Тут можна лише дивитися: змінювати дані можна в застосунку.',
+  sign_in_message: 'Увійди тим самим акаунтом Google, що й у застосунку на телефоні. Тут видно твої дані; зміни, бонуси й виплати можна й редагувати, якщо ввімкнути редагування.',
   sign_in_button: 'Увійти через Google',
   sign_in_failed: 'Не вдалося увійти: %1$s',
   sign_in_demo: 'Переглянути демо',
@@ -45,13 +45,19 @@ const uk = {
   saving: 'Зберігаємо…',
   restored: 'Відновлено',
   undo_failed: 'Не вдалося відновити: %1$s',
+  editing_switch: 'Увімкнути редагування',
+  editing_off: 'Лише перегляд. Редагування змін, бонусів і виплат вмикається тут лише для цієї сесії.',
+  editing_on: 'Редагування увімкнено до закриття вкладки. Зміни йдуть у хмару, і телефон отримає їх під час синхронізації.',
+  editing_demo: 'У демо зміни лишаються тільки на цій сторінці.',
+  snapshot_button: 'Завантажити знімок хмари',
+  snapshot_note: 'Перед редагуванням збережи знімок: копію всіх документів хмари у файл JSON. Це не резервна копія для імпорту в застосунок.',
 };
 
 const en: Record<keyof typeof uk, string> = {
   app_name: 'Shift Tracker',
   nav_jobs: 'Jobs',
   sign_in_title: 'View your shifts',
-  sign_in_message: 'Sign in with the same Google account as the app on your phone. This site only shows your data: change it in the app.',
+  sign_in_message: 'Sign in with the same Google account as the app on your phone. You see your data here; shifts, bonuses and payments can also be changed once you enable editing.',
   sign_in_button: 'Sign in with Google',
   sign_in_failed: 'Couldn’t sign in: %1$s',
   sign_in_demo: 'View the demo',
@@ -93,6 +99,12 @@ const en: Record<keyof typeof uk, string> = {
   saving: 'Saving…',
   restored: 'Restored',
   undo_failed: 'Couldn’t undo: %1$s',
+  editing_switch: 'Enable editing',
+  editing_off: 'View only. Editing shifts, bonuses and payments is turned on here, for this session only.',
+  editing_on: 'Editing is on until you close this tab. Changes go to the cloud; your phone gets them when it syncs.',
+  editing_demo: 'In the demo, changes stay on this page only.',
+  snapshot_button: 'Download cloud snapshot',
+  snapshot_note: 'Before editing, save a snapshot: a copy of all your cloud documents as a JSON file. It is not a backup the app can import.',
 };
 
 export type WebKey = keyof typeof uk;

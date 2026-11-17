@@ -221,3 +221,20 @@ st-snackbar {
 }
 .payments .payment-button md-icon { --md-icon-size: 18px; color: var(--md-sys-color-primary); }
 .payments:has(.payment-button) { list-style: none; padding: 0; }
+
+/* The editing switch and the snapshot, above the screens. */
+.editing-bar {
+  margin: 0 16px 12px;
+  padding: 8px 16px 8px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container);
+}
+.editing-bar.on { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+.editing-bar p { margin: 0 0 4px; }
+.editing-switch { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; }
+.editing-switch md-icon { --md-icon-size: 20px; }
+.editing-bar .snapshot { display: flex; flex-wrap: wrap; align-items: center; gap: 0 8px; margin-left: -12px; }
+.editing-bar .snapshot span { flex: 1 1 220px; padding-left: 12px; }
+@media (min-width: 840px) {
+  .editing-bar { margin-left: 12px; margin-right: 12px; }
+}

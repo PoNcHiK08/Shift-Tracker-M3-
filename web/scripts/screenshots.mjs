@@ -24,6 +24,13 @@ async function waitForServer(url) {
   throw new Error(`no server at ${url}`);
 }
 
+async function shot(page, name, fullPage = true) {
+  await page.evaluate(() => document.fonts.ready);
+  const file = resolve(OUT, `${name}.png`);
+  await page.screenshot({ path: file, fullPage });
+  console.log(file);
+}
+
 mkdirSync(OUT, { recursive: true });
 const server = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { cwd: ROOT, stdio: 'ignore' });
 try {
@@ -39,6 +46,32 @@ try {
         const file = resolve(OUT, `${screen}-${sizeName}-${scheme}.png`);
         await page.screenshot({ path: file, fullPage: true });
         console.log(file);
+      }
+      if (process.env.EDITORS !== '0') {
+        // Stage B: the editing switch on, then each editor (in the demo, edits stay on the page).
+        await page.goto(`http://localhost:${PORT}/?demo#/calendar`);
+        await page.waitForSelector('[data-testid="editing-switch"]');
+        await page.click('[data-testid="editing-switch"]');
+        await page.waitForSelector('[data-testid="add-shift"]');
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(300);
+        await shot(page, `calendar-editing-${sizeName}-${scheme}`);
+        await page.locator('[data-testid="day-panel"] [data-testid="shift-card"]').nth(1).click();
+        await page.waitForSelector('st-shift-editor dialog.editor[open]');
+        await shot(page, `shift-editor-${sizeName}-${scheme}`, false);
+        await page.click('st-shift-editor [data-testid="editor-close"]');
+        await page.click('[data-testid="add-bonus"]');
+        await page.click('[data-whole-month="true"]');
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(300);
+        await shot(page, `bonus-editor-${sizeName}-${scheme}`, false);
+        await page.click('st-bonus-editor [data-testid="editor-close"]');
+        await page.click('[data-testid="confirm-discard-yes"]');
+        // The same page: editing stays on for the session.
+        await page.goto(`http://localhost:${PORT}/?demo#/summary`);
+        await page.locator('[data-testid="add-payment"]').first().click();
+        await page.waitForSelector('st-payout-editor dialog.editor[open]');
+        await shot(page, `payout-editor-${sizeName}-${scheme}`, false);
       }
       await page.close();
     }

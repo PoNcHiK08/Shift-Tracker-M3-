@@ -9,3 +9,4 @@ import '@material/web/focus/md-focus-ring.js';
 import '@material/web/progress/circular-progress.js';
 import '@material/web/progress/linear-progress.js';
 import '@material/web/divider/divider.js';
+import '@material/web/switch/switch.js';
