@@ -1,0 +1,12 @@
+node_modules/
+dist/
+# Firebase web config: your own values, never committed (see .env.example and docs/web.md).
+.env.local
+.env.*.local
+# Review screenshots (npm run screenshots): looked at, never committed.
+screenshots/
+.vitest-attachments/
+test/browser/__screenshots__/
+# Firebase CLI (firebase deploy from here).
+.firebase/
+firebase-debug.log

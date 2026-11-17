@@ -1,0 +1,53 @@
+name: Web (tests and build)
+
+# The read-only web version in web/: installs, tests and builds it. No deploy, no secrets, no Firebase config:
+# the tests run on the demo data and the golden fixtures exported from the app's own Kotlin calculations.
+on:
+  push:
+    paths:
+      - 'web/**'
+      - 'app/src/main/res/values/strings.xml'
+      - 'app/src/main/res/values-en/strings.xml'
+      - '.github/workflows/web-ci.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'app/src/main/res/values/strings.xml'
+      - 'app/src/main/res/values-en/strings.xml'
+      - '.github/workflows/web-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Chromium for the screen tests
+        run: npx playwright install --with-deps chromium
+
+      - name: Tests (golden fixtures, parsing, screens in demo mode)
+        run: npm test
+
+      - name: Build
+        run: npm run build
