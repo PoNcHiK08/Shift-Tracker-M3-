@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { planWrite, type Plan, type WriteOp } from '../../src/edit/plan';
 import { applyChanges, OVERLAP_MS, type Changes, type DocumentChange } from '../../src/data/changes';
 import { emptyDocuments, type RawDocument } from '../../src/data/documents-types';
 import { classify, DataStore, FOCUS_REFRESH_MS, type CloudBackend, type CloudUser } from '../../src/data/store';
@@ -49,6 +50,11 @@ class FakeCloud implements CloudBackend {
   async readEpoch() {
     if (this.fail) throw this.fail;
     return this.epoch;
+  }
+  written: WriteOp[] = [];
+  async write(_uid: string, op: WriteOp, live: ReadonlySet<string>): Promise<Plan> {
+    this.written.push(op);
+    return planWrite(op, null, 1_800_000_000_000, live);
   }
   async changesSince(_uid: string, since: number | null): Promise<Changes> {
     this.asked.push(since);
@@ -255,5 +261,75 @@ describe('demo and setup', () => {
   test('without Firebase settings the site says so (and never loads Firebase)', async () => {
     const store = await createStore(false, null);
     expect(store.state.phase.kind).toBe('not-configured');
+  });
+});
+
+describe('writing (stage B)', () => {
+  const shiftValues = {
+    jobId: JOB, date: DAY, start: 600, end: 900, breakMinutes: 0, rate: 3000n, note: null, externalUid: null, secondRate: null,
+  };
+
+  test('a write shows at once, without reading everything again', async () => {
+    const { cloud, store } = setup();
+    cloud.docs = [change('jobs', JOB, job, 1)];
+    store.start();
+    cloud.emit(USER);
+    await settle();
+    const result = await store.write({ kind: 'create', collection: 'shifts', id: id(9), values: shiftValues });
+    expect(result.ok).toBe(true);
+    expect(store.state.view.shifts.map((s) => s.shift.id)).toEqual([id(9)]);
+    expect(store.record('shifts', id(9))).toMatchObject({ kind: 'shift', deleted: false, start: 600 });
+    expect(cloud.asked).toEqual([null]);
+  });
+
+  test('a refused write changes nothing; jobs that aren’t loaded can’t be written to', async () => {
+    const { cloud, store } = setup();
+    cloud.docs = [change('jobs', JOB, job, 1)];
+    store.start();
+    cloud.emit(USER);
+    await settle();
+    const result = await store.write({ kind: 'create', collection: 'shifts', id: id(9), values: { ...shiftValues, jobId: id(77) } });
+    expect(result).toEqual({ ok: false, refusal: 'no-job' });
+    expect(store.state.view.shifts).toEqual([]);
+  });
+
+  test('a read that started before a write and ends after it doesn’t bring the old version back', async () => {
+    const { cloud, store } = setup();
+    cloud.docs = [change('jobs', JOB, job, 1), change('shifts', id(1), shift({ updatedAt: 5 }), 100_000)];
+    store.start();
+    cloud.emit(USER);
+    await settle();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const original = cloud.changesSince.bind(cloud);
+    cloud.changesSince = async (uid, since) => {
+      const changes = await original(uid, since);
+      await gate;
+      return changes;
+    };
+    cloud.docs.push(change('shifts', id(1), shift({ updatedAt: 5 }), 100_000)); // the read sees the old version
+    const refresh = store.refresh();
+    const tombstone = { ...shift({ updatedAt: 1_800_000_000_000, deleted: true }) };
+    cloud.write = async () => ({ ok: true, fields: tombstone as never, updatedAt: 1_800_000_000_000 });
+    await store.write({ kind: 'delete', collection: 'shifts', id: id(1), base: 5 });
+    expect(store.state.view.shifts).toEqual([]);
+    release();
+    await refresh;
+    expect(store.state.view.shifts).toEqual([]);
+    expect(store.record('shifts', id(1))).toMatchObject({ deleted: true });
+  });
+
+  test('the demo edits in memory only, through the same checks', async () => {
+    const backend = new DemoBackend(() => {}, () => 1_800_000_000_000);
+    const store = new DataStore(backend);
+    store.start();
+    await settle();
+    const target = store.state.view.shifts[0]!;
+    const record = store.record('shifts', target.shift.id)!;
+    const deleted = await store.write({ kind: 'delete', collection: 'shifts', id: record.id, base: record.updatedAt });
+    expect(deleted.ok).toBe(true);
+    expect(store.state.view.shifts.find((s) => s.shift.id === record.id)).toBeUndefined();
+    const stale = await store.write({ kind: 'delete', collection: 'shifts', id: record.id, base: record.updatedAt });
+    expect(stale).toEqual({ ok: false, refusal: 'changed' });
   });
 });

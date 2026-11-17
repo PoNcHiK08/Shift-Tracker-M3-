@@ -6,6 +6,7 @@ import '../../src/app/app';
 import { Strings } from '../../src/i18n/i18n';
 import type { App } from '../../src/app/app';
 import type { Changes } from '../../src/data/changes';
+import { planWrite, type Plan, type WriteOp } from '../../src/edit/plan';
 import { DemoBackend } from '../../src/data/source';
 import { DataStore, type CloudBackend, type CloudUser } from '../../src/data/store';
 import { demoDocuments } from '../../src/demo/demo';
@@ -40,6 +41,11 @@ class FakeCloud implements CloudBackend {
   }
   async readEpoch() {
     return 'e1';
+  }
+  written: WriteOp[] = [];
+  async write(_uid: string, op: WriteOp, live: ReadonlySet<string>): Promise<Plan> {
+    this.written.push(op);
+    return planWrite(op, null, 1_800_000_000_000, live);
   }
   async changesSince(_uid: string, since: number | null): Promise<Changes> {
     this.reads++;

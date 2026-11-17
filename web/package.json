@@ -11,11 +11,12 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173 --strictPort",
-    "test": "vitest run",
+    "test": "vitest run --project unit --project browser",
     "test:unit": "vitest run --project unit",
     "test:browser": "vitest run --project browser",
     "strings": "node scripts/sync-strings.mjs",
-    "screenshots": "node scripts/screenshots.mjs"
+    "screenshots": "node scripts/screenshots.mjs",
+    "test:emulator": "node scripts/emulator-tests.mjs"
   },
   "dependencies": {
     "@fontsource/roboto": "5.3.0",

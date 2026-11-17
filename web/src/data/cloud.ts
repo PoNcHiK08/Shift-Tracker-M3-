@@ -30,6 +30,8 @@ import {
   type QuerySnapshot,
 } from 'firebase/firestore/lite';
 import type { Changes, DocumentChange } from './changes';
+import type { Plan, WriteOp } from '../edit/plan';
+import { writeRecord } from './writes';
 import { COLLECTIONS, type CollectionName } from './documents-types';
 import type { FirebaseSettings } from './firebase-config';
 import { errorCode, type CloudBackend, type CloudUser } from './store';
@@ -37,9 +39,9 @@ import { errorCode, type CloudBackend, type CloudUser } from './store';
 /*
  * The only module that talks to Firebase, loaded only when signed-in use is possible (never in the demo).
  *
- * READ-ONLY: it reads users/{uid} and its four collections, exactly as the app's FirestoreRemoteStore.kt reads them
- * (by `serverUpdatedAt`, 500 per page). It has no way to write: test/unit/no-writes.test.ts fails the build if a
- * write call appears anywhere in web/src.
+ * It reads users/{uid} and its four collections, exactly as the app's FirestoreRemoteStore.kt reads them (by
+ * `serverUpdatedAt`, 500 per page). It writes nothing itself: writes go through data/writes.ts only (shifts, bonuses
+ * and payouts; test/unit/write-guard.test.ts).
  *
  * Nothing is kept after the tab closes: the sign-in lives in this tab's session storage only, and Firestore lite
  * keeps no cache. (Firebase's own SDK notes the day it was used, with no account data, in an IndexedDB database of
@@ -113,6 +115,11 @@ export class FirebaseBackend implements CloudBackend {
       const request = indexedDB.deleteDatabase(HEARTBEAT_DATABASE);
       request.onsuccess = request.onerror = request.onblocked = () => resolve();
     });
+  }
+
+  /** The single write path (data/writes.ts). */
+  write(uid: string, op: WriteOp, liveJobIds: ReadonlySet<string>): Promise<Plan> {
+    return writeRecord(this.firebase.db, uid, op, liveJobIds);
   }
 
   async readEpoch(uid: string): Promise<string | null> {
