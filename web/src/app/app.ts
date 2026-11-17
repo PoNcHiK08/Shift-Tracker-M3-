@@ -8,9 +8,22 @@ import type { EarningsMode } from '../domain/model';
 import { routeOf, type Route } from './app-shell';
 import { icon } from '../ui/icons';
 import { createStore } from '../data/source';
+import { downloadSnapshot } from '../data/snapshot';
 import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
 import '../screens/calendar';
+import '../editors/shift-editor';
+import '../editors/bonus-editor';
+import '../editors/payout-editor';
+import type { BonusEditor } from '../editors/bonus-editor';
+import type { PayoutEditor } from '../editors/payout-editor';
+import type { NewBonusRequest } from '../screens/calendar';
+import type { YearMonth } from '../domain/dates';
+import '../ui/snackbar';
+import type { ShiftEditor } from '../editors/shift-editor';
+import type { EditorDone } from '../editors/editor-base';
+import type { Snackbar } from '../ui/snackbar';
+import type { EpochDay } from '../domain/dates';
 import '../screens/summary';
 import '../screens/jobs';
 
@@ -27,10 +40,18 @@ export class App extends LitElement {
   @state() protected snapshot: Snapshot | null = null;
   /** Gross or net, as chosen on Summary (memory only; the app's default is gross). */
   @state() mode: EarningsMode = 'GROSS';
+  /** Editing is OFF at the start of every session; only the "Enable editing" switch turns it on (never stored). */
+  @state() editing = false;
   private unsubscribe: (() => void) | null = null;
 
   private readonly onHashChange = () => {
     this.route = routeOf(location.hash);
+  };
+
+  /** Closing or reloading the tab with unsaved changes in an editor asks first. */
+  private readonly onBeforeUnload = (event: BeforeUnloadEvent) => {
+    const editors = [...this.querySelectorAll<Element & { dirty?: boolean }>('st-shift-editor, st-bonus-editor, st-payout-editor')];
+    if (editors.some((e) => e.dirty)) event.preventDefault();
   };
 
   private readonly onVisible = () => {
@@ -45,6 +66,7 @@ export class App extends LitElement {
     super.connectedCallback();
     window.addEventListener('hashchange', this.onHashChange);
     window.addEventListener('focus', this.onVisible);
+    window.addEventListener('beforeunload', this.onBeforeUnload);
     document.addEventListener('visibilitychange', this.onVisible);
     document.documentElement.lang = this.strings.lang;
     document.title = this.strings.t('app_name');
@@ -55,6 +77,7 @@ export class App extends LitElement {
   override disconnectedCallback() {
     window.removeEventListener('hashchange', this.onHashChange);
     window.removeEventListener('focus', this.onVisible);
+    window.removeEventListener('beforeunload', this.onBeforeUnload);
     document.removeEventListener('visibilitychange', this.onVisible);
     this.unsubscribe?.();
     this.unsubscribe = null;
@@ -188,7 +211,33 @@ export class App extends LitElement {
         'empty',
       )}`;
     }
-    return html`${notes}${this.screen(s)}`;
+    return html`${notes}${this.editingBar()}${this.screen(s)}`;
+  }
+
+  /**
+   * The editing switch: OFF at the start of every session, on for this session only (it is a field of this page,
+   * never stored). Next to it, the cloud snapshot to save before editing.
+   */
+  private editingBar() {
+    const t = this.strings;
+    const on = this.editing;
+    return html`<section class="editing-bar ${on ? 'on' : ''}" data-testid="editing-bar">
+      <label class="editing-switch">
+        ${icon(on ? 'editNote' : 'lock')}
+        <span class="title-small grow">${t.t('editing_switch')}</span>
+        <md-switch data-testid="editing-switch" ?selected=${on} aria-label=${t.t('editing_switch')}
+          @change=${(e: Event) => (this.editing = (e.target as HTMLInputElement & { selected: boolean }).selected)}></md-switch>
+      </label>
+      <p class="body-small on-surface-variant" data-testid="editing-state">
+        ${on ? t.t('editing_on') : t.t('editing_off')} ${this.demo ? t.t('editing_demo') : ''}
+      </p>
+      <div class="snapshot">
+        <md-text-button data-testid="snapshot" has-icon @click=${() => this.store && downloadSnapshot(this.store.documentsHeld)}
+          >${icon('download', 'icon')}${t.t('snapshot_button')}</md-text-button
+        >
+        <span class="body-small on-surface-variant">${t.t('snapshot_note')}</span>
+      </div>
+    </section>`;
   }
 
   /** Today, as the screens see it: fixed in the demo, so it always shows the same months. */
@@ -209,6 +258,11 @@ export class App extends LitElement {
           .mode=${this.mode}
           .showModeTag=${showModeTag}
           .today=${this.today()}
+          .editing=${this.editing}
+          @new-shift=${(e: CustomEvent<EpochDay>) => this.editor<ShiftEditor>('st-shift-editor')?.openNew(e.detail)}
+          @edit-shift=${(e: CustomEvent<string>) => this.editor<ShiftEditor>('st-shift-editor')?.openExisting(e.detail)}
+          @new-bonus=${(e: CustomEvent<NewBonusRequest>) => this.editor<BonusEditor>('st-bonus-editor')?.openNew(e.detail.date, e.detail.wholeMonth)}
+          @edit-bonus=${(e: CustomEvent<string>) => this.editor<BonusEditor>('st-bonus-editor')?.openExisting(e.detail)}
         ></st-calendar>`;
       case 'summary':
         return html`<st-summary
@@ -218,21 +272,61 @@ export class App extends LitElement {
           .mode=${this.mode}
           .showModeTag=${showModeTag}
           .today=${this.today()}
+          .editing=${this.editing}
           @mode-change=${(e: CustomEvent<EarningsMode>) => (this.mode = e.detail)}
+          @new-bonus=${(e: CustomEvent<NewBonusRequest>) => this.editor<BonusEditor>('st-bonus-editor')?.openNew(e.detail.date, e.detail.wholeMonth)}
+          @edit-bonus=${(e: CustomEvent<string>) => this.editor<BonusEditor>('st-bonus-editor')?.openExisting(e.detail)}
+          @new-payout=${(e: CustomEvent<{ jobId: string; month: YearMonth }>) => this.editor<PayoutEditor>('st-payout-editor')?.openNew(e.detail.jobId, e.detail.month)}
+          @edit-payout=${(e: CustomEvent<string>) => this.editor<PayoutEditor>('st-payout-editor')?.openExisting(e.detail)}
         ></st-summary>`;
       case 'jobs':
         return html`<st-jobs data-testid="screen-jobs" .strings=${this.strings} .view=${s.view} .today=${this.today()}></st-jobs>`;
     }
   }
 
+  private editor<T extends Element>(tag: string): T | null {
+    return this.editing ? (this.querySelector(tag) as T | null) : null;
+  }
+
+  /** An editor closed after a write: say so, and offer Undo after a delete. */
+  private onEditorClosed(done: EditorDone | undefined) {
+    if (!done) return;
+    const snackbar = this.querySelector<Snackbar>('st-snackbar');
+    const undo = done.undo;
+    snackbar?.show(
+      done.message,
+      undo && this.store
+        ? {
+            label: this.strings.t('undo'),
+            run: () => {
+              void this.store!.write(undo).then(
+                (result) => snackbar.show(result.ok ? this.strings.t('restored') : this.strings.t('undo_failed', this.strings.t('conflict_changed'))),
+                (error) => snackbar.show(this.strings.t('undo_failed', String((error as { code?: string }).code ?? error))),
+              );
+            },
+          }
+        : null,
+    );
+  }
+
+  private editors() {
+    if (!this.editing || this.snapshot?.phase.kind !== 'ready') return nothing;
+    const showModeTag = this.snapshot.view.jobs.some(hasDeductions);
+    return html`<st-shift-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-shift-editor>
+      <st-bonus-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-bonus-editor>
+      <st-payout-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-payout-editor>`;
+  }
+
   protected override render() {
     return html`<st-shell
-      .strings=${this.strings}
-      .route=${this.route}
-      .banner=${this.banner()}
-      .actions=${this.actions()}
-      .content=${this.content()}
-    ></st-shell>`;
+        .strings=${this.strings}
+        .route=${this.route}
+        .banner=${this.banner()}
+        .actions=${this.actions()}
+        .content=${this.content()}
+      ></st-shell>
+      <div @editor-closed=${(e: CustomEvent<EditorDone | undefined>) => this.onEditorClosed(e.detail)}>${this.editors()}</div>
+      <st-snackbar></st-snackbar>`;
   }
 }
 

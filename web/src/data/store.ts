@@ -1,14 +1,18 @@
 import { applyChanges, newestOf, sinceFor, type Changes } from './changes';
 import { emptyDocuments, type CloudDocuments } from './documents-types';
-import { readDocuments } from './documents';
+import { isUsable, readDocuments, readRecord } from './documents';
 import { EMPTY_VIEW, type DataView } from '../domain/screens';
+import type { EditableCollection, EditableRecord } from '../edit/documents';
+import type { Plan, WriteOp } from '../edit/plan';
 
 /*
  * The signed-in user's data for the screens, and when it is read: once on opening, again on Refresh and when the
  * tab comes back into view (at most once a minute). There is no live listener, and nothing is kept anywhere but in
  * this page's memory: signing out drops it all and reloads the page.
  *
- * READ-ONLY: a CloudBackend can only read. The site never writes to the cloud (test/unit/no-writes.test.ts).
+ * Writes (stage B) go through [DataStore.write] to the backend's single write path (data/writes.ts for Firebase):
+ * one shift, bonus or payout at a time, never a job. The written document is put in place at once, so the screens
+ * show it without reloading; the next read brings the server's own copy.
  */
 
 export interface CloudUser {
@@ -28,6 +32,8 @@ export interface CloudBackend {
   readEpoch(uid: string): Promise<string | null>;
   /** Every document of the four collections with a server time at or after [since] (all of them when null). */
   changesSince(uid: string, since: number | null): Promise<Changes>;
+  /** Writes one shift, bonus or payout (data/writes.ts): refused, not forced, when the server's version moved on. */
+  write(uid: string, op: WriteOp, liveJobIds: ReadonlySet<string>): Promise<Plan>;
 }
 
 export type LoadError = { kind: 'access-denied' } | { kind: 'offline' } | { kind: 'other'; detail: string };
@@ -163,6 +169,38 @@ export class DataStore {
     if (this.snapshot.phase.kind !== 'ready' && this.snapshot.phase.kind !== 'failed') return;
     if (this.now() - this.lastStarted < FOCUS_REFRESH_MS) return;
     void this.refresh();
+  }
+
+  /** A shift, bonus or payout as held now (with its updatedAt: the version an editor opens from). */
+  record(collection: EditableCollection, id: string): EditableRecord | null {
+    const data = this.documents[collection][id];
+    if (!data) return null;
+    const record = readRecord(collection, id, data);
+    return record && record.kind !== 'job' && isUsable(record) ? record : null;
+  }
+
+  /**
+   * Writes one record and shows it at once. A refusal ("changed" on another device, ...) changes nothing here; the
+   * editor says so and offers a reload.
+   */
+  async write(op: WriteOp): Promise<Plan> {
+    const backend = this.backend;
+    const user = this.snapshot.user;
+    if (!backend || !user || this.snapshot.phase.kind !== 'ready') throw new Error('not ready to write');
+    const generation = this.generation;
+    const live = new Set(this.snapshot.view.jobs.map((j) => j.id));
+    const result = await backend.write(user.uid, op, live);
+    if (result.ok && generation === this.generation) {
+      this.documents = applyChanges(this.documents, [{ collection: op.collection, id: op.id, data: result.fields, serverTime: null }]);
+      const { view, skipped } = readDocuments(this.documents);
+      this.set({ view, skipped });
+    }
+    return result;
+  }
+
+  /** Every document held, as read (the cloud snapshot download). */
+  get documentsHeld(): CloudDocuments {
+    return this.documents;
   }
 
   /**

@@ -1,0 +1,107 @@
+{
+    "note": "Written by app/src/test/.../web/WebWritesCompatTest.kt (UPDATE_WEB_FIXTURES=1): records saved on a phone, as the app uploads them. Read by web/test/unit/app-writes.test.ts.",
+    "documents": {
+        "shifts": {
+            "cba4964a-cde3-41e9-8b70-2569fcf21ca6": {
+                "v": 1,
+                "updatedAt": 1794875671850,
+                "deleted": false,
+                "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+                "dateEpochDay": 20777,
+                "startMinute": 540,
+                "endMinute": 1020,
+                "unpaidBreakMinutes": 30,
+                "hourlyRateGrosze": 3150,
+                "note": "Z telefonu",
+                "externalUid": null,
+                "secondRate": null
+            },
+            "b6ca5f0b-fdce-40c6-92d0-4b46a25c07ee": {
+                "v": 1,
+                "updatedAt": 1794875671853,
+                "deleted": false,
+                "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+                "dateEpochDay": 20778,
+                "startMinute": 1320,
+                "endMinute": 360,
+                "unpaidBreakMinutes": 30,
+                "hourlyRateGrosze": 3300,
+                "note": null,
+                "externalUid": null,
+                "secondRate": {
+                    "rateGrosze": 3700,
+                    "fromMinute": 1380,
+                    "toMinute": 360
+                }
+            },
+            "6998088a-8d8e-4039-96a3-aa436f805a0a": {
+                "v": 1,
+                "updatedAt": 1794875671858,
+                "deleted": true,
+                "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+                "dateEpochDay": 20779,
+                "startMinute": 600,
+                "endMinute": 840,
+                "unpaidBreakMinutes": 0,
+                "hourlyRateGrosze": 3150,
+                "note": null,
+                "externalUid": null,
+                "secondRate": null
+            }
+        },
+        "bonuses": {
+            "d94afb15-2dbd-47fe-b4f6-02e6e2e652f4": {
+                "v": 1,
+                "updatedAt": 1794875671862,
+                "deleted": false,
+                "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+                "dateEpochDay": 20777,
+                "amountGrosze": 4200,
+                "note": "Napiwki",
+                "wholeMonth": false
+            },
+            "1b93cf10-8f34-463c-b914-677930c86263": {
+                "v": 1,
+                "updatedAt": 1794875671864,
+                "deleted": false,
+                "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+                "dateEpochDay": 20758,
+                "amountGrosze": 30000,
+                "note": null,
+                "wholeMonth": true
+            }
+        },
+        "payouts": {
+            "b16e81d9-cd05-45c1-b404-64a50ab8e770": {
+                "v": 1,
+                "updatedAt": 1794875671866,
+                "deleted": false,
+                "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+                "month": 202611,
+                "amountMinor": 190000,
+                "note": "Przelew",
+                "receivedEpochDay": 20797
+            },
+            "17f129a1-0b09-40fa-a3e8-86658ecca8b3": {
+                "v": 1,
+                "updatedAt": 1794875671868,
+                "deleted": false,
+                "jobId": "0b6f0c0e-7a5d-4c43-9f0d-2d5ad1e0b7a1",
+                "month": 202610,
+                "amountMinor": 12345,
+                "note": null,
+                "receivedEpochDay": null
+            },
+            "b54eeccf-c5a9-402e-abb1-af89b97a91fc": {
+                "v": 1,
+                "updatedAt": 1794875671872,
+                "deleted": true,
+                "jobId": "0b6f0c0e-7a5d-4c43-9f0d-2d5ad1e0b7a1",
+                "month": 202609,
+                "amountMinor": 500,
+                "note": null,
+                "receivedEpochDay": null
+            }
+        }
+    }
+}

@@ -1,0 +1,299 @@
+{
+ "note": "Written by web/test/unit/write-fixtures.test.ts from the web’s document builders (UPDATE_WEB_WRITES=1). Read by app/src/test/.../web/WebWritesCompatTest.kt.",
+ "jobs": {
+  "c49f2c0c-b280-4492-8476-1ad7e501e5da": {
+   "v": 1,
+   "updatedAt": 1790000000000,
+   "deleted": false,
+   "name": "Kawiarnia „Bajka”",
+   "hourlyRateGrosze": 3150,
+   "color": -12345273,
+   "secondRate": null,
+   "currency": "PLN",
+   "payHistory": []
+  },
+  "fe49c731-2814-47c8-8c10-5f9ad3994e8e": {
+   "v": 1,
+   "updatedAt": 1790000000000,
+   "deleted": false,
+   "name": "Magazyn nocny",
+   "hourlyRateGrosze": 3300,
+   "color": -14575885,
+   "secondRate": {
+    "rateGrosze": 3700,
+    "fromMinute": 1380,
+    "toMinute": 360
+   },
+   "currency": "PLN",
+   "payHistory": [
+    {
+     "fromMonth": 202609,
+     "payType": "HOURLY",
+     "monthlyAmountMinor": 0,
+     "deductionBp": 1371
+    }
+   ]
+  },
+  "0b6f0c0e-7a5d-4c43-9f0d-2d5ad1e0b7a1": {
+   "v": 1,
+   "updatedAt": 1790000000000,
+   "deleted": false,
+   "name": "Переклади",
+   "hourlyRateGrosze": 1800,
+   "color": -26624,
+   "secondRate": null,
+   "currency": "EUR",
+   "payHistory": []
+  }
+ },
+ "appDocuments": {
+  "shifts/a1000000-0000-4000-8000-000000000003": {
+   "v": 1,
+   "updatedAt": 1794000000000,
+   "deleted": false,
+   "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+   "dateEpochDay": 20759,
+   "startMinute": 600,
+   "endMinute": 900,
+   "unpaidBreakMinutes": 0,
+   "hourlyRateGrosze": 3000,
+   "note": null,
+   "externalUid": "ics-20261102-1",
+   "secondRate": null
+  },
+  "bonuses/b2000000-0000-4000-8000-000000000003": {
+   "v": 1,
+   "updatedAt": 1794000000000,
+   "deleted": false,
+   "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+   "dateEpochDay": 20760,
+   "amountGrosze": 2500,
+   "note": "Stara"
+  }
+ },
+ "steps": [
+  {
+   "name": "shift: created on the web",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "startMinute": 540,
+    "endMinute": 1020,
+    "unpaidBreakMinutes": 30,
+    "hourlyRateGrosze": 3150,
+    "note": "Rano",
+    "externalUid": null,
+    "secondRate": null
+   }
+  },
+  {
+   "name": "shift: edited on the web",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000001,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "startMinute": 540,
+    "endMinute": 1080,
+    "unpaidBreakMinutes": 30,
+    "hourlyRateGrosze": 3150,
+    "note": null,
+    "externalUid": null,
+    "secondRate": null
+   }
+  },
+  {
+   "name": "shift: deleted on the web (tombstone)",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000002,
+    "deleted": true,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "startMinute": 540,
+    "endMinute": 1080,
+    "unpaidBreakMinutes": 30,
+    "hourlyRateGrosze": 3150,
+    "note": null,
+    "externalUid": null,
+    "secondRate": null
+   }
+  },
+  {
+   "name": "shift: undo of the delete",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000003,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "startMinute": 540,
+    "endMinute": 1080,
+    "unpaidBreakMinutes": 30,
+    "hourlyRateGrosze": 3150,
+    "note": null,
+    "externalUid": null,
+    "secondRate": null
+   }
+  },
+  {
+   "name": "night shift with a second rate, ends the next day",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000002",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+    "dateEpochDay": 20770,
+    "startMinute": 1320,
+    "endMinute": 360,
+    "unpaidBreakMinutes": 30,
+    "hourlyRateGrosze": 3300,
+    "note": null,
+    "externalUid": null,
+    "secondRate": {
+     "rateGrosze": 3700,
+     "fromMinute": 1380,
+     "toMinute": 360
+    }
+   }
+  },
+  {
+   "name": "an imported shift edited on the web keeps its externalUid",
+   "collection": "shifts",
+   "id": "a1000000-0000-4000-8000-000000000003",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20759,
+    "startMinute": 600,
+    "endMinute": 960,
+    "unpaidBreakMinutes": 15,
+    "hourlyRateGrosze": 3000,
+    "note": "Dłużej",
+    "externalUid": "ics-20261102-1",
+    "secondRate": null
+   }
+  },
+  {
+   "name": "bonus on a day",
+   "collection": "bonuses",
+   "id": "b2000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "amountGrosze": 3800,
+    "note": "Napiwki",
+    "wholeMonth": false
+   }
+  },
+  {
+   "name": "bonus for the whole month",
+   "collection": "bonuses",
+   "id": "b2000000-0000-4000-8000-000000000002",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+    "dateEpochDay": 20758,
+    "amountGrosze": 30000,
+    "note": "Premia",
+    "wholeMonth": true
+   }
+  },
+  {
+   "name": "old-shape bonus edited on the web gets wholeMonth",
+   "collection": "bonuses",
+   "id": "b2000000-0000-4000-8000-000000000003",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20760,
+    "amountGrosze": 2600,
+    "note": "Stara",
+    "wholeMonth": false
+   }
+  },
+  {
+   "name": "bonus: deleted on the web (tombstone)",
+   "collection": "bonuses",
+   "id": "b2000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000001,
+    "deleted": true,
+    "jobId": "c49f2c0c-b280-4492-8476-1ad7e501e5da",
+    "dateEpochDay": 20770,
+    "amountGrosze": 3800,
+    "note": "Napiwki",
+    "wholeMonth": false
+   }
+  },
+  {
+   "name": "payout with a received date",
+   "collection": "payouts",
+   "id": "c3000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+    "month": 202611,
+    "amountMinor": 190000,
+    "note": "Przelew",
+    "receivedEpochDay": 20797
+   }
+  },
+  {
+   "name": "payout in euro, no date, no note",
+   "collection": "payouts",
+   "id": "c3000000-0000-4000-8000-000000000002",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000000,
+    "deleted": false,
+    "jobId": "0b6f0c0e-7a5d-4c43-9f0d-2d5ad1e0b7a1",
+    "month": 202610,
+    "amountMinor": 12345,
+    "note": null,
+    "receivedEpochDay": null
+   }
+  },
+  {
+   "name": "payout: edited on the web",
+   "collection": "payouts",
+   "id": "c3000000-0000-4000-8000-000000000001",
+   "fields": {
+    "v": 1,
+    "updatedAt": 1795000000001,
+    "deleted": false,
+    "jobId": "fe49c731-2814-47c8-8c10-5f9ad3994e8e",
+    "month": 202611,
+    "amountMinor": 195000,
+    "note": null,
+    "receivedEpochDay": 20798
+   }
+  }
+ ]
+}

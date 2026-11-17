@@ -34,12 +34,25 @@ export function sinceFor(cursor: number | null): number | null {
 /**
  * [documents] with [changes] in place: a known document is replaced where it stands, a new one goes last (the
  * order the phone would have stored them in). Returns new maps; the old ones stay as they were.
+ *
+ * A change older than the document held (by updatedAt, the app's last-write-wins clock) is ignored: a read that
+ * started before this page wrote a document can come back after the write, with the version before it.
  */
 export function applyChanges(documents: CloudDocuments, changes: readonly DocumentChange[]): CloudDocuments {
   const next = emptyDocuments();
   for (const name of Object.keys(next) as CollectionName[]) next[name] = { ...documents[name] };
-  for (const change of changes) next[change.collection][change.id] = change.data;
+  for (const change of changes) {
+    const held = next[change.collection][change.id];
+    if (held && isOlder(change.data, held)) continue;
+    next[change.collection][change.id] = change.data;
+  }
   return next;
+}
+
+function isOlder(incoming: RawDocument, held: RawDocument): boolean {
+  const a = incoming['updatedAt'];
+  const b = held['updatedAt'];
+  return typeof a === 'number' && typeof b === 'number' && a < b;
 }
 
 export function newestOf(cursor: number | null, changes: Changes): number | null {

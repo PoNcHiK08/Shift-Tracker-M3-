@@ -1,11 +1,12 @@
-# Web version (stage A: view only)
+# Web version
 
-`web/` is a read-only website for the data the app syncs to the cloud: **Calendar**, **Summary** and **Jobs**,
-with the same look (Material 3, the app's colours, light and dark) and the same numbers as the phone. It is in
-Ukrainian or English, from the browser's language.
+`web/` is a website for the data the app syncs to the cloud: **Calendar**, **Summary** and **Jobs**, with the same
+look (Material 3, the app's colours, light and dark) and the same numbers as the phone. It is in Ukrainian or
+English, from the browser's language.
 
-- **View only.** It never writes to the cloud: there is no write call anywhere in `web/src` (a test fails the
-  build if one appears). Shifts, bonuses, jobs and received pay are changed in the app.
+- **View first, edit when you choose.** Every visit starts read-only. **Enable editing** (above the screens) lets you
+  add, change and delete **shifts, bonuses and received payments** until you close the tab. Jobs, rates and pay
+  settings are only changed in the app. See [Editing](#editing).
 - **Same numbers.** The calculations are ported from the app and checked against figures the app's own Kotlin code
   writes (`web/test/fixtures`, see [Updating the golden figures](#updating-the-golden-figures)).
 - **Nothing kept in the browser.** The sign-in lasts while the tab is open (session storage) and the data lives
@@ -13,7 +14,7 @@ Ukrainian or English, from the browser's language.
   day it was used (a date and the browser name, no account data) in an IndexedDB database of its own; sign-out
   deletes it.
 - **Demo:** add `?demo` to the address (e.g. `https://your-project.web.app/?demo`). Made-up data, no sign-in, no
-  network call.
+  network call. Editing works there too, but the changes stay on that page only.
 
 The steps below are for Windows (PowerShell). On macOS or Linux the commands are the same, except `copy` →
 `cp` and `notepad` → any editor.
@@ -115,9 +116,22 @@ Run it **in `web\`**: the site's Hosting settings are `web\firebase.json`, which
 > phone would be refused until you publish your real rules again (README → Security rules). If that happens,
 > nothing is lost: republish the rules with your address in the console.
 
-To publish a newer version: `git pull`, then step 4 again (`npm ci`, `npm run build`, `firebase deploy --only
-hosting --project PROJECT_ID`). Firebase keeps earlier versions: **Hosting** → **Release history** → ⋮ →
-**Rollback**.
+### Publishing a newer version (redeploy)
+
+Whenever the site changes (for example after editing was added), in PowerShell:
+
+```powershell
+cd $HOME\Shift-Tracker-web      # your clone
+git checkout claude/link-review-1f6y6c
+git pull
+cd web
+npm ci                           # the dependencies may have changed
+npm run build
+firebase deploy --only hosting --project PROJECT_ID
+```
+
+Your `web\.env.local` stays as it is (git doesn't touch it). Open the site again (Ctrl+F5 if the old version still
+shows). Firebase keeps earlier versions: **Hosting** → **Release history** → ⋮ → **Rollback**.
 
 ### Trying it on your computer first
 
@@ -158,6 +172,43 @@ using your key against your project's quotas.
 
 The `.web.app` address keeps working alongside.
 
+## Editing
+
+**What can be edited:** shifts, bonuses (on a day or for the whole month) and received payments: add, change,
+delete, and Undo a delete. **Not here:** jobs, rates, pay settings, bulk changes ("apply the current rate to all
+shifts"), imports and backups; those stay in the app.
+
+**Turning it on.** Every visit starts with editing off: nothing on the screens can change anything. Above the
+screens, **Enable editing** turns it on for this tab until you close or reload it; it is never remembered. Next to
+it, **Download cloud snapshot** saves a JSON copy of every document the site has read. Save one before your first
+edits: it is a copy for safekeeping, **not a backup the app can import** (the app's own backups are in the app:
+Settings → Data).
+
+**Where:**
+- Calendar → a day: **Add shift**, **Bonus**, or tap a shift or bonus to change or delete it.
+- Calendar → **Month bonuses** row: open a bonus, or **Add a bonus for the month**.
+- Summary → Month: the month bonuses (open, or add one) and **Received pay** (**Add payment** under a job, or tap a
+  payment).
+
+**How it stays in step with the phone:**
+- The site writes each record exactly as the app writes it (same fields, same limits, same rules for night shifts,
+  breaks, amounts, whole-month bonuses), into the same cloud documents. The phone takes the change on its next sync
+  (**Sync now**, opening the app, or its own changes), and doesn't send it back.
+- **Nothing is overwritten blindly.** Saving checks the cloud's current version first. If the record changed on
+  another device (or in another tab) since you opened it, the site doesn't save and says "This changed on another
+  device. Reload to see the latest version." **Reload** shows the latest data; open the record again.
+- **Deleting** leaves a hidden marker (as the app does), so the deletion reaches the phone too; **Undo** in the
+  message at the bottom puts the record back. Undo only works while nobody changed the record since.
+- **Unsaved changes:** closing a form (×, Cancel, Esc) or the tab with changes asks first.
+- **Your computer's clock** counts as the time of a change, as the phone's does. The cloud refuses a change from a
+  clock more than 10 minutes ahead; the site says so. Set the date and time automatically.
+- The Firestore rules don't change for this: they already allow exactly these writes, and only for your account.
+
+**If a save is refused:**
+- "This changed on another device": press **Reload**, open the record again, redo your change.
+- "The cloud refused the change": check the computer's date and time, and that the published rules have your address.
+- "This record was saved by a newer version of the app": update the app; change it there.
+
 ## If something goes wrong
 
 - **"This site was built without its Firebase settings"**: `web\.env.local` is missing or has an empty value
@@ -195,10 +246,12 @@ the site, compare:
   which the cloud doesn't record).
 - **Same-day order**: two shifts that start at the same minute, or two bonuses on one day, can be listed in a
   different order than on the phone. Totals are the same.
+- **Same-moment edits**: when the phone and the site change the same record before either syncs, the change made
+  later (by each device's clock) wins whole, as between two phones.
 - **Not live**: the site reads when opened, on ↻ and when you come back to the tab (at most once a minute). Each
   read after the first fetches only what changed (one Firestore read per changed record, plus one per
   collection).
-- **Firestore "lite"**: the site uses Firebase's read-only-friendly Firestore build, which has no cache and no
+- **Firestore "lite"**: the site uses Firebase's lightweight Firestore build, which has no cache and no
   offline storage at all (stricter than an in-memory cache).
 
 ## For developers
@@ -207,14 +260,21 @@ the site, compare:
 cd web
 npx playwright install chromium   # once: the browser the screen tests run in
 npm test                          # unit tests (Node) and screen tests (Chromium)
+npm run test:emulator             # the write layer on the Firestore emulator with firebase\firestore.rules (needs Java 21)
 npm run build
 npm run screenshots               # demo screenshots into web\screenshots (ignored by git); needs a build first
 npm run strings                   # copy the app's texts from app\src\main\res after they change
 ```
 
 - Layout: `src/domain` (calculations ported from the app), `src/data` (reading and checking the cloud documents,
-  sign-in; `cloud.ts` is the only file that imports Firebase), `src/screens`, `src/ui`, `src/i18n`.
-- CI: `.github/workflows/web-ci.yml` installs, tests and builds `web/` (no deploy, no secrets).
+  sign-in; `cloud.ts` and `writes.ts` are the only files that import Firebase; `writes.ts` is the only place that
+  writes), `src/edit` (the documents the site writes and the editors' rules), `src/editors`, `src/screens`, `src/ui`,
+  `src/i18n`.
+- Writes and the app: `app/src/test/.../web/WebWritesCompatTest.kt` runs what the site writes through the app's own
+  sync engine (and the reverse); its fixtures are `web/test/fixtures/writes/` (`UPDATE_WEB_WRITES=1 npm test` for the
+  web's, `UPDATE_WEB_FIXTURES=1` on the Kotlin test for the app's).
+- CI: `.github/workflows/web-ci.yml` installs, tests (including the emulator tests) and builds `web/` (no deploy,
+  no secrets).
 
 ### Updating the golden figures
 

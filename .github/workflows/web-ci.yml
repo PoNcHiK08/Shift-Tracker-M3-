@@ -1,19 +1,22 @@
 name: Web (tests and build)
 
-# The read-only web version in web/: installs, tests and builds it. No deploy, no secrets, no Firebase config:
-# the tests run on the demo data and the golden fixtures exported from the app's own Kotlin calculations.
+# The web version in web/: installs, tests and builds it. No deploy, no secrets, no Firebase config: the tests run
+# on the demo data and the golden fixtures exported from the app's own Kotlin calculations, and the write layer runs
+# against the Firestore emulator with the repository's own firebase/firestore.rules (a copy with a test address).
 on:
   push:
     paths:
       - 'web/**'
       - 'app/src/main/res/values/strings.xml'
       - 'app/src/main/res/values-en/strings.xml'
+      - 'firebase/firestore.rules'
       - '.github/workflows/web-ci.yml'
   pull_request:
     paths:
       - 'web/**'
       - 'app/src/main/res/values/strings.xml'
       - 'app/src/main/res/values-en/strings.xml'
+      - 'firebase/firestore.rules'
       - '.github/workflows/web-ci.yml'
   workflow_dispatch:
 
@@ -48,6 +51,14 @@ jobs:
 
       - name: Tests (golden fixtures, parsing, screens in demo mode)
         run: npm test
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Writes against the Firestore emulator and firestore.rules
+        run: npm run test:emulator
 
       - name: Build
         run: npm run build

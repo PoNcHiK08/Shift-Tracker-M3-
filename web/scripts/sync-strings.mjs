@@ -21,6 +21,17 @@ export const KEYS = [
   'bonus', 'bonus_for_job', 'bonus_for_whole_month', 'break_short', 'overnight_shift', 'fixed_salary', 'hours_value',
   'jobs_title', 'no_jobs_title', 'fixed_salary_per_month', 'second_rate_summary', 'deduction_value',
   'previous_month', 'next_month', 'previous_period', 'next_period', 'today', 'current_period', 'nav_calendar', 'nav_summary', 'currency',
+  // Editors (stage B).
+  'save', 'cancel', 'delete', 'undo', 'close', 'earnings', 'paid_hours', 'minutes_short', 'minutes_suffix', 'add_shift',
+  'new_shift', 'edit_shift', 'job', 'date', 'start_time', 'end_time', 'ends_next_day', 'unpaid_break', 'no_break',
+  'break_minutes', 'note_optional', 'rate_used', 'rate_changed_hint', 'rate_line_base', 'rate_line_second', 'break_split_hint',
+  'error_job_required', 'error_break_too_long', 'error_amount_invalid', 'delete_shift', 'delete_shift_title',
+  'delete_shift_message', 'shift_saved', 'shift_deleted', 'fixed_salary_shift_hint', 'new_bonus', 'edit_bonus', 'delete_bonus',
+  'delete_bonus_title', 'bonus_saved', 'bonus_deleted', 'bonus_amount', 'bonus_note', 'bonus_hint', 'bonus_hint_month',
+  'bonus_kind_day', 'bonus_kind_month', 'bonus_month', 'add_month_bonus', 'received_pay_add', 'received_pay_new',
+  'received_pay_edit', 'received_pay_amount', 'received_pay_month', 'received_pay_month_hint', 'received_pay_received_on',
+  'received_pay_received_on_clear', 'received_pay_note', 'received_pay_saved', 'received_pay_deleted', 'received_pay_sheet_title',
+  'text_length', 'text_too_long', 'pay_type',
 ];
 export const PLURALS = ['shift_count', 'received_pay_count'];
 

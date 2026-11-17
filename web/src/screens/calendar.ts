@@ -11,6 +11,12 @@ import type { Strings } from '../i18n/i18n';
 import { icon } from '../ui/icons';
 import { amounts, cssColor, decimalHours, fullDate, money, monthYear, onColor, time, weekdayNames } from '../ui/format';
 
+/** A new bonus: on [date], or for the whole month of [date]. */
+export interface NewBonusRequest {
+  date: EpochDay;
+  wholeMonth: boolean;
+}
+
 /** "Gross" / "Net" next to an earnings figure, only when some job has deductions (EarningsDisplay.kt). */
 export function modeTag(strings: Strings, mode: EarningsMode, show: boolean, extraClass = ''): TemplateResult | typeof nothing {
   if (!show) return nothing;
@@ -34,12 +40,23 @@ export function jobAvatar(name: string, color: number): TemplateResult {
 }
 
 /** A shift as a card (EntryCards.kt ShiftCard), read-only. */
-export function shiftCard(strings: Strings, item: ShiftWithJob, mode: EarningsMode, position: string): TemplateResult {
+/** [onOpen]: while editing is on, the card opens the shift's editor (otherwise it is plain text). */
+export function shiftCard(strings: Strings, item: ShiftWithJob, mode: EarningsMode, position: string, onOpen?: () => void): TemplateResult {
   const { shift, job } = item;
   const details = [`${time(shift.start)}–${time(shift.end)}`];
   if (shift.breakMinutes > 0) details.push(strings.t('break_short', shift.breakMinutes));
   const paid = shiftPaidMinutes(shift);
-  return html`<li class="entry ${position}" data-testid="shift-card">
+  return html`<li
+    class="entry ${position} ${onOpen ? 'openable' : ''}"
+    data-testid="shift-card"
+    data-id=${shift.id}
+    role=${onOpen ? 'button' : nothing}
+    tabindex=${onOpen ? 0 : nothing}
+    aria-label=${onOpen ? `${strings.t('edit_shift')}: ${job.name}, ${time(shift.start)}–${time(shift.end)}` : nothing}
+    @click=${onOpen ?? nothing}
+    @keydown=${onOpen ? (e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen()) : nothing}
+  >
+    ${onOpen ? html`<md-ripple></md-ripple><md-focus-ring></md-focus-ring>` : nothing}
     ${jobAvatar(job.name, job.color)}
     <div class="entry-text">
       <div class="title-medium ellipsis">${job.name}</div>
@@ -61,9 +78,19 @@ export function shiftCard(strings: Strings, item: ShiftWithJob, mode: EarningsMo
 }
 
 /** A bonus as a card (EntryCards.kt BonusCard), read-only. */
-export function bonusCard(strings: Strings, item: BonusWithJob, mode: EarningsMode, position: string): TemplateResult {
+export function bonusCard(strings: Strings, item: BonusWithJob, mode: EarningsMode, position: string, onOpen?: () => void): TemplateResult {
   const { bonus, job } = item;
-  return html`<li class="entry bonus ${position}" data-testid="bonus-card">
+  return html`<li
+    class="entry bonus ${position} ${onOpen ? 'openable' : ''}"
+    data-testid="bonus-card"
+    data-id=${bonus.id}
+    role=${onOpen ? 'button' : nothing}
+    tabindex=${onOpen ? 0 : nothing}
+    aria-label=${onOpen ? `${strings.t('edit_bonus')}: ${strings.t('bonus_for_job', job.name)}` : nothing}
+    @click=${onOpen ?? nothing}
+    @keydown=${onOpen ? (e: KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onOpen()) : nothing}
+  >
+    ${onOpen ? html`<md-ripple></md-ripple><md-focus-ring></md-focus-ring>` : nothing}
     <span class="avatar bonus-avatar" aria-hidden="true">${icon('redeem')}</span>
     <div class="entry-text">
       <div class="title-medium ellipsis">${strings.t('bonus_for_job', job.name)}</div>
@@ -93,6 +120,8 @@ export class CalendarScreen extends LitElement {
   @property() mode: EarningsMode = 'GROSS';
   @property({ type: Boolean }) showModeTag = false;
   @property({ type: Number }) today: EpochDay = 0;
+  /** Editing is on for this session: the day panel offers Add and its cards open their editors. */
+  @property({ type: Boolean }) editing = false;
   @state() private month: YearMonth | null = null;
   @state() private selected: EpochDay | null = null;
   @state() private bonusesOpen = false;
@@ -143,6 +172,11 @@ export class CalendarScreen extends LitElement {
     this.selected = next;
     if (monthOf(next) !== this.shownMonth) this.month = monthOf(next);
     void this.updateComplete.then(() => this.querySelector<HTMLButtonElement>('.day[aria-selected="true"]')?.focus());
+  }
+
+  /** Asks the app to open an editor ('new-shift' with a date; 'edit-shift' / 'edit-bonus' with a sync id). */
+  private request(kind: string, detail: string | EpochDay | NewBonusRequest) {
+    this.dispatchEvent(new CustomEvent(kind, { detail, bubbles: true, composed: true }));
   }
 
   private toolbar() {
@@ -206,8 +240,14 @@ export class CalendarScreen extends LitElement {
       </button>
       ${this.bonusesOpen
         ? html`<ul class="entries" data-testid="month-bonuses-list" aria-label=${t.t('month_bonuses_sheet_title', monthYear(this.shownMonth, t.locale))}>
-            ${items.map((b, i) => bonusCard(t, b, this.mode, segment(i, items.length)))}
-          </ul>`
+            ${items.map((b, i) => bonusCard(t, b, this.mode, segment(i, items.length), this.editing ? () => this.request('edit-bonus', b.bonus.id) : undefined))}
+          </ul>
+          ${this.editing
+            ? html`<md-filled-tonal-button class="add-month-bonus" data-testid="add-month-bonus" has-icon
+                @click=${() => this.request('new-bonus', { date: firstDay(this.shownMonth), wholeMonth: true })}
+                >${icon('add', 'icon')}${t.t('add_month_bonus')}</md-filled-tonal-button
+              >`
+            : nothing}`
         : nothing}
     </div>`;
   }
@@ -297,9 +337,17 @@ export class CalendarScreen extends LitElement {
       ${count === 0
         ? html`<p class="day-free body-medium" data-testid="day-free">${icon('eventAvailable')}${t.t('day_free')}</p>`
         : html`<ul class="entries">
-            ${shifts.map((s, i) => shiftCard(t, s, this.mode, segment(i, count)))}
-            ${bonuses.map((b, i) => bonusCard(t, b, this.mode, segment(shifts.length + i, count)))}
+            ${shifts.map((s, i) => shiftCard(t, s, this.mode, segment(i, count), this.editing ? () => this.request('edit-shift', s.shift.id) : undefined))}
+            ${bonuses.map((b, i) => bonusCard(t, b, this.mode, segment(shifts.length + i, count), this.editing ? () => this.request('edit-bonus', b.bonus.id) : undefined))}
           </ul>`}
+      ${this.editing
+        ? html`<div class="day-actions">
+            <md-filled-button data-testid="add-shift" has-icon @click=${() => this.request('new-shift', day)}>${icon('add', 'icon')}${t.t('add_shift')}</md-filled-button>
+            <md-filled-tonal-button data-testid="add-bonus" has-icon @click=${() => this.request('new-bonus', { date: day, wholeMonth: false })}
+              >${icon('redeem', 'icon')}${t.t('bonus')}</md-filled-tonal-button
+            >
+          </div>`
+        : nothing}
     </section>`;
   }
 
