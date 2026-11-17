@@ -42,8 +42,9 @@ dialog.editor::backdrop { background: rgb(0 0 0 / 0.32); }
 .danger { --md-text-button-label-text-color: var(--md-sys-color-error); --md-text-button-icon-color: var(--md-sys-color-error); }
 
 .field-label { display: block; margin-top: 8px; color: var(--md-sys-color-on-surface-variant); }
-.field { display: flex; flex: 1; flex-direction: column; gap: 4px; min-width: 0; }
+.field { display: flex; flex: none; flex-direction: column; gap: 4px; min-width: 0; }
 .field-row { display: flex; gap: 12px; }
+.field-row .field { flex: 1; }
 .field-support { color: var(--md-sys-color-on-surface-variant); font-size: 12px; line-height: 16px; }
 .input-row {
   display: flex;
@@ -186,3 +187,37 @@ st-snackbar {
 }
 .editor .choice { background: var(--md-sys-color-surface-container-highest); }
 .editor .choice.selected { background: var(--md-sys-color-secondary-container); }
+
+.month-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 0 4px;
+  border: 1px solid var(--md-sys-color-outline);
+  border-radius: var(--md-sys-shape-corner-extra-small);
+  text-align: center;
+}
+.bonus-kind { margin-top: 8px; }
+.payout-job { margin: 4px 0; }
+.add-month-bonus { margin-top: 8px; }
+.add-payment { margin-top: 8px; }
+.payments .payment-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--md-sys-shape-corner-small);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+  outline: none;
+}
+.payments .payment-button md-icon { --md-icon-size: 18px; color: var(--md-sys-color-primary); }
+.payments:has(.payment-button) { list-style: none; padding: 0; }

@@ -12,6 +12,12 @@ import type { DataStore, LoadError, Snapshot } from '../data/store';
 import './app-shell';
 import '../screens/calendar';
 import '../editors/shift-editor';
+import '../editors/bonus-editor';
+import '../editors/payout-editor';
+import type { BonusEditor } from '../editors/bonus-editor';
+import type { PayoutEditor } from '../editors/payout-editor';
+import type { NewBonusRequest } from '../screens/calendar';
+import type { YearMonth } from '../domain/dates';
 import '../ui/snackbar';
 import type { ShiftEditor } from '../editors/shift-editor';
 import type { EditorDone } from '../editors/editor-base';
@@ -220,6 +226,8 @@ export class App extends LitElement {
           .editing=${this.editing}
           @new-shift=${(e: CustomEvent<EpochDay>) => this.editor<ShiftEditor>('st-shift-editor')?.openNew(e.detail)}
           @edit-shift=${(e: CustomEvent<string>) => this.editor<ShiftEditor>('st-shift-editor')?.openExisting(e.detail)}
+          @new-bonus=${(e: CustomEvent<NewBonusRequest>) => this.editor<BonusEditor>('st-bonus-editor')?.openNew(e.detail.date, e.detail.wholeMonth)}
+          @edit-bonus=${(e: CustomEvent<string>) => this.editor<BonusEditor>('st-bonus-editor')?.openExisting(e.detail)}
         ></st-calendar>`;
       case 'summary':
         return html`<st-summary
@@ -229,7 +237,12 @@ export class App extends LitElement {
           .mode=${this.mode}
           .showModeTag=${showModeTag}
           .today=${this.today()}
+          .editing=${this.editing}
           @mode-change=${(e: CustomEvent<EarningsMode>) => (this.mode = e.detail)}
+          @new-bonus=${(e: CustomEvent<NewBonusRequest>) => this.editor<BonusEditor>('st-bonus-editor')?.openNew(e.detail.date, e.detail.wholeMonth)}
+          @edit-bonus=${(e: CustomEvent<string>) => this.editor<BonusEditor>('st-bonus-editor')?.openExisting(e.detail)}
+          @new-payout=${(e: CustomEvent<{ jobId: string; month: YearMonth }>) => this.editor<PayoutEditor>('st-payout-editor')?.openNew(e.detail.jobId, e.detail.month)}
+          @edit-payout=${(e: CustomEvent<string>) => this.editor<PayoutEditor>('st-payout-editor')?.openExisting(e.detail)}
         ></st-summary>`;
       case 'jobs':
         return html`<st-jobs data-testid="screen-jobs" .strings=${this.strings} .view=${s.view} .today=${this.today()}></st-jobs>`;
@@ -264,7 +277,9 @@ export class App extends LitElement {
   private editors() {
     if (!this.editing || this.snapshot?.phase.kind !== 'ready') return nothing;
     const showModeTag = this.snapshot.view.jobs.some(hasDeductions);
-    return html`<st-shift-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-shift-editor>`;
+    return html`<st-shift-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-shift-editor>
+      <st-bonus-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-bonus-editor>
+      <st-payout-editor .strings=${this.strings} .store=${this.store} .mode=${this.mode} .showModeTag=${showModeTag}></st-payout-editor>`;
   }
 
   protected override render() {

@@ -56,6 +56,8 @@ export class SummaryScreen extends LitElement {
   @property() mode: EarningsMode = 'GROSS';
   @property({ type: Boolean }) showModeTag = false;
   @property({ type: Number }) today: EpochDay = 0;
+  /** Editing is on: month bonuses and received payments can be added and opened. */
+  @property({ type: Boolean }) editing = false;
   @state() private period: SummaryPeriod = 'MONTH';
   /** The day the shown period contains (as the app's saved anchor); today until moved. */
   @state() private anchor: EpochDay | null = null;
@@ -87,6 +89,10 @@ export class SummaryScreen extends LitElement {
 
   private step(step: number) {
     this.anchor = stepAnchor(this.anchor ?? this.today, this.period, step);
+  }
+
+  private request(kind: string, detail: unknown) {
+    this.dispatchEvent(new CustomEvent(kind, { detail, bubbles: true, composed: true }));
   }
 
   private setMode(mode: EarningsMode) {
@@ -228,14 +234,25 @@ export class SummaryScreen extends LitElement {
         : this.amountLine(t.t('received_pay_difference'), signedMoney(difference, row.currency, locale), 'difference', differenceClass(difference))}
       ${row.payouts.length
         ? html`<ul class="payments">
-            ${row.payouts.map(
-              (p) => html`<li class="body-small on-surface-variant" data-testid="payment">
-                <span class="num">${money(p.amount, row.currency, locale)}</span>
+            ${row.payouts.map((p) => {
+              const content = html`<span class="num">${money(p.amount, row.currency, locale)}</span>
                 ${p.receivedOn !== null ? html` · ${t.t('received_pay_received_on_value', shortDate(p.receivedOn, locale))}` : nothing}
-                ${p.note?.trim() ? html` · ${p.note}` : nothing}
-              </li>`,
-            )}
+                ${p.note?.trim() ? html` · ${p.note}` : nothing}`;
+              return this.editing
+                ? html`<li class="body-small" data-testid="payment" data-id=${p.id}>
+                    <button class="payment-button" data-testid="edit-payment" @click=${() => this.request('edit-payout', p.id)}>
+                      <md-ripple></md-ripple><md-focus-ring></md-focus-ring>${icon('edit')}<span>${content}</span>
+                    </button>
+                  </li>`
+                : html`<li class="body-small on-surface-variant" data-testid="payment" data-id=${p.id}>${content}</li>`;
+            })}
           </ul>`
+        : nothing}
+      ${this.editing
+        ? html`<md-text-button class="add-payment" data-testid="add-payment" has-icon
+            @click=${() => this.request('new-payout', { jobId: row.job.id, month: row.month })}
+            >${icon('add', 'icon')}${t.t('received_pay_add')}</md-text-button
+          >`
         : nothing}
     </li>`;
   }
@@ -297,8 +314,16 @@ export class SummaryScreen extends LitElement {
         ${s.monthBonuses.length === 0
           ? html`<p class="body-medium on-surface-variant note" data-testid="month-bonuses-none">${t.t('month_bonuses_none')}</p>`
           : html`<ul class="entries segments" data-testid="summary-month-bonuses">
-              ${s.monthBonuses.map((b, i) => bonusCard(t, b, this.mode, segment(i, s.monthBonuses.length)))}
-            </ul>`}`);
+              ${s.monthBonuses.map((b, i) =>
+                bonusCard(t, b, this.mode, segment(i, s.monthBonuses.length), this.editing ? () => this.request('edit-bonus', b.bonus.id) : undefined),
+              )}
+            </ul>`}
+        ${this.editing
+          ? html`<md-filled-tonal-button class="add-month-bonus" data-testid="summary-add-month-bonus" has-icon
+              @click=${() => this.request('new-bonus', { date: this.current.from, wholeMonth: true })}
+              >${icon('add', 'icon')}${t.t('add_month_bonus')}</md-filled-tonal-button
+            >`
+          : nothing}`);
     }
     if (s.receivedPay.length) {
       parts.push(html`<h3 class="section title-small primary">${t.t('received_pay_title')}</h3>
