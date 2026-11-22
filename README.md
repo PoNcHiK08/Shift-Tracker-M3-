@@ -24,6 +24,10 @@ UI in **Ukrainian** by default with **English** as an alternative.
   - Pay changes never rewrite the past: a job with entries changes pay type, salary or deductions *from a chosen month*
     (any month, default the current one), and earlier months keep theirs (hourly rates are also saved with each shift).
 - **Shifts** — job, date, start/end time (overnight shifts supported), unpaid break, note.
+  Hours and pay are the **real time** that passes on the phone's clocks (its time zone): a 22:00–06:00 shift lasts and
+  is paid 9 hours on the night the clocks go back (24→25 October 2026) and 7 on the night they go forward (last
+  Sunday of March). A time inside the skipped hour counts as just after it; a time in the repeated hour as its first
+  occurrence. Backup files and cloud records are still checked on the clock face, so no existing file is refused.
   The time dial gives a light haptic tick for each hour or minute your finger selects (at most one per frame) and a
   confirm click on OK; opening the dial or changing the time from code stays silent. The phone's touch-feedback /
   vibration settings apply.
@@ -260,11 +264,10 @@ firebase/run-emulator-tests.sh                 # the app's Firestore code and sy
 
 ## Known questions
 
-- **Pay on the nights the clocks change.** A shift's length is wall-clock time. A 22:00–06:00 shift on the night
-  the clocks go back (24→25 October 2026) really lasts 9 hours but is paid as 8; on the night they go forward
-  (last Sunday of March) it lasts 7 and is paid as 8. Whether to pay real elapsed time is an open product decision,
-  so the calculator deliberately stays as it is for now. (Schedule import already converts UTC and `TZID`
-  times correctly across these nights; this is only about how a shift's hours are counted.)
+- **The web version counts hours on the clock face.** The app counts a shift's real length (see *Shifts*), so on
+  the two nights a year the clocks change, a shift across the change shows an hour more or less in the app than on
+  the web (22:00–06:00 on 24→25 October 2026: 9 h in the app, 8 h on the web). The web's parity fixtures are made
+  and checked in UTC, where both agree.
 
 ## Project layout
 
@@ -275,7 +278,7 @@ app/src/main/java/com/vkurylo/shifttracker/
 ├── di/            Hilt modules
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
-app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
+app/src/test/      calculator (incl. second rate and the nights the clocks change), money parser, .ics parser (incl. DST and time zones),
                    import planner, DB migrations from v1, v6 and v7, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
                    time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
                    engine (last write wins, first sign-in, several phones) and its Firestore documents

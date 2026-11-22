@@ -13,27 +13,45 @@ import com.vkurylo.shifttracker.domain.model.MonthSummary
 import com.vkurylo.shifttracker.domain.model.ShiftPay
 import com.vkurylo.shifttracker.domain.model.ShiftWithJob
 import com.vkurylo.shifttracker.domain.model.TimedRate
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.YearMonth
 
 object ShiftCalculator {
 
-    private const val MINUTES_PER_DAY = 24 * 60
-
     /** A shift whose end is not after its start finishes on the following day. */
     fun isOvernight(start: LocalTime, end: LocalTime): Boolean = !end.isAfter(start)
 
-    /** Total minutes between start and end, crossing midnight when needed. */
-    fun durationMinutes(start: LocalTime, end: LocalTime): Long {
-        val startMin = start.hour * 60 + start.minute
-        val endMin = end.hour * 60 + end.minute
-        val diff = endMin - startMin
-        return (if (diff <= 0) diff + MINUTES_PER_DAY else diff).toLong()
+    /*
+     * Time. A shift is stored as its start date plus a start and an end on the clock. Its length is the real
+     * time that passes between the two in [zone] (the phone's time zone): one hour more on the night the clocks
+     * go back, one hour less on the night they go forward. A time the clocks skip counts as the moment just after
+     * the skipped hour; a time that happens twice (the hour the clocks go back) as its first occurrence.
+     *
+     * The overloads without a date read the clock face only, as if no clock change ever happened (the same as a
+     * zone without daylight saving time). They are for checks that must not depend on the phone's zone (backup and
+     * cloud records), not for what a shift lasts or earns.
+     */
+
+    /** Real minutes between start and end of a shift starting on [date], crossing midnight when needed. */
+    fun durationMinutes(date: LocalDate, start: LocalTime, end: LocalTime, zone: ZoneId = ZoneId.systemDefault()): Long {
+        val (from, to) = span(date, start, end, zone)
+        return (to - from).coerceAtLeast(0)
     }
 
-    /** Paid minutes = duration minus the unpaid break, never negative. */
+    /** Clock-face minutes between start and end, crossing midnight when needed (no clock change). */
+    fun durationMinutes(start: LocalTime, end: LocalTime): Long = durationMinutes(CLOCK_FACE_DAY, start, end, ZoneOffset.UTC)
+
+    /** Paid minutes = real duration minus the unpaid break, never negative. */
+    fun paidMinutes(date: LocalDate, start: LocalTime, end: LocalTime, unpaidBreakMinutes: Int, zone: ZoneId = ZoneId.systemDefault()): Long =
+        (durationMinutes(date, start, end, zone) - unpaidBreakMinutes.coerceAtLeast(0)).coerceAtLeast(0)
+
+    /** Clock-face paid minutes (no clock change). */
     fun paidMinutes(start: LocalTime, end: LocalTime, unpaidBreakMinutes: Int): Long =
-        (durationMinutes(start, end) - unpaidBreakMinutes.coerceAtLeast(0)).coerceAtLeast(0)
+        paidMinutes(CLOCK_FACE_DAY, start, end, unpaidBreakMinutes, ZoneOffset.UTC)
 
     /** Earnings in grosze at a single rate, rounded half-up to the nearest grosz. */
     fun earningsGrosze(paidMinutes: Long, hourlyRateGrosze: Long): Long {
@@ -42,42 +60,45 @@ object ShiftCalculator {
     }
 
     /**
-     * Minutes of the shift (start..end, crossing midnight if needed) that fall inside the
-     * daily window [window].from..[window].to (which may itself cross midnight).
+     * Real minutes of the shift starting on [date] (start..end, crossing midnight if needed) that fall inside the
+     * daily window [window].from..[window].to (which may itself cross midnight), both on [zone]'s clocks.
      */
-    fun minutesInWindow(start: LocalTime, end: LocalTime, window: TimedRate): Long {
-        val shiftStart = start.toMinuteOfDay()
-        val shiftEnd = shiftStart + durationMinutes(start, end)
-        val from = window.from.toMinuteOfDay()
-        val to = window.to.toMinuteOfDay()
-        if (from == to) return 0
-        val windowLength = if (to > from) to - from else to + MINUTES_PER_DAY - from
-        // A shift is at most 24 h long, so it can touch windows starting yesterday, today or tomorrow.
+    fun minutesInWindow(date: LocalDate, start: LocalTime, end: LocalTime, window: TimedRate, zone: ZoneId = ZoneId.systemDefault()): Long {
+        if (window.from == window.to) return 0
+        val (shiftStart, shiftEnd) = span(date, start, end, zone)
+        // A shift is at most 24 h long, so it can touch windows starting the day before, that day or the day after.
         var total = 0L
-        for (day in -1..1) {
-            val windowStart = day * MINUTES_PER_DAY + from
-            val windowEnd = windowStart + windowLength
-            val overlap = minOf(shiftEnd, windowEnd.toLong()) - maxOf(shiftStart.toLong(), windowStart.toLong())
+        for (day in -1L..1L) {
+            val (windowStart, windowEnd) = span(date.plusDays(day), window.from, window.to, zone)
+            val overlap = minOf(shiftEnd, windowEnd) - maxOf(shiftStart, windowStart)
             if (overlap > 0) total += overlap
         }
         return total
     }
 
+    /** Clock-face minutes inside the window (no clock change). */
+    fun minutesInWindow(start: LocalTime, end: LocalTime, window: TimedRate): Long =
+        minutesInWindow(CLOCK_FACE_DAY, start, end, window, ZoneOffset.UTC)
+
     /**
-     * Full pay calculation. Minutes inside the second-rate window are paid at that rate, the rest
-     * at the base rate. The unpaid break is taken from both parts proportionally, since the app
+     * Full pay calculation for a shift starting on [date]. Minutes inside the second-rate window are paid at that
+     * rate, the rest at the base rate. The unpaid break is taken from both parts proportionally, since the app
      * doesn't know when exactly the break happened.
      */
     fun pay(
+        date: LocalDate,
         start: LocalTime,
         end: LocalTime,
         unpaidBreakMinutes: Int,
         baseRateGrosze: Long,
         secondRate: TimedRate?,
+        zone: ZoneId = ZoneId.systemDefault(),
     ): ShiftPay {
-        val duration = durationMinutes(start, end)
-        val paid = paidMinutes(start, end, unpaidBreakMinutes)
-        val secondMinutes = secondRate?.let { minutesInWindow(start, end, it) } ?: 0L
+        val duration = durationMinutes(date, start, end, zone)
+        // Only inside the hour the clocks skip (e.g. 02:00-03:00 that night): no time passes, nothing is earned.
+        if (duration == 0L) return ShiftPay(0, 0, 0, 0)
+        val paid = paidMinutes(date, start, end, unpaidBreakMinutes, zone)
+        val secondMinutes = secondRate?.let { minutesInWindow(date, start, end, it, zone) }?.coerceAtMost(duration) ?: 0L
         val secondRateGrosze = secondRate?.rateGrosze ?: baseRateGrosze
         // earnings = (base part + second part) * paid / duration, in one exact integer division.
         val weighted = (duration - secondMinutes) * baseRateGrosze + secondMinutes * secondRateGrosze
@@ -87,7 +108,22 @@ object ShiftCalculator {
         return ShiftPay(duration, paid, secondMinutes, earnings)
     }
 
-    private fun LocalTime.toMinuteOfDay(): Int = hour * 60 + minute
+    /** Clock-face pay (no clock change): for checks and comparisons that must not depend on the phone's zone. */
+    fun pay(start: LocalTime, end: LocalTime, unpaidBreakMinutes: Int, baseRateGrosze: Long, secondRate: TimedRate?): ShiftPay =
+        pay(CLOCK_FACE_DAY, start, end, unpaidBreakMinutes, baseRateGrosze, secondRate, ZoneOffset.UTC)
+
+    /** Start and end of a shift (or a rate window) starting on [date], in epoch minutes. */
+    private fun span(date: LocalDate, start: LocalTime, end: LocalTime, zone: ZoneId): Pair<Long, Long> {
+        val endDate = if (isOvernight(start, end)) date.plusDays(1) else date
+        return epochMinute(date, start, zone) to epochMinute(endDate, end, zone)
+    }
+
+    /** [ZonedDateTime.of] moves a skipped time past the gap and takes the earlier offset of a repeated one. */
+    private fun epochMinute(date: LocalDate, time: LocalTime, zone: ZoneId): Long =
+        Math.floorDiv(ZonedDateTime.of(date, time, zone).toEpochSecond(), 60L)
+
+    /** Any day: in UTC every day is 24 h, so the clock face and real time agree. */
+    private val CLOCK_FACE_DAY: LocalDate = LocalDate.of(2000, 1, 3)
 
     /**
      * What a shift earns: its hourly pay, or 0 when its job is paid a fixed monthly salary that month
@@ -186,7 +222,7 @@ object ShiftCalculator {
             Amounts.sum(bonuses, { it.job.currency }, { bonusAmount(it, mode) })
 
     /** The whole months between [from] and [to] (inclusive): where monthly salaries are counted. */
-    fun wholeMonths(from: java.time.LocalDate, to: java.time.LocalDate): List<YearMonth> {
+    fun wholeMonths(from: LocalDate, to: LocalDate): List<YearMonth> {
         val months = mutableListOf<YearMonth>()
         var month = YearMonth.from(from)
         while (!month.isAfter(YearMonth.from(to))) {

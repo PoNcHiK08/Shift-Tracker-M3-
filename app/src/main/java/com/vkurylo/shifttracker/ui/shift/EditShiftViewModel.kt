@@ -61,8 +61,9 @@ data class EditShiftUiState(
     /** The job is paid a monthly salary in the shift's month: the shift only logs hours. */
     val fixedPay: Boolean get() = selectedJob?.paysHourly(date) == false
     val breakValue: Int? get() = breakMinutes.trim().ifEmpty { "0" }.toIntOrNull()?.takeIf { it in 0..1440 }
-    val durationMinutes: Long get() = ShiftCalculator.durationMinutes(start, end)
-    val pay: ShiftPay get() = ShiftCalculator.pay(start, end, breakValue ?: 0, rateGrosze, secondRate)
+    /** Real time on the phone's clocks, as the saved shift counts it (see [ShiftCalculator]). */
+    val durationMinutes: Long get() = ShiftCalculator.durationMinutes(date, start, end)
+    val pay: ShiftPay get() = ShiftCalculator.pay(date, start, end, breakValue ?: 0, rateGrosze, secondRate)
     val paidMinutes: Long get() = pay.paidMinutes
     val earningsGrosze: Long get() = pay.earningsGrosze
 
