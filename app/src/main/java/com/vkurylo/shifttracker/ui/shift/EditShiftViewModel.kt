@@ -155,8 +155,15 @@ class EditShiftViewModel @Inject constructor(
     }
 
     fun selectJob(job: Job) = _uiState.update {
-        // Picking a different job always uses that job's current rate.
-        if (it.jobId == job.id) it else it.copy(jobId = job.id, rateGrosze = job.hourlyRateGrosze, secondRate = job.secondRate)
+        val saved = original
+        when {
+            it.jobId == job.id -> it
+            // Back to the stored shift's own job: its saved rates, never silently the job's current ones
+            // (only "Use current rate" and "Apply to all shifts of this job…" put those on it).
+            saved != null && saved.jobId == job.id -> it.copy(jobId = job.id, rateGrosze = saved.hourlyRateGrosze, secondRate = saved.secondRate)
+            // A different job: that job's current rate.
+            else -> it.copy(jobId = job.id, rateGrosze = job.hourlyRateGrosze, secondRate = job.secondRate)
+        }
     }
 
     fun setDate(date: LocalDate) = _uiState.update { it.copy(date = date) }

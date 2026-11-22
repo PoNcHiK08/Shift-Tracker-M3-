@@ -29,7 +29,8 @@ UI in **Ukrainian** by default with **English** as an alternative.
   vibration settings apply.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
-  earnings (the editor offers "use current rate" when they differ). **"Apply to all shifts of this job…"** next to it
+  earnings (the editor offers "use current rate" when they differ; picking another job in the editor and coming
+  back to the shift's own job brings back its saved rates, not the job's current ones). **"Apply to all shifts of this job…"** next to it
   puts the job's current rates on all its other shifts, or on those from that shift's date on: a dialog first shows
   how many shifts change and the money it moves, a safety backup is saved, and a snackbar offers Undo.
 - **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
