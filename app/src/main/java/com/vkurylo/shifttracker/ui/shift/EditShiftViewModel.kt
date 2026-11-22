@@ -54,6 +54,8 @@ data class EditShiftUiState(
     val saving: Boolean = false,
     /** What the form held when it opened (or as the stored shift is): closing asks first once it differs. */
     val baseline: ShiftDraft? = null,
+    /** The user set the start or end: a new shift's times no longer follow the job picked. */
+    val timesSetByUser: Boolean = false,
 ) {
     /** What Save would store, as far as the user can change it. */
     val draft: ShiftDraft
@@ -158,11 +160,14 @@ class EditShiftViewModel @Inject constructor(
                 )
             } else {
                 val job = jobs.singleOrNull() ?: jobs.firstOrNull()
+                val (start, end) = defaultTimes(job?.id)
                 EditShiftUiState(
                     loading = false,
                     isNew = true,
                     jobs = jobs,
                     jobId = job?.id,
+                    start = start,
+                    end = end,
                     date = route.dateEpochDay.takeIf { it != EditShiftRoute.NO_DATE }?.let(LocalDate::ofEpochDay) ?: LocalDate.now(),
                     rateGrosze = job?.hourlyRateGrosze ?: 0,
                     secondRate = job?.secondRate,
@@ -173,6 +178,7 @@ class EditShiftViewModel @Inject constructor(
         // Keep the job list fresh (e.g. after creating a job from this screen).
         viewModelScope.launch {
             jobRepository.observeJobs().collect { jobs ->
+                val before = _uiState.value
                 _uiState.update { state ->
                     val keepJob = state.jobId != null && jobs.any { it.id == state.jobId }
                     val jobId = if (keepJob) state.jobId else jobs.firstOrNull()?.id
@@ -187,11 +193,39 @@ class EditShiftViewModel @Inject constructor(
                     // A job picked for the user (the first one created from here) is not a change of theirs.
                     if (untouched) next.pristine() else next
                 }
+                val after = _uiState.value
+                if (after.isNew && !after.loading && after.jobId != before.jobId) followJobTimes(after.jobId)
             }
         }
     }
 
-    fun selectJob(job: Job) = _uiState.update {
+    fun selectJob(job: Job) {
+        val before = _uiState.value
+        selectJobState(job)
+        if (before.isNew && before.jobId != job.id) followJobTimes(job.id)
+    }
+
+    /**
+     * A new shift whose times the user hasn't set takes those of [jobId]'s latest shift (08:00–16:00 without one),
+     * once they're read, unless the job or the times have changed by then.
+     */
+    private fun followJobTimes(jobId: Long?) {
+        viewModelScope.launch {
+            val (start, end) = defaultTimes(jobId)
+            _uiState.update { s ->
+                if (!s.isNew || s.timesSetByUser || s.jobId != jobId) return@update s
+                val untouched = s.baseline != null && s.draft == s.baseline
+                val next = s.copy(start = start, end = end)
+                // Picked by the app for the user (the first job created from here): still nothing of theirs.
+                if (untouched) next.pristine() else next
+            }
+        }
+    }
+
+    private suspend fun defaultTimes(jobId: Long?): Pair<LocalTime, LocalTime> =
+        jobId?.let { shiftRepository.latestShiftOf(it) }?.let { it.start to it.end } ?: (DEFAULT_START to DEFAULT_END)
+
+    private fun selectJobState(job: Job) = _uiState.update {
         val saved = original
         when {
             it.jobId == job.id -> it
@@ -204,8 +238,8 @@ class EditShiftViewModel @Inject constructor(
     }
 
     fun setDate(date: LocalDate) = _uiState.update { it.copy(date = date) }
-    fun setStart(time: LocalTime) = _uiState.update { it.copy(start = time) }
-    fun setEnd(time: LocalTime) = _uiState.update { it.copy(end = time) }
+    fun setStart(time: LocalTime) = _uiState.update { it.copy(start = time, timesSetByUser = true) }
+    fun setEnd(time: LocalTime) = _uiState.update { it.copy(end = time, timesSetByUser = true) }
     fun setBreak(text: String) = _uiState.update { it.copy(breakMinutes = text.filter(Char::isDigit).take(4)) }
     fun setNote(text: String) = _uiState.update { it.copy(note = TextLimits.limitInput(it.note, text)) }
     /** The job's current rates on this shift (the same rates "Apply to all shifts" puts on the others). */
@@ -263,5 +297,11 @@ class EditShiftViewModel @Inject constructor(
     /** Called from the snackbar after this screen is gone, hence the app scope. */
     fun undoDelete(shift: Shift) {
         appScope.launch { shiftRepository.upsert(shift) }
+    }
+
+    private companion object {
+        /** A new shift's times when its job has no shift yet. */
+        val DEFAULT_START: LocalTime = LocalTime.of(8, 0)
+        val DEFAULT_END: LocalTime = LocalTime.of(16, 0)
     }
 }

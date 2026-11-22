@@ -142,6 +142,10 @@ interface ShiftDao {
     @Query("SELECT * FROM shifts WHERE id = :id AND deleted = 0")
     suspend fun get(id: Long): ShiftEntity?
 
+    /** The job's live shift on the latest day (the latest start that day); a new shift starts at its times. */
+    @Query("SELECT * FROM shifts WHERE job_id = :jobId AND deleted = 0 ORDER BY date_epoch_day DESC, start_minute DESC, id DESC LIMIT 1")
+    suspend fun latestOfJob(jobId: Long): ShiftEntity?
+
     /** The row even when it is a tombstone. */
     @Query("SELECT * FROM shifts WHERE id = :id")
     suspend fun getAny(id: Long): ShiftEntity?

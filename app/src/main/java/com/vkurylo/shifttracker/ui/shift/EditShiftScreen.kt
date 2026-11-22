@@ -73,6 +73,7 @@ import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.jobs.jobRatesLabel
 import com.vkurylo.shifttracker.ui.util.EarningsModeTag
 import com.vkurylo.shifttracker.ui.util.Formatters
+import com.vkurylo.shifttracker.ui.util.hoursLabel
 import com.vkurylo.shifttracker.ui.util.LocalEarningsDisplay
 import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
@@ -371,7 +372,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, o
                 Column(horizontalAlignment = Alignment.End) {
                     Text(stringResource(R.string.paid_hours), style = MaterialTheme.typography.labelMedium, color = onColor.copy(alpha = 0.75f))
                     RollingText(
-                        text = Formatters.hoursMinutes(pay.paidMinutes),
+                        text = hoursLabel(pay.paidMinutes),
                         value = pay.paidMinutes,
                         style = MaterialTheme.typography.titleLarge,
                         color = onColor,
@@ -388,12 +389,12 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, o
                     style = MaterialTheme.typography.bodyMedium,
                 )
             } else {
-                // Per-rate split, e.g. "33,00 zł/h · 6:00" and "23:00–06:00 · 37,00 zł/h · 2:00".
+                // Per-rate split, e.g. "33,00 zł/h · 6 год" and "23:00–06:00: 37,00 zł/h · 2 год".
                 Text(
                     stringResource(
                         R.string.rate_line_base,
                         Formatters.rate(state.rateGrosze, state.currency, locale),
-                        Formatters.hoursMinutes(pay.baseRateMinutes),
+                        Formatters.decimalHours(pay.baseRateMinutes, locale),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -403,7 +404,7 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, o
                         Formatters.time(second.from),
                         Formatters.time(second.to),
                         Formatters.rate(second.rateGrosze, state.currency, locale),
-                        Formatters.hoursMinutes(pay.secondRateMinutes),
+                        Formatters.decimalHours(pay.secondRateMinutes, locale),
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )

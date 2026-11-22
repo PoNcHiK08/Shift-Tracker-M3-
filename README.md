@@ -28,6 +28,8 @@ UI in **Ukrainian** by default with **English** as an alternative.
   is paid 9 hours on the night the clocks go back (24→25 October 2026) and 7 on the night they go forward (last
   Sunday of March). A time inside the skipped hour counts as just after it; a time in the repeated hour as its first
   occurrence. Backup files and cloud records are still checked on the clock face, so no existing file is refused.
+  A new shift starts at the times of its job's latest shift (08:00–16:00 for a job without any) and follows the job
+  you pick until you set a time yourself. Hours are shown the same way everywhere, as decimal hours ("7,5 год").
   The time dial gives a light haptic tick for each hour or minute your finger selects (at most one per frame) and a
   confirm click on OK; opening the dial or changing the time from code stays silent. The phone's touch-feedback /
   vibration settings apply.
