@@ -109,6 +109,9 @@ private fun EditShiftUiState.pristine(): EditShiftUiState = copy(baseline = draf
 sealed interface EditShiftEvent {
     data object Saved : EditShiftEvent
     data class Deleted(val shift: Shift) : EditShiftEvent
+
+    /** Opened for a shift that is gone (deleted here or by sync): the editor closes instead of becoming a new one. */
+    data object Missing : EditShiftEvent
 }
 
 @HiltViewModel
@@ -132,6 +135,11 @@ class EditShiftViewModel @Inject constructor(
         viewModelScope.launch {
             val jobs = jobRepository.observeJobs().first()
             val existing = if (route.shiftId != 0L) shiftRepository.getShift(route.shiftId) else null
+            if (route.shiftId != 0L && existing == null) {
+                // Stays "loading" (Save does nothing) until the screen closes.
+                _events.send(EditShiftEvent.Missing)
+                return@launch
+            }
             original = existing
             val loaded = if (existing != null) {
                 EditShiftUiState(
@@ -207,7 +215,8 @@ class EditShiftViewModel @Inject constructor(
 
     fun save() {
         val state = _uiState.value
-        if (state.saving) return
+        // Nothing to save before the shift is loaded (or when it turned out to be gone).
+        if (state.saving || state.loading) return
         if (!state.canSave) {
             _uiState.update { it.copy(showErrors = true) }
             return

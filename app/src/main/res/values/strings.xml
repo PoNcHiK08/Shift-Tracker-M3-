@@ -161,6 +161,7 @@
     <string name="delete_shift_message">Її години й заробіток зникнуть з підсумків.</string>
     <string name="shift_saved">Зміну збережено</string>
     <string name="shift_deleted">Зміну видалено</string>
+    <string name="shift_missing">Цієї зміни вже немає</string>
 
     <!-- Settings -->
     <string name="settings_title">Налаштування</string>

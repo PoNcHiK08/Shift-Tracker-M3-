@@ -99,6 +99,7 @@ fun EditShiftScreen(
         viewModel.events.collect { event ->
             when (event) {
                 EditShiftEvent.Saved -> snackbar.show(context.getString(R.string.shift_saved))
+                EditShiftEvent.Missing -> snackbar.show(context.getString(R.string.shift_missing))
                 is EditShiftEvent.Deleted -> snackbar.show(
                     message = context.getString(R.string.shift_deleted),
                     actionLabel = context.getString(R.string.undo),

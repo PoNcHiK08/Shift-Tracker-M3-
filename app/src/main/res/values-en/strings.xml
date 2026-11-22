@@ -158,6 +158,7 @@
     <string name="delete_shift_message">Its hours and earnings will be removed from your totals.</string>
     <string name="shift_saved">Shift saved</string>
     <string name="shift_deleted">Shift deleted</string>
+    <string name="shift_missing">This shift no longer exists</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
