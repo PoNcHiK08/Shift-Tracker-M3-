@@ -16,6 +16,10 @@
     <!-- Common -->
     <string name="save">Зберегти</string>
     <string name="cancel">Скасувати</string>
+    <string name="discard_changes_title">Відкинути зміни?</string>
+    <string name="discard_changes_message">Незбережені зміни буде втрачено.</string>
+    <string name="discard_changes_confirm">Відкинути</string>
+    <string name="discard_changes_keep">Редагувати далі</string>
     <string name="delete">Видалити</string>
     <string name="ok">OK</string>
     <string name="undo">Повернути</string>

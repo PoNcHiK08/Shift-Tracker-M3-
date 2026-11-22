@@ -63,6 +63,7 @@ import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
+import com.vkurylo.shifttracker.ui.components.rememberDiscardGuard
 import com.vkurylo.shifttracker.ui.components.PickerField
 import com.vkurylo.shifttracker.ui.components.ChoiceButtonGroup
 import com.vkurylo.shifttracker.ui.components.RollingMoney
@@ -122,6 +123,8 @@ fun EditShiftScreen(
         }
     }
 
+    // Close and system back ask "Discard changes?" first when something is unsaved.
+    val close = rememberDiscardGuard(state.hasChanges && !state.saving, onClose)
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     var showStartPicker by rememberSaveable { mutableStateOf(false) }
     var showEndPicker by rememberSaveable { mutableStateOf(false) }
@@ -132,7 +135,7 @@ fun EditShiftScreen(
             TopAppBar(
                 title = { Text(stringResource(if (state.isNew) R.string.new_shift else R.string.edit_shift)) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) { Icon(Icons.Filled.Close, stringResource(R.string.close)) }
+                    IconButton(onClick = close) { Icon(Icons.Filled.Close, stringResource(R.string.close)) }
                 },
                 actions = {
                     if (!state.isNew) {

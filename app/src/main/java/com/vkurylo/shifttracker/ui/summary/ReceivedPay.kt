@@ -35,7 +35,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,10 +59,12 @@ import com.vkurylo.shifttracker.domain.calc.PayReconciliation
 import com.vkurylo.shifttracker.domain.model.Currencies
 import com.vkurylo.shifttracker.domain.model.Job
 import com.vkurylo.shifttracker.domain.model.Payout
+import com.vkurylo.shifttracker.ui.components.DiscardChangesDialog
 import com.vkurylo.shifttracker.ui.components.JobAvatar
 import com.vkurylo.shifttracker.ui.components.MonthStepperField
 import com.vkurylo.shifttracker.ui.components.PickerField
 import com.vkurylo.shifttracker.ui.components.SegmentedItem
+import com.vkurylo.shifttracker.ui.components.rememberDiscardGuardedSheetState
 import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
@@ -182,7 +183,12 @@ internal fun ReceivedPaySheet(
     onDismiss: () -> Unit,
 ) {
     val draft by editor.draft.collectAsStateWithLifecycle()
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    // Swiping the sheet away, tapping outside it or back with an edited payment asks first.
+    val sheetState = rememberDiscardGuardedSheetState(
+        hasChanges = draft?.hasChanges == true,
+        onDiscard = editor::cancel,
+        onDismissed = onDismiss,
+    )
     ModalBottomSheet(
         onDismissRequest = {
             editor.cancel()
@@ -288,7 +294,7 @@ private fun PaymentForm(draft: PayoutDraft, editor: PayoutEditorViewModel) {
             style = MaterialTheme.typography.titleLarge,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = editor::cancel, modifier = Modifier.testTag(RECEIVED_PAY_CANCEL_TAG)) {
+        IconButton(onClick = editor::requestClose, modifier = Modifier.testTag(RECEIVED_PAY_CANCEL_TAG)) {
             Icon(Icons.Filled.Close, stringResource(R.string.close))
         }
     }
@@ -354,6 +360,10 @@ private fun PaymentForm(draft: PayoutDraft, editor: PayoutEditorViewModel) {
         Button(onClick = editor::save, enabled = !draft.saving, modifier = Modifier.testTag(RECEIVED_PAY_SAVE_TAG)) { Text(stringResource(R.string.save)) }
     }
 
+    if (draft.confirmDiscard) {
+        // The form's Close with unsaved changes: back to the list only after "Discard".
+        DiscardChangesDialog(onDiscard = editor::cancel, onKeepEditing = editor::keepEditing)
+    }
     if (showDatePicker) {
         val pickerState = rememberDatePickerState(
             initialSelectedDateMillis = (draft.receivedOn ?: LocalDate.now()).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),

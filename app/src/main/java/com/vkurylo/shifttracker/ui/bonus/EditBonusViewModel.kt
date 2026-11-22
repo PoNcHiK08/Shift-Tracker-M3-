@@ -42,7 +42,16 @@ data class EditBonusUiState(
     val confirmDelete: Boolean = false,
     /** Save was pressed and is being written: a second press must not store the bonus again. */
     val saving: Boolean = false,
+    /** What the form held when it opened: closing asks first once it differs. */
+    val baseline: BonusDraft? = null,
 ) {
+    /** What Save would store, as far as the user can change it (a month bonus is on the 1st of its month). */
+    val draft: BonusDraft
+        get() = BonusDraft(jobId, if (wholeMonth) date.withDayOfMonth(1) else date, wholeMonth, amount.trim(), note.trim())
+
+    /** Something differs from what is saved: closing would lose it. */
+    val hasChanges: Boolean get() = !loading && baseline != null && draft != baseline
+
     /** The bonus is in its job's currency (decimals and limits follow it). */
     val currency: String get() = jobs.firstOrNull { it.id == jobId }?.currency ?: Currencies.DEFAULT
     val amountGrosze: Long? get() =
@@ -53,6 +62,9 @@ data class EditBonusUiState(
     val noteTooLong: Boolean get() = note.length > TextLimits.MAX_LENGTH
     val canSave: Boolean get() = !jobMissing && amountGrosze != null && !noteTooLong
 }
+
+/** The parts of a bonus the editor changes. */
+data class BonusDraft(val jobId: Long?, val date: LocalDate, val wholeMonth: Boolean, val amount: String, val note: String)
 
 sealed interface EditBonusEvent {
     data object Saved : EditBonusEvent
@@ -81,7 +93,7 @@ class EditBonusViewModel @Inject constructor(
             val jobs = jobRepository.observeJobs().first()
             val existing = if (route.bonusId != 0L) bonusRepository.getBonus(route.bonusId) else null
             original = existing
-            _uiState.value = if (existing != null) {
+            val loaded = if (existing != null) {
                 EditBonusUiState(
                     loading = false,
                     isNew = false,
@@ -105,12 +117,16 @@ class EditBonusViewModel @Inject constructor(
                     wholeMonth = route.wholeMonth,
                 )
             }
+            _uiState.value = loaded.copy(baseline = loaded.draft)
         }
         viewModelScope.launch {
             jobRepository.observeJobs().collect { jobs ->
                 _uiState.update { state ->
                     val jobId = state.jobId?.takeIf { id -> jobs.any { it.id == id } } ?: jobs.firstOrNull()?.id
-                    state.copy(jobs = jobs, jobId = jobId)
+                    val untouched = state.baseline != null && state.draft == state.baseline
+                    val next = state.copy(jobs = jobs, jobId = jobId)
+                    // A job picked for the user (the first one created from here) is not a change of theirs.
+                    if (untouched) next.copy(baseline = next.draft) else next
                 }
             }
         }

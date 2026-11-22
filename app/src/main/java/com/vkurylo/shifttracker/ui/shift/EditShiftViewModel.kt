@@ -52,7 +52,16 @@ data class EditShiftUiState(
     val confirmDelete: Boolean = false,
     /** Save was pressed and is being written: a second press must not store the shift again. */
     val saving: Boolean = false,
+    /** What the form held when it opened (or as the stored shift is): closing asks first once it differs. */
+    val baseline: ShiftDraft? = null,
 ) {
+    /** What Save would store, as far as the user can change it. */
+    val draft: ShiftDraft
+        get() = ShiftDraft(jobId, date, start, end, breakValue?.toString() ?: breakMinutes.trim(), note.trim(), rateGrosze, secondRate)
+
+    /** Something differs from what is saved: closing would lose it. */
+    val hasChanges: Boolean get() = !loading && baseline != null && draft != baseline
+
     val selectedJob: Job? get() = jobs.firstOrNull { it.id == jobId }
 
     /** The shift's currency: its job's. */
@@ -82,6 +91,21 @@ data class EditShiftUiState(
     val canSave: Boolean get() = !jobMissing && breakValue != null && !breakTooLong && !noteTooLong
 }
 
+/** The parts of a shift the editor changes. */
+data class ShiftDraft(
+    val jobId: Long?,
+    val date: LocalDate,
+    val start: LocalTime,
+    val end: LocalTime,
+    val breakMinutes: String,
+    val note: String,
+    val rateGrosze: Long,
+    val secondRate: TimedRate?,
+)
+
+/** The state with its current form as the unchanged one. */
+private fun EditShiftUiState.pristine(): EditShiftUiState = copy(baseline = draft)
+
 sealed interface EditShiftEvent {
     data object Saved : EditShiftEvent
     data class Deleted(val shift: Shift) : EditShiftEvent
@@ -109,7 +133,7 @@ class EditShiftViewModel @Inject constructor(
             val jobs = jobRepository.observeJobs().first()
             val existing = if (route.shiftId != 0L) shiftRepository.getShift(route.shiftId) else null
             original = existing
-            _uiState.value = if (existing != null) {
+            val loaded = if (existing != null) {
                 EditShiftUiState(
                     loading = false,
                     isNew = false,
@@ -136,6 +160,7 @@ class EditShiftViewModel @Inject constructor(
                     secondRate = job?.secondRate,
                 )
             }
+            _uiState.value = loaded.pristine()
         }
         // Keep the job list fresh (e.g. after creating a job from this screen).
         viewModelScope.launch {
@@ -144,12 +169,15 @@ class EditShiftViewModel @Inject constructor(
                     val keepJob = state.jobId != null && jobs.any { it.id == state.jobId }
                     val jobId = if (keepJob) state.jobId else jobs.firstOrNull()?.id
                     val keepRates = keepJob || !state.isNew
-                    state.copy(
+                    val untouched = state.baseline != null && state.draft == state.baseline
+                    val next = state.copy(
                         jobs = jobs,
                         jobId = jobId,
                         rateGrosze = if (keepRates) state.rateGrosze else jobs.firstOrNull()?.hourlyRateGrosze ?: 0,
                         secondRate = if (keepRates) state.secondRate else jobs.firstOrNull()?.secondRate,
                     )
+                    // A job picked for the user (the first one created from here) is not a change of theirs.
+                    if (untouched) next.pristine() else next
                 }
             }
         }

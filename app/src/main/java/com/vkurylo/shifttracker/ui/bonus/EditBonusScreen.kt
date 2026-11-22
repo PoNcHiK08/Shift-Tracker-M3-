@@ -56,6 +56,7 @@ import com.vkurylo.shifttracker.ui.components.textLengthSupport
 import com.vkurylo.shifttracker.ui.components.ExpressiveFilterPill
 import com.vkurylo.shifttracker.ui.components.JobColorDot
 import com.vkurylo.shifttracker.ui.components.LocalSnackbarController
+import com.vkurylo.shifttracker.ui.components.rememberDiscardGuard
 import com.vkurylo.shifttracker.ui.components.PickerField
 import com.vkurylo.shifttracker.ui.components.composeColor
 import com.vkurylo.shifttracker.ui.util.Formatters
@@ -76,6 +77,8 @@ fun EditBonusScreen(
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
+    // Close and system back ask "Discard changes?" first when something is unsaved.
+    val close = rememberDiscardGuard(state.hasChanges && !state.saving, onClose)
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
@@ -97,7 +100,7 @@ fun EditBonusScreen(
             TopAppBar(
                 title = { Text(stringResource(if (state.isNew) R.string.new_bonus else R.string.edit_bonus)) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) { Icon(Icons.Filled.Close, stringResource(R.string.close)) }
+                    IconButton(onClick = close) { Icon(Icons.Filled.Close, stringResource(R.string.close)) }
                 },
                 actions = {
                     if (!state.isNew) {

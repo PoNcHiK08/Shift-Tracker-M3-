@@ -85,6 +85,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
   and replaces the data in one transaction, so a bad or
   half-written file leaves the existing data exactly as it was. Records the file doesn't have are kept as deleted
   (tombstones), records it does have are updated in place, so the replacement can later reach other devices.
+- **Unsaved changes** — the shift, bonus, received-payment and job editors ask "Discard changes?" before Close,
+  system back, or swiping a sheet away / tapping outside it would drop what you typed; without changes they close
+  straight away (and back keeps its predictive-back animation).
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
   Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;
