@@ -6,16 +6,17 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.CompositionLocalProvider
@@ -226,8 +227,8 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    // Keep snackbars above the bottom bar on the home screen.
-                    .padding(bottom = if (onHome) HomeNavigationBarHeight else 0.dp),
+                    // Keep snackbars above the floating bar on the home screen.
+                    .padding(bottom = if (onHome) homeBarClearance(FloatingBarHeight) else 0.dp),
             )
         }
     }
@@ -239,28 +240,17 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            HomeNavigationBar(
-                tabs = HomeTabs,
-                isSelected = { tab -> currentTab?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true },
-                onSelect = { tab ->
-                    tabNav.navigate(tab.route) {
-                        popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    // The tabs run edge to edge; the floating bar is drawn over their bottom, and their lists end above it
+    // (LocalHomeBarClearance). Its height is measured, so a larger font still clears.
+    val density = LocalDensity.current
+    var barHeight by remember { mutableStateOf(FloatingBarHeight) }
+    val selectedIndex = HomeTabs.indexOfFirst { tab -> currentTab?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
+    Box(Modifier.fillMaxSize()) {
+        CompositionLocalProvider(LocalHomeBarClearance provides homeBarClearance(barHeight)) {
         NavHost(
             navController = tabNav,
             startDestination = CalendarRoute,
-            modifier = Modifier
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             // Top-level destinations: fade through (also when going back to the first tab).
             enterTransition = {
                 PredictiveBackGesture.clear(initialState.id, targetState.id)
@@ -313,5 +303,22 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                 }
             }
         }
+        }
+        HomeNavigationBar(
+            tabs = HomeTabs,
+            selectedIndex = selectedIndex,
+            onSelect = { tab ->
+                tabNav.navigate(tab.route) {
+                    popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = FloatingBarSideMargin, end = FloatingBarSideMargin, bottom = FloatingBarBottomGap)
+                .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+        )
     }
 }
