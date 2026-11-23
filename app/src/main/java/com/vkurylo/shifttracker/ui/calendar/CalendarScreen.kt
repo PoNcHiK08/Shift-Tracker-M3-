@@ -128,6 +128,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
+import com.vkurylo.shifttracker.ui.navigation.LocalHomeBarClearance
 
 private const val PAGE_COUNT = 1200 // 100 years
 private const val INITIAL_PAGE = PAGE_COUNT / 2
@@ -206,7 +207,8 @@ fun CalendarScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag(CALENDAR_LIST_TAG),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+            // The last item scrolls clear of the floating navigation bar.
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + LocalHomeBarClearance.current + 24.dp),
         ) {
             // The month at a glance, first thing on screen: earnings, hours and shifts in one compact row.
             if (state.loading || hasJobs) {

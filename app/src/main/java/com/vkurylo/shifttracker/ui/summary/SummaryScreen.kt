@@ -81,6 +81,7 @@ import com.vkurylo.shifttracker.ui.util.hoursLabel
 import com.vkurylo.shifttracker.ui.util.shiftsCountLabel
 import java.time.LocalDate
 import java.time.YearMonth
+import com.vkurylo.shifttracker.ui.navigation.LocalHomeBarClearance
 
 const val SUMMARY_ADD_MONTH_BONUS_TAG = "summary-add-month-bonus"
 
@@ -132,7 +133,8 @@ fun SummaryScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+            // The last item scrolls clear of the floating navigation bar.
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + LocalHomeBarClearance.current + 24.dp),
         ) {
             item(key = "period") {
                 PeriodSelector(
