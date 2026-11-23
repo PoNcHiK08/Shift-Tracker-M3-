@@ -2,6 +2,9 @@ package com.vkurylo.shifttracker.ui.navigation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.indication
@@ -36,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -45,6 +49,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onSizeChanged
@@ -56,6 +65,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.vkurylo.shifttracker.R
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
@@ -76,8 +86,8 @@ val HomeTabs = listOf(
 /** The floating bar's distance from the screen's sides. */
 val FloatingBarSideMargin = 16.dp
 
-/** The floating bar's distance above the system navigation bar (gesture handle or buttons). */
-val FloatingBarBottomGap = 12.dp
+/** The floating bar's distance above the system navigation bar (gesture handle or buttons): low, but clear of it. */
+val FloatingBarBottomGap = 8.dp
 
 /** The bar's height at the default font size (taller with a larger font: it is measured, see [HomeScreen]). */
 val FloatingBarHeight = 72.dp
@@ -213,3 +223,82 @@ private fun HomeBarItem(tab: HomeTab, selected: Boolean, onClick: () -> Unit, mo
 
 /** The clearance lists need for a bar [barHeight] tall: the bar plus its gap above the system navigation bar. */
 fun homeBarClearance(barHeight: Dp): Dp = barHeight + FloatingBarBottomGap
+
+/**
+ * Whether the floating bar shows, from how the tab's content scrolls (a nested-scroll listener around the tabs, so
+ * every scrolling screen counts without knowing about it): it hides once the content has moved [thresholdPx] down in
+ * one go, and shows once it has moved [thresholdPx] up, so small or jittery movements never toggle it. It also shows
+ * when the content can't scroll any further (the end of a list, or nothing to scroll), and when [show] is called (a
+ * tab switch). Horizontal scrolling (the calendar's month pager) is ignored.
+ */
+@Stable
+class HomeBarVisibility(private val thresholdPx: Float) {
+    var visible by mutableStateOf(true)
+        private set
+
+    /** Content movement since the last direction change: negative = scrolled down (towards the end). */
+    private var run = 0f
+
+    fun show() {
+        visible = true
+        run = 0f
+    }
+
+    val connection: NestedScrollConnection = object : NestedScrollConnection {
+        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+            onScrolled(consumed.y, available.y)
+            return Offset.Zero
+        }
+    }
+
+    /** [moved]: how far the content scrolled (negative = down); [left]: what it couldn't scroll (it is at an end). */
+    internal fun onScrolled(moved: Float, left: Float) {
+        if (moved != 0f) {
+            if (run != 0f && (moved < 0f) != (run < 0f)) run = 0f
+            run += moved
+            if (run <= -thresholdPx) {
+                visible = false
+                run = 0f
+            } else if (run >= thresholdPx) {
+                show()
+            }
+        }
+        // Pushing past an end: the end of the list (or a screen with nothing to scroll) brings the bar back.
+        if (abs(left) > END_SLOP_PX) show()
+    }
+
+    private companion object {
+        const val END_SLOP_PX = 1f
+    }
+}
+
+/** How far the content must move in one direction before the bar hides or shows. */
+val HomeBarScrollThreshold = 24.dp
+
+@Composable
+fun rememberHomeBarVisibility(): HomeBarVisibility {
+    val threshold = with(LocalDensity.current) { HomeBarScrollThreshold.toPx() }
+    return remember(threshold) { HomeBarVisibility(threshold) }
+}
+
+/** Slide down + fade over ~200 ms (M3 short4), emphasized easing: decelerate in, accelerate out. */
+private const val HIDE_DURATION_MS = 200
+private val EmphasizedDecelerate = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private val EmphasizedAccelerate = CubicBezierEasing(0.3f, 0f, 0.8f, 0.15f)
+
+/**
+ * Moves the bar below the bottom of the screen and fades it out while [visible] is false. [below] is how far its
+ * bottom is from the screen's (the gap plus the system navigation bar), so it leaves the screen entirely.
+ */
+@Composable
+fun Modifier.homeBarHiding(visible: Boolean, below: () -> Float): Modifier {
+    val hidden by animateFloatAsState(
+        targetValue = if (visible) 0f else 1f,
+        animationSpec = tween(HIDE_DURATION_MS, easing = if (visible) EmphasizedDecelerate else EmphasizedAccelerate),
+        label = "homeBarHidden",
+    )
+    return graphicsLayer {
+        translationY = hidden * (size.height + below())
+        alpha = 1f - hidden
+    }
+}

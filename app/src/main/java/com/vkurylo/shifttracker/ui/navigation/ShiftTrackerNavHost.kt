@@ -6,6 +6,9 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -245,7 +248,12 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
     val density = LocalDensity.current
     var barHeight by remember { mutableStateOf(FloatingBarHeight) }
     val selectedIndex = HomeTabs.indexOfFirst { tab -> currentTab?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
-    Box(Modifier.fillMaxSize()) {
+    // Scrolling a tab's content down hides the bar, up (or to the end) shows it; a tab switch always shows it.
+    val barVisibility = rememberHomeBarVisibility()
+    LaunchedEffect(selectedIndex) { barVisibility.show() }
+    val gapPx = with(density) { FloatingBarBottomGap.toPx() }
+    val navInset = WindowInsets.navigationBars
+    Box(Modifier.fillMaxSize().nestedScroll(barVisibility.connection)) {
         CompositionLocalProvider(LocalHomeBarClearance provides homeBarClearance(barHeight)) {
         NavHost(
             navController = tabNav,
@@ -318,7 +326,8 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .padding(start = FloatingBarSideMargin, end = FloatingBarSideMargin, bottom = FloatingBarBottomGap)
-                .onSizeChanged { barHeight = with(density) { it.height.toDp() } },
+                .onSizeChanged { barHeight = with(density) { it.height.toDp() } }
+                .homeBarHiding(barVisibility.visible) { gapPx + navInset.getBottom(density) },
         )
     }
 }
