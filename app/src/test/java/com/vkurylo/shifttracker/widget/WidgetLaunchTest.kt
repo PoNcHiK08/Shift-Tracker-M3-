@@ -7,6 +7,7 @@ import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vkurylo.shifttracker.CrashReporter
@@ -177,5 +178,33 @@ class WidgetLaunchTest {
         back()
         composeRule.waitUntil(10_000) { count(str(R.string.edit_shift)) == 0 }
         assertOnCalendar()
+    }
+
+    // --- A shift the widget still shows but that is gone (deleted here, or by sync from another phone) ---
+
+    private fun deleteTheShift() = runBlocking { shifts.delete(shifts.getShift(shiftId)!!) }
+
+    private fun assertNoEditor() {
+        assertEquals(0, count(str(R.string.edit_shift)))
+        assertEquals("not an empty editor that would save a new shift", 0, count(str(R.string.new_shift)))
+    }
+
+    @Test
+    fun aDeletedShiftOpensTheCalendarNotAnEmptyEditor() {
+        deleteTheShift()
+        launch(LaunchRequest.EditShift(shiftId))
+        assertOnCalendar()
+        assertNoEditor()
+    }
+
+    @Test
+    fun aShiftThatNeverExistedOpensTheCalendarOnAWarmStartFromAnotherTab() {
+        launch(null)
+        assertOnCalendar()
+        composeRule.onNode(hasContentDescription(str(R.string.nav_summary)) and hasClickAction()).performClick()
+        composeRule.waitUntil(10_000) { count(str(R.string.add_shift)) == 0 }
+        newIntent(LaunchRequest.EditShift(shiftId + 1_000))
+        assertOnCalendar()
+        assertNoEditor()
     }
 }

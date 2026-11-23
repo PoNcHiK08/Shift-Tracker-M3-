@@ -66,6 +66,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.longOrNull
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -106,8 +107,21 @@ class WebFixturesExport {
     private val update = System.getenv("UPDATE_WEB_FIXTURES") == "1"
     private val databases = mutableListOf<ShiftDatabase>()
 
+    /**
+     * The web counts a shift's hours on the clock face, the app in real time on the phone's clocks (an hour more or
+     * less on the nights the clocks change; see ShiftCalculator). In UTC the two agree, so the fixtures are made and
+     * checked in UTC whatever the machine's zone: the "edge" and "demo" datasets have 22:00-06:00 shifts on such nights.
+     */
+    private val machineZone = java.util.TimeZone.getDefault()
+
+    @Before
+    fun clockFaceZone() = java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+
     @After
-    fun tearDown() = databases.forEach { it.close() }
+    fun tearDown() {
+        databases.forEach { it.close() }
+        java.util.TimeZone.setDefault(machineZone)
+    }
 
     // --- The fixtures ---------------------------------------------------------------------------------
 

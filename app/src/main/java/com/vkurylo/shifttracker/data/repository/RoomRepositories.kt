@@ -134,6 +134,7 @@ class RoomShiftRepository @Inject constructor(
         }
 
     override suspend fun getShift(id: Long): Shift? = dao.get(id)?.toDomain()
+    override suspend fun latestShiftOf(jobId: Long): Shift? = dao.latestOfJob(jobId)?.toDomain()
     override suspend fun getAllShifts(): List<Shift> = dao.getAll().map { it.toDomain() }
     /** Keeps the row's sync id, moves `updated_at` forward and marks it changed; Undo uses it to undelete. */
     override suspend fun upsert(shift: Shift): Long = db.withTransaction {

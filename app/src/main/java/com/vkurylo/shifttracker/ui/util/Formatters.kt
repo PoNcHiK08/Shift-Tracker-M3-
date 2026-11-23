@@ -66,10 +66,7 @@ object Formatters {
         if (amounts.isEmpty) money(0, fallbackCurrency, locale)
         else amounts.sortedByValue().joinToString(" · ") { (code, value) -> money(value, code, locale) }
 
-    /** 450 -> "7:30" (hours:minutes). */
-    fun hoursMinutes(minutes: Long): String = "%d:%02d".format(minutes / 60, minutes % 60)
-
-    /** 450 -> "7,5" style decimal hours. */
+    /** 450 -> "7,5" style decimal hours: how hours are shown everywhere (with [hoursLabel] for the unit). */
     fun decimalHours(minutes: Long, locale: Locale): String {
         val format = NumberFormat.getNumberInstance(locale).apply {
             minimumFractionDigits = 0

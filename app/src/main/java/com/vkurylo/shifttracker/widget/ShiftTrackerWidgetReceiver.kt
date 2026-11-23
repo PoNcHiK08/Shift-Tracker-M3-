@@ -16,7 +16,8 @@ import kotlinx.coroutines.launch
 /**
  * The widget's receiver. Every update from the system (placing, the 30 min period, resizing) and every
  * clock, time zone or locale change draws the widget directly ([WidgetRenderer]), besides Glance's own
- * session, so it never depends on a background job being run.
+ * session, so it never depends on a background job being run. Each of these also sets the alarm that redraws it
+ * just after midnight ([WidgetMidnight]).
  */
 class ShiftTrackerWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = ShiftTrackerWidget()
@@ -24,15 +25,18 @@ class ShiftTrackerWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         updater(context).setPlaced(true)
+        WidgetMidnight.schedule(context)
     }
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
         updater(context).setPlaced(false)
+        WidgetMidnight.cancel(context)
     }
 
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         super.onUpdate(context, appWidgetManager, appWidgetIds)
+        WidgetMidnight.schedule(context)
         renderInBackground { appWidgetIds.forEach { WidgetRenderer.render(context, appWidgetManager, it) } }
     }
 
@@ -43,7 +47,11 @@ class ShiftTrackerWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
-        if (intent.action in REFRESH_ACTIONS) renderInBackground { WidgetRenderer.renderAll(context) }
+        if (intent.action in REFRESH_ACTIONS) {
+            // A new day (or a clock / time zone change, which moves midnight): redraw, and set the next one.
+            WidgetMidnight.schedule(context)
+            renderInBackground { WidgetRenderer.renderAll(context) }
+        }
     }
 
     /** Runs [block] off the main thread, keeping the broadcast alive until it is done. */
@@ -61,9 +69,10 @@ class ShiftTrackerWidgetReceiver : GlanceAppWidgetReceiver() {
     private fun updater(context: Context) =
         EntryPointAccessors.fromApplication(context.applicationContext, WidgetEntryPoint::class.java).widgetUpdater()
 
-    private companion object {
-        const val TAG = "ShiftTrackerWidget"
+    internal companion object {
+        private const val TAG = "ShiftTrackerWidget"
         val REFRESH_ACTIONS = setOf(
+            WidgetMidnight.ACTION,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,
             Intent.ACTION_LOCALE_CHANGED,

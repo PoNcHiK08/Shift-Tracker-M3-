@@ -36,8 +36,18 @@ data class PayoutDraft(
     val showErrors: Boolean = false,
     /** Save was pressed and is being written: a second press must not store the payment again. */
     val saving: Boolean = false,
+    /** What the form held when it opened: closing asks first once it differs. */
+    val baseline: PayoutFields? = null,
+    /** Close was pressed with unsaved changes: "Discard changes?" is showing. */
+    val confirmDiscard: Boolean = false,
 ) {
     val isNew: Boolean get() = id == 0L
+
+    /** What Save would store, as far as the user can change it. */
+    val fields: PayoutFields get() = PayoutFields(month, amount.trim(), receivedOn, note.trim())
+
+    /** Something differs from what is saved: closing would lose it. */
+    val hasChanges: Boolean get() = baseline != null && fields != baseline
 
     /** In the job's currency; the same limits as a bonus. */
     val currency: String get() = job.currency
@@ -46,6 +56,11 @@ data class PayoutDraft(
     val noteTooLong: Boolean get() = note.length > TextLimits.MAX_LENGTH
     val canSave: Boolean get() = amountMinor != null && !noteTooLong
 }
+
+/** The parts of a received payment the form changes. */
+data class PayoutFields(val month: YearMonth, val amount: String, val receivedOn: LocalDate?, val note: String)
+
+private fun PayoutDraft.pristine(): PayoutDraft = copy(baseline = fields)
 
 sealed interface PayoutEvent {
     data object Saved : PayoutEvent
@@ -73,7 +88,7 @@ class PayoutEditorViewModel @Inject constructor(
 
     fun startNew(job: Job, month: YearMonth) {
         original = null
-        _draft.value = PayoutDraft(job = job, month = month)
+        _draft.value = PayoutDraft(job = job, month = month).pristine()
     }
 
     fun startEdit(payout: Payout, job: Job) {
@@ -85,10 +100,19 @@ class PayoutEditorViewModel @Inject constructor(
             amount = MoneyParser.toInput(payout.amountMinor, Currencies.fractionDigits(job.currency)),
             receivedOn = payout.receivedOn,
             note = payout.note.orEmpty(),
-        )
+        ).pristine()
     }
 
-    /** Closes the form without saving. */
+    /** The form's Close: back to the list at once, or "Discard changes?" first when there are unsaved changes. */
+    fun requestClose() {
+        val draft = _draft.value ?: return
+        if (draft.hasChanges) _draft.update { it?.copy(confirmDiscard = true) } else cancel()
+    }
+
+    /** "Keep editing" in "Discard changes?". */
+    fun keepEditing() = _draft.update { it?.copy(confirmDiscard = false) }
+
+    /** Closes the form without saving (also "Discard" in "Discard changes?"). */
     fun cancel() {
         original = null
         _draft.value = null

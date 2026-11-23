@@ -24,12 +24,19 @@ UI in **Ukrainian** by default with **English** as an alternative.
   - Pay changes never rewrite the past: a job with entries changes pay type, salary or deductions *from a chosen month*
     (any month, default the current one), and earlier months keep theirs (hourly rates are also saved with each shift).
 - **Shifts** — job, date, start/end time (overnight shifts supported), unpaid break, note.
+  Hours and pay are the **real time** that passes on the phone's clocks (its time zone): a 22:00–06:00 shift lasts and
+  is paid 9 hours on the night the clocks go back (24→25 October 2026) and 7 on the night they go forward (last
+  Sunday of March). A time inside the skipped hour counts as just after it; a time in the repeated hour as its first
+  occurrence. Backup files and cloud records are still checked on the clock face, so no existing file is refused.
+  A new shift starts at the times of its job's latest shift (08:00–16:00 for a job without any) and follows the job
+  you pick until you set a time yourself. Hours are shown the same way everywhere, as decimal hours ("7,5 год").
   The time dial gives a light haptic tick for each hour or minute your finger selects (at most one per frame) and a
   confirm click on OK; opening the dial or changing the time from code stays silent. The phone's touch-feedback /
   vibration settings apply.
   Minutes inside the second-rate window are paid at that rate, the rest at the base rate; the unpaid break is taken
   from both parts proportionally. Rates are *saved with the shift*, so changing a job's rates later never rewrites past
-  earnings (the editor offers "use current rate" when they differ). **"Apply to all shifts of this job…"** next to it
+  earnings (the editor offers "use current rate" when they differ; picking another job in the editor and coming
+  back to the shift's own job brings back its saved rates, not the job's current ones). **"Apply to all shifts of this job…"** next to it
   puts the job's current rates on all its other shifts, or on those from that shift's date on: a dialog first shows
   how many shifts change and the money it moves, a safety backup is saved, and a snackbar offers Undo.
 - **Bonuses** — one-off extra payments for a job on a given day (premium, tips…). They count towards earnings in the
@@ -69,8 +76,10 @@ UI in **Ukrainian** by default with **English** as an alternative.
   there's room, full-width "+ Shift"), 3×2 and up the month next to the next shift. Texts shrink to fit rather than
   being cut with "…". Taps open the new-shift editor on today, that shift's editor or Jobs (no jobs yet); the calendar
   opens the app; an open editor is never stacked on. Dynamic colors on Android 12+, the app's palette before; texts
-  and dates in the app's language. It updates as soon as anything changes in the app, and on its own every 30 min
-  and on clock / time zone / locale changes (so a new day or a finished shift can take up to 30 min to show).
+  and dates in the app's language. It updates as soon as anything changes in the app, on its own every 30 min, on clock /
+  time zone / locale changes, and just after midnight (an inexact alarm, no special permission), so a new day shows
+  at once; a finished shift can take up to 30 min to show. A tap on a shift that is gone since (deleted here or by
+  sync) opens the calendar instead of an editor.
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
   Exports are format version 6 (every job, shift, bonus and received payment carries its sync id, so a backup restored
@@ -83,6 +92,9 @@ UI in **Ukrainian** by default with **English** as an alternative.
   and replaces the data in one transaction, so a bad or
   half-written file leaves the existing data exactly as it was. Records the file doesn't have are kept as deleted
   (tombstones), records it does have are updated in place, so the replacement can later reach other devices.
+- **Unsaved changes** — the shift, bonus, received-payment and job editors ask "Discard changes?" before Close,
+  system back, or swiping a sheet away / tapping outside it would drop what you typed; without changes they close
+  straight away (and back keeps its predictive-back animation).
 - **Lists** look like Android 16: every group (a day's entries, by-job, by-day/month, settings sections, jobs) is a
   segmented list — items 2 dp apart, large outer and small inner corners; pressing an item rounds its corners.
   Single choices (week/month/year, unpaid break presets, theme, language) are M3 Expressive connected button groups;
@@ -262,11 +274,10 @@ firebase/run-emulator-tests.sh                 # the app's Firestore code and sy
 
 ## Known questions
 
-- **Pay on the nights the clocks change.** A shift's length is wall-clock time. A 22:00–06:00 shift on the night
-  the clocks go back (24→25 October 2026) really lasts 9 hours but is paid as 8; on the night they go forward
-  (last Sunday of March) it lasts 7 and is paid as 8. Whether to pay real elapsed time is an open product decision,
-  so the calculator deliberately stays as it is for now. (Schedule import already converts UTC and `TZID`
-  times correctly across these nights; this is only about how a shift's hours are counted.)
+- **The web version counts hours on the clock face.** The app counts a shift's real length (see *Shifts*), so on
+  the two nights a year the clocks change, a shift across the change shows an hour more or less in the app than on
+  the web (22:00–06:00 on 24→25 October 2026: 9 h in the app, 8 h on the web). The web's parity fixtures are made
+  and checked in UTC, where both agree.
 
 ## Project layout
 
@@ -277,7 +288,7 @@ app/src/main/java/com/vkurylo/shifttracker/
 ├── di/            Hilt modules
 └── ui/            theme, shared components, navigation, and one package per screen
                    (calendar, summary, settings, jobs, shift, importics)
-app/src/test/      calculator (incl. second rate), money parser, .ics parser (incl. DST and time zones),
+app/src/test/      calculator (incl. second rate and the nights the clocks change), money parser, .ics parser (incl. DST and time zones),
                    import planner, DB migrations from v1, v6 and v7, tombstones and the job/entry rule, JSON backup (validation, versions, rollback),
                    time-dial haptics, predictive back frame by frame, an end-to-end UI smoke test, and the sync
                    engine (last write wins, first sign-in, several phones) and its Firestore documents

@@ -45,6 +45,9 @@ interface ShiftRepository {
     fun observeMonth(month: YearMonth): Flow<List<ShiftWithJob>> =
         observeShifts(month.atDay(1), month.atEndOfMonth())
     suspend fun getShift(id: Long): Shift?
+
+    /** The job's live shift on the latest day, or null: whose start and end a new shift for the job begins with. */
+    suspend fun latestShiftOf(jobId: Long): Shift? = null
     suspend fun getAllShifts(): List<Shift>
     suspend fun upsert(shift: Shift): Long
 

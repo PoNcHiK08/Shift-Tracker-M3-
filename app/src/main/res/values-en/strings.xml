@@ -13,6 +13,10 @@
     <!-- Common -->
     <string name="save">Save</string>
     <string name="cancel">Cancel</string>
+    <string name="discard_changes_title">Discard changes?</string>
+    <string name="discard_changes_message">Your unsaved changes will be lost.</string>
+    <string name="discard_changes_confirm">Discard</string>
+    <string name="discard_changes_keep">Keep editing</string>
     <string name="delete">Delete</string>
     <string name="ok">OK</string>
     <string name="undo">Undo</string>
@@ -157,6 +161,7 @@
     <string name="delete_shift_message">Its hours and earnings will be removed from your totals.</string>
     <string name="shift_saved">Shift saved</string>
     <string name="shift_deleted">Shift deleted</string>
+    <string name="shift_missing">This shift no longer exists</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -177,19 +182,19 @@
     <string name="language_english">English</string>
     <string name="language_system">System</string>
     <string name="export_data">Export data</string>
-    <string name="export_data_summary">Save all jobs and shifts to a JSON file</string>
+    <string name="export_data_summary">Save all jobs, shifts, bonuses and received payments to a JSON file</string>
     <string name="export_done">Data exported</string>
     <string name="import_data">Import data</string>
     <string name="import_data_summary">Restore from a JSON file (replaces current data)</string>
     <string name="import_backup_title">Replace all data?</string>
-    <string name="import_backup_message">All current jobs and shifts will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.</string>
-    <string name="import_backup_message_linked">All current jobs and shifts will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.\n\nSync is off, but this phone is still linked to your account: when you turn sync on again, this replaces the data on your other devices too.</string>
+    <string name="import_backup_message">All current jobs, shifts, bonuses and received payments will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.</string>
+    <string name="import_backup_message_linked">All current jobs, shifts, bonuses and received payments will be deleted and replaced with the data from the file. A safety backup of the current data is saved first.\n\nSync is off, but this phone is still linked to your account: when you turn sync on again, this replaces the data on your other devices too.</string>
     <string name="import_backup_title_everywhere">Replace data on all your devices?</string>
-    <string name="import_backup_message_synced">This will replace data on all your devices. Sync is on, so the jobs, shifts and bonuses that aren\'t in the file are deleted on your other phones too, at their next sync, and the file\'s data takes their place.\n\nA safety backup of this phone\'s current data is saved first.</string>
+    <string name="import_backup_message_synced">This will replace data on all your devices. Sync is on, so the jobs, shifts, bonuses and received payments that aren\'t in the file are deleted on your other phones too, at their next sync, and the file\'s data takes their place.\n\nA safety backup of this phone\'s current data is saved first.</string>
     <string name="replace_data">Replace</string>
     <string name="replace_data_everywhere">Replace everywhere</string>
     <string name="safety_backups">Safety backups</string>
-    <string name="safety_backups_none">None yet. One is saved automatically before your data is replaced (a file import, or an account\'s data).</string>
+    <string name="safety_backups_none">None yet. One is saved automatically before your data is replaced (a file import, or an account\'s data) and before the current rate is applied to many shifts.</string>
     <string name="safety_backups_summary">Saved before your data was replaced: %1$d. Tap to save one to a file.</string>
     <string name="safety_backups_message">The app saves these itself before it replaces the data on this phone (the newest %1$d are kept). Save one to a file or share it (Drive, a messenger, email); restore it with Import data.</string>
     <string name="safety_backup_reason_import">Before importing a file</string>
@@ -235,7 +240,7 @@
     <string name="sync_now_summary">Without waiting for the automatic sync</string>
     <string name="sync_running">Syncing…</string>
     <string name="sync_not_yet">Not synced yet</string>
-    <string name="sync_done">Last sync: %1$s · %2$d received, %3$d sent (%3$d cloud writes; today %4$d)</string>
+    <string name="sync_done">Last sync: %1$s · %2$d received, %3$d sent · cloud writes today: %4$d</string>
     <string name="sync_pending">Waiting to be sent: %1$d</string>
     <string name="sync_skipped">Cloud records skipped: %1$d (perhaps made by a newer version of the app)</string>
     <string name="sync_offline">Can\'t reach the cloud. Changes will sync when the phone is online.</string>
@@ -262,10 +267,10 @@
     <string name="sync_upload_again">Upload again</string>
     <string name="sync_turn_off">Turn sync off</string>
     <string name="cloud_delete">Delete my cloud data</string>
-    <string name="cloud_delete_summary">Removes your jobs, shifts and bonuses from the cloud. This phone keeps them.</string>
+    <string name="cloud_delete_summary">Removes your jobs, shifts, bonuses and received payments from the cloud. This phone keeps them.</string>
     <string name="cloud_deleting">Deleting from the cloud…</string>
     <string name="cloud_delete_title">Delete your cloud data?</string>
-    <string name="cloud_delete_message">All jobs, shifts and bonuses of %1$s will be deleted from the cloud, and sync turns off. The data on this phone stays.\n\nYour other phones that sync with this account will stop syncing and ask what to do. Anything that exists only in the cloud (for example, from a phone you no longer have) will be lost. This can\'t be undone.</string>
+    <string name="cloud_delete_message">All jobs, shifts, bonuses and received payments of %1$s will be deleted from the cloud, and sync turns off. The data on this phone stays.\n\nYour other phones that sync with this account will stop syncing and ask what to do. Anything that exists only in the cloud (for example, from a phone you no longer have) will be lost. This can\'t be undone.</string>
     <string name="cloud_delete_confirm">Delete</string>
     <string name="cloud_delete_done">Deleted from the cloud (%1$d records). Sync is off; the data on this phone stays.</string>
     <string name="cloud_delete_offline">Couldn\'t delete the cloud data: no connection. Try again when you\'re online; whatever wasn\'t deleted yet is still there.</string>

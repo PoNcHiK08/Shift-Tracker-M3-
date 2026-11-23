@@ -25,8 +25,9 @@ data class Shift(
     val secondRate: TimedRate? = null,
 ) {
     val isOvernight: Boolean get() = ShiftCalculator.isOvernight(start, end)
-    val pay: ShiftPay get() = ShiftCalculator.pay(start, end, unpaidBreakMinutes, hourlyRateGrosze, secondRate)
-    val paidMinutes: Long get() = ShiftCalculator.paidMinutes(start, end, unpaidBreakMinutes)
+    /** Real time in the phone's time zone: an hour more or less on the nights the clocks change. */
+    val pay: ShiftPay get() = ShiftCalculator.pay(date, start, end, unpaidBreakMinutes, hourlyRateGrosze, secondRate)
+    val paidMinutes: Long get() = ShiftCalculator.paidMinutes(date, start, end, unpaidBreakMinutes)
     val earningsGrosze: Long get() = pay.earningsGrosze
 }
 
