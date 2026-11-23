@@ -94,7 +94,8 @@ class AppSmokeTest {
         assertEquals(1, composeRule.onAllNodesWithText(str(R.string.day_off)).fetchSemanticsNodes().size)
         clickOn(str(R.string.add_shift))
         waitForText(str(R.string.new_shift))
-        composeRule.onNodeWithText(str(R.string.save)).performClick()
+        // Save is enabled once the editor has loaded (with the job's latest shift times); a tap before that is ignored.
+        clickOn(str(R.string.save))
         // The editor collapses back into the "Add shift" button.
         waitGone(str(R.string.new_shift))
 
