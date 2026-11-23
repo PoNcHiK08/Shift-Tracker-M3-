@@ -201,7 +201,7 @@ class WidgetLaunchTest {
     fun aShiftThatNeverExistedOpensTheCalendarOnAWarmStartFromAnotherTab() {
         launch(null)
         assertOnCalendar()
-        composeRule.onNode(hasContentDescription(str(R.string.nav_summary)) and hasClickAction()).performClick()
+        composeRule.onNode(hasText(str(R.string.nav_summary)) and hasClickAction()).performClick()
         composeRule.waitUntil(10_000) { count(str(R.string.add_shift)) == 0 }
         newIntent(LaunchRequest.EditShift(shiftId + 1_000))
         assertOnCalendar()
