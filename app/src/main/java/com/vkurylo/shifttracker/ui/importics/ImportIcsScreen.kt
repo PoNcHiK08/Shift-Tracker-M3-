@@ -200,7 +200,7 @@ fun ImportIcsScreen(
                 itemsIndexed(state.candidates, key = { index, _ -> index }) { index, candidate ->
                     val event = candidate.event
                     val checked = index in state.selected
-                    val minutes = ShiftCalculator.durationMinutes(event.start.toLocalTime(), event.end.toLocalTime())
+                    val minutes = ShiftCalculator.durationMinutes(event.start.toLocalDate(), event.start.toLocalTime(), event.end.toLocalTime())
                     ListItem(
                         modifier = Modifier.toggleable(value = checked, role = Role.Checkbox, onValueChange = { viewModel.toggle(index) }),
                         leadingContent = { Checkbox(checked = checked, onCheckedChange = null) },

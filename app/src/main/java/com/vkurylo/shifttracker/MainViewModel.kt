@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.vkurylo.shifttracker.domain.model.UserPreferences
 import com.vkurylo.shifttracker.domain.model.hasDeductions
 import com.vkurylo.shifttracker.domain.repository.JobRepository
+import com.vkurylo.shifttracker.domain.repository.ShiftRepository
 import com.vkurylo.shifttracker.ui.util.EarningsDisplay
 import com.vkurylo.shifttracker.domain.repository.LanguageRepository
 import com.vkurylo.shifttracker.domain.repository.PreferencesRepository
@@ -21,6 +22,7 @@ class MainViewModel @Inject constructor(
     preferencesRepository: PreferencesRepository,
     languageRepository: LanguageRepository,
     jobRepository: JobRepository,
+    private val shiftRepository: ShiftRepository,
 ) : ViewModel() {
 
     val preferences: StateFlow<UserPreferences?> = preferencesRepository.preferences
@@ -36,4 +38,7 @@ class MainViewModel @Inject constructor(
     init {
         viewModelScope.launch { languageRepository.applyDefaultOnFirstLaunch() }
     }
+
+    /** A live (not deleted) shift with this id: what a widget tap may open. */
+    suspend fun shiftExists(id: Long): Boolean = shiftRepository.getShift(id) != null
 }

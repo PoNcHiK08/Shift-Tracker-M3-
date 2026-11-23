@@ -73,7 +73,11 @@ class MainActivity : AppCompatActivity() {
                 CompositionLocalProvider(LocalEarningsDisplay provides earningsDisplay) {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         val launch by launchRequests.collectAsStateWithLifecycle()
-                        ShiftTrackerNavHost(launchRequest = launch, onLaunchHandled = { launchRequests.value = null })
+                        ShiftTrackerNavHost(
+                            launchRequest = launch,
+                            onLaunchHandled = { launchRequests.value = null },
+                            shiftExists = viewModel::shiftExists,
+                        )
                     }
                 }
                 // A crash/unexpected close last time? Show it so it can be copied and sent.

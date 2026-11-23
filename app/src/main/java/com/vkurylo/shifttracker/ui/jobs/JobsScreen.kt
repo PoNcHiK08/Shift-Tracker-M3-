@@ -55,7 +55,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -69,6 +68,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -98,6 +98,7 @@ import com.vkurylo.shifttracker.ui.components.PickerField
 import com.vkurylo.shifttracker.ui.components.TimeDialog
 import com.vkurylo.shifttracker.ui.components.onColor
 import com.vkurylo.shifttracker.ui.components.SegmentedItem
+import com.vkurylo.shifttracker.ui.components.rememberDiscardGuardedSheetState
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.util.Formatters
 import com.vkurylo.shifttracker.ui.util.currentLocale
@@ -229,6 +230,50 @@ fun JobsScreen(
     }
 }
 
+const val JOB_NAME_TAG = "job-name"
+
+/** What the job editor's fields hold, as typed. */
+internal data class JobForm(
+    val name: String,
+    val currency: String,
+    val rate: String,
+    val color: Int,
+    val secondEnabled: Boolean,
+    val secondRate: String,
+    val secondFrom: Int,
+    val secondTo: Int,
+    /** year * 12 + month - 1 of "from which month" (a job with entries). */
+    val payFromKey: Int,
+    val payType: PayType,
+    val monthlyAmount: String,
+    val deduction: String,
+) {
+    /** Without the spaces around typed text, which Save drops too. */
+    fun normalized(): JobForm = copy(name = name.trim(), rate = rate.trim(), secondRate = secondRate.trim(), monthlyAmount = monthlyAmount.trim(), deduction = deduction.trim())
+
+    companion object {
+        /** The form for [job] as the editor opens it (a new job: id 0). */
+        fun of(job: Job): JobForm {
+            val digits = Currencies.fractionDigits(job.currency)
+            val pay = job.payFor(YearMonth.now())
+            return JobForm(
+                name = job.name,
+                currency = job.currency,
+                rate = if (job.id == 0L) "" else MoneyParser.toInput(job.hourlyRateGrosze, digits),
+                color = job.color,
+                secondEnabled = job.secondRate != null,
+                secondRate = job.secondRate?.let { MoneyParser.toInput(it.rateGrosze, digits) } ?: "",
+                secondFrom = (job.secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toSecondOfDay() / 60,
+                secondTo = (job.secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toSecondOfDay() / 60,
+                payFromKey = YearMonth.now().let { it.year * 12 + it.monthValue - 1 },
+                payType = pay.payType,
+                monthlyAmount = if (pay.payType == PayType.FIXED_MONTHLY) MoneyParser.toInput(pay.monthlyAmountMinor, digits) else "",
+                deduction = if (pay.deductionBp == 0) "" else MoneyParser.toInput(pay.deductionBp.toLong(), 2),
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun JobEditorSheet(
@@ -240,46 +285,33 @@ private fun JobEditorSheet(
     onDelete: () -> Unit,
 ) {
     val isNew = job.id == 0L
-    var name by rememberSaveable(job.id) { mutableStateOf(job.name) }
-    var currency by rememberSaveable(job.id) { mutableStateOf(job.currency) }
+    // The form as it opens; closing asks "Discard changes?" once it differs.
+    val initial = remember(job) { JobForm.of(job) }
+    var name by rememberSaveable(job.id) { mutableStateOf(initial.name) }
+    var currency by rememberSaveable(job.id) { mutableStateOf(initial.currency) }
     val digits = Currencies.fractionDigits(currency)
-    var rate by rememberSaveable(job.id) {
-        mutableStateOf(if (isNew) "" else MoneyParser.toInput(job.hourlyRateGrosze, Currencies.fractionDigits(job.currency)))
-    }
-    var color by rememberSaveable(job.id) { mutableIntStateOf(job.color) }
+    var rate by rememberSaveable(job.id) { mutableStateOf(initial.rate) }
+    var color by rememberSaveable(job.id) { mutableIntStateOf(initial.color) }
     var showErrors by rememberSaveable(job.id) { mutableStateOf(false) }
-    var secondEnabled by rememberSaveable(job.id) { mutableStateOf(job.secondRate != null) }
-    var secondRate by rememberSaveable(job.id) {
-        mutableStateOf(job.secondRate?.let { MoneyParser.toInput(it.rateGrosze, Currencies.fractionDigits(job.currency)) } ?: "")
-    }
-    var secondFrom by rememberSaveable(job.id) {
-        mutableIntStateOf((job.secondRate?.from ?: TimedRate.DEFAULT_NIGHT_FROM).toSecondOfDay() / 60)
-    }
-    var secondTo by rememberSaveable(job.id) {
-        mutableIntStateOf((job.secondRate?.to ?: TimedRate.DEFAULT_NIGHT_TO).toSecondOfDay() / 60)
-    }
+    var secondEnabled by rememberSaveable(job.id) { mutableStateOf(initial.secondEnabled) }
+    var secondRate by rememberSaveable(job.id) { mutableStateOf(initial.secondRate) }
+    var secondFrom by rememberSaveable(job.id) { mutableIntStateOf(initial.secondFrom) }
+    var secondTo by rememberSaveable(job.id) { mutableIntStateOf(initial.secondTo) }
     var pickingFrom by rememberSaveable { mutableStateOf(false) }
     var pickingTo by rememberSaveable { mutableStateOf(false) }
     var pickingCurrency by rememberSaveable { mutableStateOf(false) }
     // Pay type and salary. A job with entries changes them from a month on (default: this month);
     // a job without entries simply has one setting for all time.
     val hasEntries = currencyLocked
-    var payFromKey by rememberSaveable(job.id) { mutableIntStateOf(YearMonth.now().let { it.year * 12 + it.monthValue - 1 }) }
+    var payFromKey by rememberSaveable(job.id) { mutableIntStateOf(initial.payFromKey) }
     val payFrom = YearMonth.of(payFromKey / 12, payFromKey % 12 + 1)
-    val initialPay = remember(job.id) { job.payFor(YearMonth.now()) }
-    var payType by rememberSaveable(job.id) { mutableStateOf(initialPay.payType) }
-    var monthlyAmount by rememberSaveable(job.id) {
-        mutableStateOf(
-            if (initialPay.payType == PayType.FIXED_MONTHLY) MoneyParser.toInput(initialPay.monthlyAmountMinor, Currencies.fractionDigits(job.currency)) else "",
-        )
-    }
+    var payType by rememberSaveable(job.id) { mutableStateOf(initial.payType) }
+    var monthlyAmount by rememberSaveable(job.id) { mutableStateOf(initial.monthlyAmount) }
 
     // Decimals and limits follow the job's currency (0 decimals for JPY, 3 for KWD).
     val rateGrosze = MoneyParser.parseMinor(rate, digits)
     val secondRateGrosze = MoneyParser.parseMinor(secondRate, digits)
-    var deduction by rememberSaveable(job.id) {
-        mutableStateOf(if (initialPay.deductionBp == 0) "" else MoneyParser.toInput(initialPay.deductionBp.toLong(), 2))
-    }
+    var deduction by rememberSaveable(job.id) { mutableStateOf(initial.deduction) }
     val monthlyMinor = MoneyParser.parseMinor(monthlyAmount, digits, MoneyParser.AMOUNT_WHOLE_DIGITS)
     // 13,71 % -> 1371 basis points; empty means none.
     val deductionBp = if (deduction.isBlank()) 0 else MoneyParser.parseMinor(deduction, 2, wholeDigits = 3)?.takeIf { it <= 10_000 }?.toInt()
@@ -292,7 +324,13 @@ private fun JobEditorSheet(
     val monthlyError = !hourly && monthlyMinor == null
     val fromTime = LocalTime.of(secondFrom / 60, secondFrom % 60)
     val toTime = LocalTime.of(secondTo / 60, secondTo % 60)
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val form = JobForm(name, currency, rate, color, secondEnabled, secondRate, secondFrom, secondTo, payFromKey, payType, monthlyAmount, deduction)
+    // Swiping the sheet away, tapping outside it or back with unsaved changes asks first.
+    val sheetState = rememberDiscardGuardedSheetState(
+        hasChanges = !saving && form.normalized() != initial.normalized(),
+        onDiscard = {},
+        onDismissed = onDismiss,
+    )
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(
@@ -325,7 +363,7 @@ private fun JobEditorSheet(
                     textLengthSupport(name.length)
                 },
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().testTag(JOB_NAME_TAG),
             )
             Spacer(Modifier.height(8.dp))
             if (currencyLocked) {

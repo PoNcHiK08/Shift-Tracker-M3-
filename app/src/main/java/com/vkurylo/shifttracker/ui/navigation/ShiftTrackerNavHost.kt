@@ -18,6 +18,8 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
@@ -67,8 +69,15 @@ data object MainRoute
  */
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: () -> Unit = {}) {
+fun ShiftTrackerNavHost(
+    launchRequest: LaunchRequest? = null,
+    onLaunchHandled: () -> Unit = {},
+    /** Whether a live shift has this id (the widget can still show one deleted here or by sync). */
+    shiftExists: suspend (Long) -> Boolean = { true },
+) {
     val rootNav = rememberNavController()
+    // Bumped to show the calendar tab (a widget tap on a shift that is gone).
+    var calendarRequests by remember { mutableIntStateOf(0) }
     LaunchedEffect(launchRequest) {
         val request = launchRequest ?: return@LaunchedEffect
         onLaunchHandled()
@@ -79,7 +88,13 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
         when (request) {
             // No shared key: the card isn't on screen, so the editor slides in instead of growing out of it.
             LaunchRequest.NewShift -> rootNav.navigate(EditShiftRoute(dateEpochDay = LocalDate.now().toEpochDay()))
-            is LaunchRequest.EditShift -> rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
+            is LaunchRequest.EditShift -> if (shiftExists(request.shiftId)) {
+                rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
+            } else if (top?.hasRoute(MainRoute::class) != false) {
+                // Gone since the widget was drawn: the calendar, never an empty editor (it would save a new shift).
+                // Another screen on top (Jobs, an import) stays as it is, like an open editor.
+                calendarRequests++
+            }
             LaunchRequest.Jobs -> if (top?.hasRoute(JobsRoute::class) != true) rootNav.navigate(JobsRoute)
         }
     }
@@ -142,7 +157,7 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
                     ) {
                         composable<MainRoute> {
                             CompositionLocalProvider(LocalRootAnimatedVisibilityScope provides this) {
-                                HomeScreen(rootNav, transitions)
+                                HomeScreen(rootNav, transitions, calendarRequests)
                             }
                         }
                         composable<JobsRoute> {
@@ -234,8 +249,16 @@ fun ShiftTrackerNavHost(launchRequest: LaunchRequest? = null, onLaunchHandled: (
 }
 
 @Composable
-private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions) {
+private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, calendarRequests: Int = 0) {
     val tabNav = rememberNavController()
+    LaunchedEffect(calendarRequests) {
+        if (calendarRequests == 0) return@LaunchedEffect
+        tabNav.navigate(CalendarRoute) {
+            popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
 
