@@ -6,6 +6,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -107,6 +108,24 @@ private val IndicatorHeight = 32.dp
 private val BarPaddingHorizontal = 8.dp
 private val BarPaddingVertical = 10.dp
 
+/** The floating bar's colours: theme roles only, so light, dark and dynamic colour all follow the theme. */
+object HomeBarDefaults {
+    /**
+     * One step above surfaceContainer, so the bar stands apart from cards in surfaceContainer / surfaceContainerLow
+     * (the calendar's day card) without looking heavy; surfaceContainerHighest was too strong in dark theme and left
+     * the pill almost no contrast in light theme.
+     */
+    val containerColor: Color @Composable get() = MaterialTheme.colorScheme.surfaceContainerHigh
+
+    /** A hairline edge: outlineVariant at low emphasis. */
+    val border: BorderStroke @Composable get() = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = OUTLINE_ALPHA))
+
+    /** The selected tab's pill: the stock navigation indicator role. */
+    val indicatorColor: Color @Composable get() = NavigationBarItemDefaults.colors().selectedIndicatorColor
+
+    private const val OUTLINE_ALPHA = 0.6f
+}
+
 /**
  * Slight bounce, about 300 ms: overshoots by ~3 % of the distance (≈ 4 dp from one tab to the next), well inside
  * the room the 64 dp pill leaves around a 24 dp icon.
@@ -115,8 +134,8 @@ private const val INDICATOR_DAMPING = 0.75f
 private const val INDICATOR_STIFFNESS = 700f
 
 /**
- * The home screen's floating navigation bar (M3): a fully rounded surfaceContainer bar with the stock tonal
- * elevation, an icon and an always visible label per tab, and ONE indicator pill (secondaryContainer) that slides
+ * The home screen's floating navigation bar (M3): a fully rounded surfaceContainerHigh bar with a faint outlineVariant
+ * edge and the stock tonal elevation ([HomeBarDefaults]), an icon and an always visible label per tab, and ONE indicator pill (secondaryContainer) that slides
  * to the selected tab with a spring. The pill follows [selectedIndex], whatever changed it (a tap, a back gesture,
  * a widget opening a tab); it is put in place without animation the first time it is known.
  */
@@ -126,8 +145,10 @@ fun HomeNavigationBar(
     selectedIndex: Int,
     onSelect: (HomeTab) -> Unit,
     modifier: Modifier = Modifier,
+    containerColor: Color = HomeBarDefaults.containerColor,
+    border: BorderStroke? = HomeBarDefaults.border,
+    indicatorColor: Color = HomeBarDefaults.indicatorColor,
 ) {
-    val colors = NavigationBarItemDefaults.colors()
     // The tab index the pill is at, as a float so it can be between two tabs while it moves.
     val position = remember { Animatable(selectedIndex.coerceAtLeast(0).toFloat()) }
     var placed by remember { mutableStateOf(false) }
@@ -145,8 +166,9 @@ fun HomeNavigationBar(
     Surface(
         modifier = modifier.fillMaxWidth().testTag(HOME_BAR_TAG),
         shape = CircleShape,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = containerColor,
         tonalElevation = NavigationBarDefaults.Elevation,
+        border = border,
     ) {
         Box(Modifier.heightIn(min = FloatingBarHeight).padding(horizontal = BarPaddingHorizontal, vertical = BarPaddingVertical)) {
             if (placed && rowWidth > 0) {
@@ -160,7 +182,7 @@ fun HomeNavigationBar(
                         }
                         .size(IndicatorWidth, IndicatorHeight)
                         .clip(CircleShape)
-                        .background(colors.selectedIndicatorColor)
+                        .background(indicatorColor)
                         .testTag(HOME_BAR_INDICATOR_TAG),
                 )
             }
