@@ -43,7 +43,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.WorkOutline
@@ -521,7 +520,8 @@ private fun DayPanel(
                             Text(Formatters.fullDate(d, locale), style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = if (dayShifts.isEmpty()) {
-                                    stringResource(R.string.no_shifts_this_day)
+                                    // The only line a day without shifts has: no icon row below it.
+                                    stringResource(emptyDayLabel(d, LocalDate.now()))
                                 } else {
                                     "${hoursLabel(dayShifts.sumOf { it.shift.paidMinutes })} · ${shiftsCountLabel(dayShifts.size)}"
                                 },
@@ -558,25 +558,7 @@ private fun DayPanel(
             ) { d ->
                 val dayShifts = shiftsByDate[d].orEmpty()
                 val dayBonuses = bonusesByDate[d].orEmpty()
-                if (dayShifts.isEmpty() && dayBonuses.isEmpty()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.EventAvailable,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.day_free),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                    }
-                } else {
+                if (dayShifts.isNotEmpty() || dayBonuses.isNotEmpty()) {
                     // The day's entries form one segmented group (Android 16 list style).
                     val count = dayShifts.size + dayBonuses.size
                     Column(
@@ -625,6 +607,13 @@ private fun DayPanel(
         }
     }
 }
+
+/**
+ * The line under the date of a day without shifts: "Day off" for a past day or today, "No shifts yet" for a day
+ * still to come.
+ */
+internal fun emptyDayLabel(date: LocalDate, today: LocalDate): Int =
+    if (date.isAfter(today)) R.string.day_no_shifts_yet else R.string.day_off
 
 /** The calendar screen's scrolling list (strip, calendar, day, …). */
 internal const val CALENDAR_LIST_TAG = "calendar-list"
