@@ -82,17 +82,27 @@ fun ShiftTrackerNavHost(
     val rootNav = rememberNavController()
     // Bumped to show the calendar tab (a widget tap on a shift that is gone).
     var calendarRequests by remember { mutableIntStateOf(0) }
+    // A widget tap, once looked up: navigating happens in the second effect, which starts from the composition on
+    // the main thread. (The lookup is a database read; Navigation must not be called from the thread it resumes on.)
+    var resolved by remember { mutableStateOf<ResolvedLaunch?>(null) }
     LaunchedEffect(launchRequest) {
         val request = launchRequest ?: return@LaunchedEffect
         onLaunchHandled()
+        // A shift the widget showed may be gone since (deleted here or by sync).
+        val shiftGone = request is LaunchRequest.EditShift && !shiftExists(request.shiftId)
+        resolved = ResolvedLaunch(request, shiftGone)
+    }
+    LaunchedEffect(resolved) {
+        val launch = resolved ?: return@LaunchedEffect
+        resolved = null
         val top = rootNav.currentBackStackEntry?.destination
         // An open editor stays as it is: nothing is stacked on it and nothing typed is thrown away.
         val editorOpen = top?.hasRoute(EditShiftRoute::class) == true || top?.hasRoute(EditBonusRoute::class) == true
         if (editorOpen) return@LaunchedEffect
-        when (request) {
+        when (val request = launch.request) {
             // No shared key: the card isn't on screen, so the editor slides in instead of growing out of it.
             LaunchRequest.NewShift -> rootNav.navigate(EditShiftRoute(dateEpochDay = LocalDate.now().toEpochDay()))
-            is LaunchRequest.EditShift -> if (shiftExists(request.shiftId)) {
+            is LaunchRequest.EditShift -> if (!launch.shiftGone) {
                 rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
             } else if (top?.hasRoute(MainRoute::class) != false) {
                 // Gone since the widget was drawn: the calendar, never an empty editor (it would save a new shift).
@@ -354,3 +364,6 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, c
         )
     }
 }
+
+/** A widget tap and whether the shift it names is gone (null for other taps), ready to navigate. */
+private data class ResolvedLaunch(val request: LaunchRequest, val shiftGone: Boolean)
