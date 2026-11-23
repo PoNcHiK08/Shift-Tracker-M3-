@@ -21,6 +21,8 @@ import dagger.hilt.android.testing.HiltTestApplication
 import com.vkurylo.shifttracker.ui.util.Formatters
 import org.junit.Assert.assertEquals
 import org.junit.Rule
+import com.vkurylo.shifttracker.ui.calendar.MONTH_TILE_EARNINGS
+import androidx.compose.ui.test.hasTestTag
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
@@ -152,7 +154,8 @@ class AppSmokeTest {
 
         // Then the bonus.
         waitForText("+75")
-        composeRule.onNode(hasText("+75", substring = true)).performScrollTo().performClick()
+        // The day's bonus card (the earnings tile's bonus line says "+75,00 zł bonus" too).
+        composeRule.onNode(hasText("+75", substring = true) and !hasTestTag(MONTH_TILE_EARNINGS)).performScrollTo().performClick()
         waitForText(str(R.string.edit_bonus))
         clickOn(str(R.string.delete_bonus))
         waitForText(str(R.string.delete_bonus_title))

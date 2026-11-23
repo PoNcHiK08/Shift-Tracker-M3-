@@ -96,8 +96,9 @@ class MonthStripLayoutTest {
         show(fontScale = 1f)
         val (earnings, hours, shifts) = assertLinedUp()
         val height = (earnings.bottom - earnings.top).value
-        // The old tiles below the day were 144 dp high; this sits above the calendar.
-        assertTrue("strip is $height dp high", height in 40f..56f)
+        // The old tiles below the day were 144 dp high; this sits above the calendar. The earnings tile's bonus line
+        // (always there) adds one label line; the separate "Month bonuses" banner (~50 dp) is gone.
+        assertTrue("strip is $height dp high", height in 56f..72f)
         assertEverythingFits(earnings, hours, shifts)
     }
 

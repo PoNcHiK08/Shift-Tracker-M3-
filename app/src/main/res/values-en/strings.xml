@@ -367,6 +367,15 @@
     <string name="bonus_month">Month</string>
     <string name="bonus_hint_month">The bonus counts in this month\'s earnings, but isn\'t shown on any day or in weekly totals. It doesn\'t change hours or the average rate.</string>
     <string name="bonus_for_whole_month">For the whole month</string>
+    <string name="bonuses_line_none">No bonuses</string>
+    <string name="bonuses_line_one">%1$s bonus</string>
+    <plurals name="bonuses_line_many">
+        <item quantity="one">%1$s · %2$d bonus</item>
+        <item quantity="other">%1$s · %2$d bonuses</item>
+    </plurals>
+    <string name="bonuses_sheet_title">Bonuses · %1$s</string>
+    <string name="bonuses_sheet_none">No bonuses this month</string>
+    <!-- month_bonuses_row and month_bonuses_sheet_title: not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
     <string name="month_bonuses_title">Month bonuses</string>
     <string name="month_bonuses_row">Month bonuses · %1$d</string>
     <string name="month_bonuses_sheet_title">Month bonuses · %1$s</string>
