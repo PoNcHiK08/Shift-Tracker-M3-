@@ -32,6 +32,24 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      # Robolectric downloads its Android runtime jars (about 200 MB per Android version) from Maven Central
+      # the first time a test needs them, outside Gradle and its cache, so a refused download used to fail the
+      # run. They are kept here instead, keyed by the Robolectric version and the Android versions the tests
+      # pin (@Config(sdk = [...])): a new version starts from the old jars and saves the full set when it passes.
+      - name: Robolectric cache key
+        id: robolectric
+        run: |
+          version=$(sed -n 's/^robolectric = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          sdks=$(grep -rhoE 'sdk = \[[0-9, ]+\]' app/src/test | grep -oE '[0-9]+' | sort -un | paste -sd- -)
+          echo "key=robolectric-$version-sdk$sdks" >> "$GITHUB_OUTPUT"
+          echo "prefix=robolectric-$version-" >> "$GITHUB_OUTPUT"
+      - name: Cache Robolectric's Android runtime jars
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: ${{ steps.robolectric.outputs.key }}
+          restore-keys: ${{ steps.robolectric.outputs.prefix }}
+
       - name: Unit tests (calculator, .ics parser, UI smoke test)
         run: ./gradlew testDebugUnitTest --stacktrace
 
