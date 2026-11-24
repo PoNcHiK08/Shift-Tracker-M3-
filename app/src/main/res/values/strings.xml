@@ -37,6 +37,9 @@
     <string name="add_shift">Додати зміну</string>
     <string name="no_shifts_title">Цього місяця змін немає</string>
     <string name="no_shifts_message">Натисни на день у календарі або «Додати зміну», щоб записати першу.</string>
+    <string name="day_off">Вихідний</string>
+    <string name="day_no_shifts_yet">Змін поки нема</string>
+    <!-- Not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
     <string name="day_free">Вихідний — змін немає</string>
     <string name="no_shifts_this_day">Цього дня змін немає.</string>
     <string name="no_jobs_title">Спершу додай роботу</string>
@@ -392,6 +395,17 @@
     <string name="bonus_month">Місяць</string>
     <string name="bonus_hint_month">Бонус входить у заробіток цього місяця, але не показується в жодному дні й не входить у тижневі підсумки. Години й середню ставку не змінює.</string>
     <string name="bonus_for_whole_month">На весь місяць</string>
+    <string name="bonuses_line_none">Без бонусів</string>
+    <string name="bonuses_line_one">%1$s бонус</string>
+    <plurals name="bonuses_line_many">
+        <item quantity="one">%1$s · %2$d бонус</item>
+        <item quantity="few">%1$s · %2$d бонуси</item>
+        <item quantity="many">%1$s · %2$d бонусів</item>
+        <item quantity="other">%1$s · %2$d бонусу</item>
+    </plurals>
+    <string name="bonuses_sheet_title">Бонуси · %1$s</string>
+    <string name="bonuses_sheet_none">Цього місяця бонусів немає</string>
+    <!-- month_bonuses_row and month_bonuses_sheet_title: not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
     <string name="month_bonuses_title">Бонуси за місяць</string>
     <string name="month_bonuses_row">Бонуси за місяць · %1$d</string>
     <string name="month_bonuses_sheet_title">Бонуси за місяць · %1$s</string>

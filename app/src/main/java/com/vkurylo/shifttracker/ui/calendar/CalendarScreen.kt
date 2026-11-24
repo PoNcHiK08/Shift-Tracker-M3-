@@ -43,7 +43,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.Redeem
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.WorkOutline
@@ -128,6 +127,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
+import com.vkurylo.shifttracker.ui.navigation.LocalHomeBarClearance
 
 private const val PAGE_COUNT = 1200 // 100 years
 private const val INITIAL_PAGE = PAGE_COUNT / 2
@@ -165,6 +165,8 @@ fun CalendarScreen(
     }
 
     var showMonthBonuses by rememberSaveable { mutableStateOf(false) }
+    // Every bonus of the visible month, for a day or for the whole month.
+    val monthAllBonuses = bonusesOfMonth(state.month, state.monthBonuses, state.bonusesByDate)
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val hasJobs = state.jobs.isNotEmpty()
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
@@ -206,25 +208,20 @@ fun CalendarScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().testTag(CALENDAR_LIST_TAG),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+            // The last item scrolls clear of the floating navigation bar.
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + LocalHomeBarClearance.current + 24.dp),
         ) {
             // The month at a glance, first thing on screen: earnings, hours and shifts in one compact row.
             if (state.loading || hasJobs) {
                 item(key = "month") {
+                    // Its bonus line is always there (also "No bonuses"), so the strip is as tall every month and the
+                    // grid below never moves; it opens the month's bonuses.
                     MonthStrip(
                         summary = state.monthSummary,
                         defaultCurrency = state.defaultCurrency,
+                        bonuses = monthAllBonuses,
+                        onBonusesClick = { showMonthBonuses = true },
                         modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 2.dp, bottom = 6.dp),
-                    )
-                }
-            }
-            // Bonuses for the whole month have no day, so they are not in the grid; they have a row of their own.
-            if (state.monthBonuses.isNotEmpty()) {
-                item(key = "month-bonuses") {
-                    MonthBonusesRow(
-                        items = state.monthBonuses,
-                        onClick = { showMonthBonuses = true },
-                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 6.dp),
                     )
                 }
             }
@@ -278,13 +275,11 @@ fun CalendarScreen(
         }
     }
 
-    // The last one can be deleted (or the month changed) while the list is open: then there is nothing to list.
-    val hasMonthBonuses = state.monthBonuses.isNotEmpty()
-    LaunchedEffect(hasMonthBonuses) { if (!hasMonthBonuses) showMonthBonuses = false }
-    if (showMonthBonuses && hasMonthBonuses) {
+    // Opens with no bonuses too: it says so and offers to add one for the month.
+    if (showMonthBonuses) {
         MonthBonusesSheet(
             month = state.month,
-            items = state.monthBonuses,
+            items = monthAllBonuses,
             onDismiss = { showMonthBonuses = false },
             onEdit = { id ->
                 showMonthBonuses = false
@@ -519,7 +514,8 @@ private fun DayPanel(
                             Text(Formatters.fullDate(d, locale), style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = if (dayShifts.isEmpty()) {
-                                    stringResource(R.string.no_shifts_this_day)
+                                    // The only line a day without shifts has: no icon row below it.
+                                    stringResource(emptyDayLabel(d, LocalDate.now()))
                                 } else {
                                     "${hoursLabel(dayShifts.sumOf { it.shift.paidMinutes })} · ${shiftsCountLabel(dayShifts.size)}"
                                 },
@@ -556,25 +552,7 @@ private fun DayPanel(
             ) { d ->
                 val dayShifts = shiftsByDate[d].orEmpty()
                 val dayBonuses = bonusesByDate[d].orEmpty()
-                if (dayShifts.isEmpty() && dayBonuses.isEmpty()) {
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 20.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(
-                            Icons.Filled.EventAvailable,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            stringResource(R.string.day_free),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.outline,
-                        )
-                    }
-                } else {
+                if (dayShifts.isNotEmpty() || dayBonuses.isNotEmpty()) {
                     // The day's entries form one segmented group (Android 16 list style).
                     val count = dayShifts.size + dayBonuses.size
                     Column(
@@ -624,6 +602,13 @@ private fun DayPanel(
     }
 }
 
+/**
+ * The line under the date of a day without shifts: "Day off" for a past day or today, "No shifts yet" for a day
+ * still to come.
+ */
+internal fun emptyDayLabel(date: LocalDate, today: LocalDate): Int =
+    if (date.isAfter(today)) R.string.day_no_shifts_yet else R.string.day_off
+
 /** The calendar screen's scrolling list (strip, calendar, day, …). */
 internal const val CALENDAR_LIST_TAG = "calendar-list"
 
@@ -644,7 +629,15 @@ internal const val MONTH_TILE_SHIFTS = "month-tile-shifts"
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
-internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier: Modifier = Modifier) {
+internal fun MonthStrip(
+    summary: MonthSummary,
+    defaultCurrency: String,
+    modifier: Modifier = Modifier,
+    /** Every bonus of the month: the earnings tile's second line, always shown. */
+    bonuses: List<BonusWithJob> = emptyList(),
+    /** Tapping the earnings tile (its bonus line) opens the month's bonuses. */
+    onBonusesClick: (() -> Unit)? = null,
+) {
     val locale = currentLocale()
     val colors = MaterialTheme.colorScheme
     val outer = 20.dp
@@ -655,6 +648,7 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
             shape = RoundedCornerShape(topStart = outer, bottomStart = outer, topEnd = inner, bottomEnd = inner),
             // A little wider than the others: the amount and its "Received" tag share a row.
             modifier = Modifier.weight(1.8f).fillMaxHeight().testTag(MONTH_TILE_EARNINGS),
+            onClick = onBonusesClick,
         ) {
             // "Earned this month · Net" when jobs have deductions, so it's never ambiguous.
             val tag = earningsModeLabel()
@@ -682,6 +676,7 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
                 )
                 ReceivedTag(summary.receivedPart, color = colors.onPrimaryContainer, horizontalPadding = 4.dp)
             }
+            MonthBonusesLine(bonuses, color = colors.onPrimaryContainer)
         }
         Tile(
             container = colors.secondaryContainer,
@@ -713,8 +708,19 @@ internal fun MonthStrip(summary: MonthSummary, defaultCurrency: String, modifier
 }
 
 @Composable
-private fun Tile(container: Color, shape: Shape, modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(modifier = modifier, shape = shape, color = container) {
+private fun Tile(
+    container: Color,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val inner: @Composable () -> Unit = {
         Column(Modifier.padding(horizontal = 14.dp, vertical = 6.dp), verticalArrangement = Arrangement.Center) { content() }
+    }
+    if (onClick != null) {
+        Surface(onClick = onClick, modifier = modifier, shape = shape, color = container) { inner() }
+    } else {
+        Surface(modifier = modifier, shape = shape, color = container) { inner() }
     }
 }

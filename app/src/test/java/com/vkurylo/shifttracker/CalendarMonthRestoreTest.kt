@@ -17,6 +17,10 @@ import dagger.hilt.android.testing.HiltTestApplication
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.performSemanticsAction
+import com.vkurylo.shifttracker.ui.navigation.FloatingBarHeight
+import com.vkurylo.shifttracker.ui.navigation.homeBarClearance
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -66,7 +70,14 @@ class CalendarMonthRestoreTest {
         if (scroll) composeRule.onNodeWithTag(CALENDAR_LIST_TAG).performScrollToNode(matcher)
         composeRule.waitUntilExactlyOneExists(matcher, timeoutMillis = 10_000)
         val node = composeRule.onNode(matcher)
-        if (scroll) node.performScrollTo()
+        if (scroll) {
+            node.performScrollTo()
+            // "Scrolled into view" can still be behind the floating navigation bar: move the list up by the bar's
+            // clearance, as a finger would (the list's bottom padding leaves room for that).
+            val clearance = with(composeRule.density) { homeBarClearance(FloatingBarHeight).toPx() }
+            composeRule.onNodeWithTag(CALENDAR_LIST_TAG).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, clearance) }
+            composeRule.waitForIdle()
+        }
         node.performClick()
         composeRule.waitForIdle()
     }

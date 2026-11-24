@@ -96,7 +96,7 @@ class PredictiveBackGestureTest {
         composeRule.onAllNodesWithText(text).fetchSemanticsNodes().firstOrNull()?.boundsInRoot
 
     private fun tabSelected(label: String): Boolean {
-        val node = composeRule.onNode(hasContentDescription(label) and hasClickAction()).fetchSemanticsNode()
+        val node = composeRule.onNode(hasText(label) and hasClickAction()).fetchSemanticsNode()
         return node.config.getOrNull(SemanticsProperties.ToggleableState) == ToggleableState.On ||
             node.config.getOrNull(SemanticsProperties.Selected) == true
     }

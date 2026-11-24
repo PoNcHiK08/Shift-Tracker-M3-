@@ -6,16 +6,20 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -78,17 +82,27 @@ fun ShiftTrackerNavHost(
     val rootNav = rememberNavController()
     // Bumped to show the calendar tab (a widget tap on a shift that is gone).
     var calendarRequests by remember { mutableIntStateOf(0) }
+    // A widget tap, once looked up: navigating happens in the second effect, which starts from the composition on
+    // the main thread. (The lookup is a database read; Navigation must not be called from the thread it resumes on.)
+    var resolved by remember { mutableStateOf<ResolvedLaunch?>(null) }
     LaunchedEffect(launchRequest) {
         val request = launchRequest ?: return@LaunchedEffect
         onLaunchHandled()
+        // A shift the widget showed may be gone since (deleted here or by sync).
+        val shiftGone = request is LaunchRequest.EditShift && !shiftExists(request.shiftId)
+        resolved = ResolvedLaunch(request, shiftGone)
+    }
+    LaunchedEffect(resolved) {
+        val launch = resolved ?: return@LaunchedEffect
+        resolved = null
         val top = rootNav.currentBackStackEntry?.destination
         // An open editor stays as it is: nothing is stacked on it and nothing typed is thrown away.
         val editorOpen = top?.hasRoute(EditShiftRoute::class) == true || top?.hasRoute(EditBonusRoute::class) == true
         if (editorOpen) return@LaunchedEffect
-        when (request) {
+        when (val request = launch.request) {
             // No shared key: the card isn't on screen, so the editor slides in instead of growing out of it.
             LaunchRequest.NewShift -> rootNav.navigate(EditShiftRoute(dateEpochDay = LocalDate.now().toEpochDay()))
-            is LaunchRequest.EditShift -> if (shiftExists(request.shiftId)) {
+            is LaunchRequest.EditShift -> if (!launch.shiftGone) {
                 rootNav.navigate(EditShiftRoute(shiftId = request.shiftId))
             } else if (top?.hasRoute(MainRoute::class) != false) {
                 // Gone since the widget was drawn: the calendar, never an empty editor (it would save a new shift).
@@ -241,8 +255,8 @@ fun ShiftTrackerNavHost(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
-                    // Keep snackbars above the bottom bar on the home screen.
-                    .padding(bottom = if (onHome) HomeNavigationBarHeight else 0.dp),
+                    // Keep snackbars above the floating bar on the home screen.
+                    .padding(bottom = if (onHome) homeBarClearance(FloatingBarHeight) else 0.dp),
             )
         }
     }
@@ -262,28 +276,22 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, c
     val tabEntry by tabNav.currentBackStackEntryAsState()
     val currentTab = tabEntry?.destination
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        bottomBar = {
-            HomeNavigationBar(
-                tabs = HomeTabs,
-                isSelected = { tab -> currentTab?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true },
-                onSelect = { tab ->
-                    tabNav.navigate(tab.route) {
-                        popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
-                        launchSingleTop = true
-                        restoreState = true
-                    }
-                },
-            )
-        },
-    ) { innerPadding ->
+    // The tabs run edge to edge; the floating bar is drawn over their bottom, and their lists end above it
+    // (LocalHomeBarClearance). Its height is measured, so a larger font still clears.
+    val density = LocalDensity.current
+    var barHeight by remember { mutableStateOf(FloatingBarHeight) }
+    val selectedIndex = HomeTabs.indexOfFirst { tab -> currentTab?.hierarchy?.any { it.hasRoute(tab.routeClass) } == true }
+    // Scrolling a tab's content down hides the bar, up (or to the end) shows it; a tab switch always shows it.
+    val barVisibility = rememberHomeBarVisibility()
+    LaunchedEffect(selectedIndex) { barVisibility.show() }
+    val gapPx = with(density) { FloatingBarBottomGap.toPx() }
+    val navInset = WindowInsets.navigationBars
+    Box(Modifier.fillMaxSize().nestedScroll(barVisibility.connection)) {
+        CompositionLocalProvider(LocalHomeBarClearance provides homeBarClearance(barHeight)) {
         NavHost(
             navController = tabNav,
             startDestination = CalendarRoute,
-            modifier = Modifier
-                .padding(innerPadding)
-                .consumeWindowInsets(innerPadding),
+            modifier = Modifier.fillMaxSize(),
             // Top-level destinations: fade through (also when going back to the first tab).
             enterTransition = {
                 PredictiveBackGesture.clear(initialState.id, targetState.id)
@@ -336,5 +344,26 @@ private fun HomeScreen(rootNav: NavHostController, transitions: M3Transitions, c
                 }
             }
         }
+        }
+        HomeNavigationBar(
+            tabs = HomeTabs,
+            selectedIndex = selectedIndex,
+            onSelect = { tab ->
+                tabNav.navigate(tab.route) {
+                    popUpTo(tabNav.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(start = FloatingBarSideMargin, end = FloatingBarSideMargin, bottom = FloatingBarBottomGap)
+                .onSizeChanged { barHeight = with(density) { it.height.toDp() } }
+                .homeBarHiding(barVisibility.visible) { gapPx + navInset.getBottom(density) },
+        )
     }
 }
+
+/** A widget tap and whether the shift it names is gone (null for other taps), ready to navigate. */
+private data class ResolvedLaunch(val request: LaunchRequest, val shiftGone: Boolean)

@@ -103,14 +103,14 @@ class PressMorphDrawTest {
         pressAndCancel(hasContentDescription(Formatters.fullDate(otherDay, locale), substring = true) and hasClickAction())
 
         // Summary: period group, the arrows (label slides), and a segmented row.
-        clickAndDraw(hasContentDescription(str(R.string.nav_summary)) and hasClickAction())
+        clickAndDraw(hasText(str(R.string.nav_summary)) and hasClickAction())
         clickAndDraw(hasText(str(R.string.period_week)) and hasClickAction())
         clickAndDraw(hasContentDescription(str(R.string.previous_period)) and hasClickAction())
         clickAndDraw(hasContentDescription(str(R.string.next_period)) and hasClickAction())
         clickAndDraw(hasText(str(R.string.period_year)) and hasClickAction())
 
         // Settings: a segmented row and the theme button group.
-        clickAndDraw(hasContentDescription(str(R.string.nav_settings)) and hasClickAction())
+        clickAndDraw(hasText(str(R.string.nav_settings)) and hasClickAction())
         pressAndCancel(hasText(str(R.string.jobs_and_rates)) and hasClickAction())
         clickAndDraw(hasText(str(R.string.theme_light)) and hasClickAction())
         clickAndDraw(hasText(str(R.string.theme_dark)) and hasClickAction())

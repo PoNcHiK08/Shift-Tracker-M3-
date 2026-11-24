@@ -19,7 +19,10 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import com.vkurylo.shifttracker.ui.util.Formatters
+import org.junit.Assert.assertEquals
 import org.junit.Rule
+import com.vkurylo.shifttracker.ui.calendar.MONTH_TILE_EARNINGS
+import androidx.compose.ui.test.hasTestTag
 import org.junit.Test
 import org.junit.rules.RuleChain
 import org.junit.runner.RunWith
@@ -85,11 +88,14 @@ class AppSmokeTest {
         waitForText("23:00–06:00")
         clickOn(str(R.string.back))
 
-        // Calendar: today is selected; its day panel's "Add shift" grows into the editor (08:00–16:00 default).
-        waitForText(str(R.string.day_free))
+        // Calendar: today is selected. A day without shifts has one line under its date ("Day off" up to today),
+        // and no icon row below it. Its day panel's "Add shift" grows into the editor (08:00–16:00 default).
+        waitForText(str(R.string.day_off))
+        assertEquals(1, composeRule.onAllNodesWithText(str(R.string.day_off)).fetchSemanticsNodes().size)
         clickOn(str(R.string.add_shift))
         waitForText(str(R.string.new_shift))
-        composeRule.onNodeWithText(str(R.string.save)).performClick()
+        // Save is enabled once the editor has loaded (with the job's latest shift times); a tap before that is ignored.
+        clickOn(str(R.string.save))
         // The editor collapses back into the "Add shift" button.
         waitGone(str(R.string.new_shift))
 
@@ -103,7 +109,8 @@ class AppSmokeTest {
         val otherDay = if (today.dayOfMonth == 1) today.plusDays(1) else today.minusDays(1)
         val otherCell = hasContentDescription(Formatters.fullDate(otherDay, locale), substring = true) and hasClickAction()
         composeRule.onNode(otherCell).performClick()
-        waitForText(str(R.string.day_free))
+        // Yesterday is a day off; on the 1st the other day is tomorrow, which has no shifts yet.
+        waitForText(str(if (otherDay.isAfter(today)) R.string.day_no_shifts_yet else R.string.day_off))
         val todayCell = hasContentDescription(Formatters.fullDate(today, locale), substring = true) and hasClickAction()
         composeRule.onNode(todayCell).performClick()
         waitForText("244")
@@ -148,11 +155,12 @@ class AppSmokeTest {
 
         // Then the bonus.
         waitForText("+75")
-        composeRule.onNode(hasText("+75", substring = true)).performScrollTo().performClick()
+        // The day's bonus card (the earnings tile's bonus line says "+75,00 zł bonus" too).
+        composeRule.onNode(hasText("+75", substring = true) and !hasTestTag(MONTH_TILE_EARNINGS)).performScrollTo().performClick()
         waitForText(str(R.string.edit_bonus))
         clickOn(str(R.string.delete_bonus))
         waitForText(str(R.string.delete_bonus_title))
         composeRule.onNodeWithText(str(R.string.delete)).performClick()
-        waitForText(str(R.string.day_free))
+        waitForText(str(R.string.day_off))
     }
 }

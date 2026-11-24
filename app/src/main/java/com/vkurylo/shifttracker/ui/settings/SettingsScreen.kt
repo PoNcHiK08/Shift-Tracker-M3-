@@ -90,6 +90,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.vkurylo.shifttracker.ui.navigation.LocalHomeBarClearance
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -154,7 +155,8 @@ fun SettingsScreen(
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + 24.dp),
+            // The last item scrolls clear of the floating navigation bar.
+            contentPadding = PaddingValues(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding() + LocalHomeBarClearance.current + 24.dp),
         ) {
             // Android 16 style: every section is one segmented group of rows.
             item { SectionHeader(stringResource(R.string.section_work)) }
