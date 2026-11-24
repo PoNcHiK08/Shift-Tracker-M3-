@@ -22,9 +22,9 @@ class SyncStatusTextTest {
     }
 
     @Test
-    fun `a sync shows what it moved, the writes and today's total`() {
+    fun `a sync shows only when it happened`() {
         val status = SyncStatus(enabled = true, lastSyncedAt = at, last = SyncOutcome(at, downloaded = 3, uploaded = 12), writesToday = 340)
-        assertEquals(listOf(UiMessage(R.string.sync_done, listOf("14:32", 3, 12, 340))), status.describe(today))
+        assertEquals(listOf(UiMessage(R.string.sync_last, listOf("14:32"))), status.describe(today))
         assertEquals("09.11, 14:32", syncTime(at - 86_400_000, today))
     }
 
@@ -32,7 +32,7 @@ class SyncStatusTextTest {
     fun `waiting changes and skipped records get their own lines`() {
         val status = SyncStatus(enabled = true, pending = 2, lastSyncedAt = at, last = SyncOutcome(at, skipped = 1))
         assertEquals(
-            listOf(UiMessage(R.string.sync_done, listOf("14:32", 0, 0, 0)), UiMessage(R.string.sync_skipped, listOf(1)), UiMessage(R.string.sync_pending, listOf(2))),
+            listOf(UiMessage(R.string.sync_last, listOf("14:32")), UiMessage(R.string.sync_skipped, listOf(1)), UiMessage(R.string.sync_pending, listOf(2))),
             status.describe(today),
         )
     }

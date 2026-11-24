@@ -157,9 +157,9 @@ class SettingsSyncTest {
         tap(str(R.string.sync_switch))
         waitFor { str(R.string.sync_turned_on) in shownMessages }
         scrollTo(str(R.string.sync_now))
-        // 3 records sent: 3 cloud writes.
-        waitForText(str(R.string.sync_done, "", 0, 3, 3).substringAfter(" · "), substring = true)
-        assertTrue(cloud.records(ana.uid).size == 3)
+        // 3 records sent; the account row says only when.
+        waitFor { cloud.records(ana.uid).size == 3 }
+        waitForText(str(R.string.sync_last, "").trim(), substring = true)
     }
 
     @Test
@@ -267,9 +267,9 @@ class SettingsSyncTest {
         tap(str(R.string.sync_now))
         // 6 sent: Kawiarnia and its 2 shifts as deleted, Biuro and its 2 shifts (3 writes before, 9 today).
         scrollTo(str(R.string.sync_switch))
-        waitForText(str(R.string.sync_done, "", 0, 6, 9).substringAfter(" · "), substring = true)
-        val jobs = cloud.records(ana.uid).filterIsInstance<RemoteJob>().associate { it.name to it.deleted }
-        assertTrue(jobs.toString(), jobs == mapOf("Kawiarnia" to true, "Biuro" to false))
+        fun jobs() = cloud.records(ana.uid).filterIsInstance<RemoteJob>().associate { it.name to it.deleted }
+        waitFor { jobs() == mapOf("Kawiarnia" to true, "Biuro" to false) }
+        assertTrue(jobs().toString(), jobs() == mapOf("Kawiarnia" to true, "Biuro" to false))
     }
 
     @Test
