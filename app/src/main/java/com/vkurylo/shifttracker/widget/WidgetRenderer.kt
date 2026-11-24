@@ -11,8 +11,10 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.glance.ExperimentalGlanceApi
 import androidx.glance.appwidget.compose
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Draws the widget straight into AppWidgetManager: composes [ShiftTrackerWidget] into RemoteViews
@@ -32,6 +34,15 @@ object WidgetRenderer {
      */
     private val renderMutex = Mutex()
 
+    /**
+     * Glance runs a composition session in the caller's context and expects one thread: its recomposer
+     * changes the tree while it copies the finished tree out (Glance's own worker uses the main thread).
+     * On the multi-threaded Default dispatcher both can run at the same moment, the copy throws
+     * ConcurrentModificationException and the widget misses that update. This runs the session on one
+     * thread at a time, still off the main thread.
+     */
+    private val glanceThread = Dispatchers.Default.limitedParallelism(1)
+
     suspend fun renderAll(context: Context) = renderMutex.withLock {
         val manager = AppWidgetManager.getInstance(context) ?: return@withLock
         val ids = manager.getAppWidgetIds(ComponentName(context, ShiftTrackerWidgetReceiver::class.java))
@@ -45,7 +56,12 @@ object WidgetRenderer {
     private suspend fun draw(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
         val widget = ShiftTrackerWidget()
         val options = manager.getAppWidgetOptions(appWidgetId) ?: Bundle()
-        val views = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val views = withContext(glanceThread) { composeViews(context, widget, options) }
+        manager.updateAppWidget(appWidgetId, views)
+    }
+
+    private suspend fun composeViews(context: Context, widget: ShiftTrackerWidget, options: Bundle): RemoteViews =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // One layout per size the launcher draws the widget at (portrait, landscape, ...), each laid
             // out for that exact size; the launcher shows the one that matches.
             RemoteViews(
@@ -56,8 +72,6 @@ object WidgetRenderer {
         } else {
             widget.compose(context, options = options, size = portraitSize(options) ?: DEFAULT_SIZE)
         }
-        manager.updateAppWidget(appWidgetId, views)
-    }
 
     /**
      * The sizes to draw for on Android 12+: the ones the launcher reports, else its min/max bounds, else
