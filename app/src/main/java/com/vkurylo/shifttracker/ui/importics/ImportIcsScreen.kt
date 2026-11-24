@@ -41,7 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -70,11 +70,11 @@ fun ImportIcsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val locale = currentLocale()
     val snackbar = LocalSnackbarController.current
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.done.collect { count ->
-            snackbar.show(context.resources.getQuantityString(R.plurals.imported_shifts, count, count))
+            snackbar.show(resources.getQuantityString(R.plurals.imported_shifts, count, count))
             onClose()
         }
     }

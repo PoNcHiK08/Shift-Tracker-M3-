@@ -63,6 +63,22 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      # Robolectric's Android runtime jars, kept by the Build APK workflow (see there). Only restored here:
+      # these tests need fewer Android versions, and saving that partial set under the same key would stop the
+      # full one from ever being saved.
+      - name: Robolectric cache key
+        id: robolectric
+        run: |
+          version=$(sed -n 's/^robolectric = "\(.*\)"$/\1/p' gradle/libs.versions.toml)
+          sdks=$(grep -rhoE 'sdk = \[[0-9, ]+\]' app/src/test | grep -oE '[0-9]+' | sort -un | paste -sd- -)
+          echo "key=robolectric-$version-sdk$sdks" >> "$GITHUB_OUTPUT"
+          echo "prefix=robolectric-$version-" >> "$GITHUB_OUTPUT"
+      - name: Restore Robolectric's Android runtime jars
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.m2/repository/org/robolectric/android-all-instrumented
+          key: ${{ steps.robolectric.outputs.key }}
+          restore-keys: ${{ steps.robolectric.outputs.prefix }}
       - name: Firestore store and sync engine on the emulators
         run: firebase/run-emulator-tests.sh --stacktrace
       - name: Upload test reports on failure

@@ -42,7 +42,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -78,7 +78,7 @@ fun EditBonusScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val locale = currentLocale()
     val snackbar = LocalSnackbarController.current
-    val context = LocalContext.current
+    val resources = LocalResources.current
     var showDatePicker by rememberSaveable { mutableStateOf(false) }
     // Close and system back ask "Discard changes?" first when something is unsaved.
     val close = rememberDiscardGuard(state.hasChanges && !state.saving, onClose)
@@ -86,10 +86,10 @@ fun EditBonusScreen(
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
-                EditBonusEvent.Saved -> snackbar.show(context.getString(R.string.bonus_saved))
+                EditBonusEvent.Saved -> snackbar.show(resources.getString(R.string.bonus_saved))
                 is EditBonusEvent.Deleted -> snackbar.show(
-                    message = context.getString(R.string.bonus_deleted),
-                    actionLabel = context.getString(R.string.undo),
+                    message = resources.getString(R.string.bonus_deleted),
+                    actionLabel = resources.getString(R.string.undo),
                     onAction = { viewModel.undoDelete(event.bonus) },
                 )
             }

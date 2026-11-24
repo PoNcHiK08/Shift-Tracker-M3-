@@ -50,7 +50,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -95,16 +95,16 @@ fun EditShiftScreen(
     val applyRateDialog by applyRate.dialog.collectAsStateWithLifecycle()
     val locale = currentLocale()
     val snackbar = LocalSnackbarController.current
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.events.collect { event ->
             when (event) {
-                EditShiftEvent.Saved -> snackbar.show(context.getString(R.string.shift_saved))
-                EditShiftEvent.Missing -> snackbar.show(context.getString(R.string.shift_missing))
+                EditShiftEvent.Saved -> snackbar.show(resources.getString(R.string.shift_saved))
+                EditShiftEvent.Missing -> snackbar.show(resources.getString(R.string.shift_missing))
                 is EditShiftEvent.Deleted -> snackbar.show(
-                    message = context.getString(R.string.shift_deleted),
-                    actionLabel = context.getString(R.string.undo),
+                    message = resources.getString(R.string.shift_deleted),
+                    actionLabel = resources.getString(R.string.undo),
                     onAction = { viewModel.undoDelete(event.shift) },
                 )
             }
@@ -117,11 +117,11 @@ fun EditShiftScreen(
         applyRate.events.collect { event ->
             when (event) {
                 is ApplyRateEvent.Applied -> snackbar.show(
-                    message = context.resources.getQuantityString(R.plurals.apply_rate_done, event.count, event.count),
-                    actionLabel = context.getString(R.string.undo),
-                    onAction = { applyRate.undo(event) { snackbar.show(context.getString(R.string.apply_rate_undo_failed)) } },
+                    message = resources.getQuantityString(R.plurals.apply_rate_done, event.count, event.count),
+                    actionLabel = resources.getString(R.string.undo),
+                    onAction = { applyRate.undo(event) { snackbar.show(resources.getString(R.string.apply_rate_undo_failed)) } },
                 )
-                ApplyRateEvent.Failed -> snackbar.show(context.getString(R.string.apply_rate_failed))
+                ApplyRateEvent.Failed -> snackbar.show(resources.getString(R.string.apply_rate_failed))
             }
         }
     }
