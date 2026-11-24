@@ -77,8 +77,8 @@ UI in **Ukrainian** by default with **English** as an alternative.
   being cut with "…". Taps open the new-shift editor on today, that shift's editor or Jobs (no jobs yet); the calendar
   opens the app; an open editor is never stacked on. Dynamic colors on Android 12+, the app's palette before; texts
   and dates in the app's language. It updates as soon as anything changes in the app, on its own every 30 min, on clock /
-  time zone / locale changes, and just after midnight (an inexact alarm, no special permission), so a new day shows
-  at once; a finished shift can take up to 30 min to show. A tap on a shift that is gone since (deleted here or by
+  time zone / locale changes, and soon after midnight (an inexact alarm, no special permission: Android delivers it
+  within about 10 minutes), so a new day shows within minutes; a finished shift can take up to 30 min to show. A tap on a shift that is gone since (deleted here or by
   sync) opens the calendar instead of an editor.
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
   small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
