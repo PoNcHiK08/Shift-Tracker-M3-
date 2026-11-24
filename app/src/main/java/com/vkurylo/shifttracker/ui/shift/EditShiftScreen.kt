@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.ui.shift
 
+import com.vkurylo.shifttracker.ui.components.InfoButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -382,7 +383,14 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, o
             Spacer(Modifier.height(12.dp))
             val second = state.secondRate
             if (state.fixedPay) {
-                Text(stringResource(R.string.fixed_salary_shift_hint), style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.fixed_salary_shift_short), style = MaterialTheme.typography.bodyMedium)
+                    InfoButton(
+                        title = stringResource(R.string.fixed_salary_shift_short),
+                        text = stringResource(R.string.fixed_salary_shift_hint),
+                        tint = onColor,
+                    )
+                }
             } else if (second == null) {
                 Text(
                     stringResource(R.string.rate_used, Formatters.rate(state.rateGrosze, state.currency, locale)),
@@ -398,22 +406,22 @@ private fun PreviewCard(state: EditShiftUiState, onUseCurrentRate: () -> Unit, o
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                Text(
-                    stringResource(
-                        R.string.rate_line_second,
-                        Formatters.time(second.from),
-                        Formatters.time(second.to),
-                        Formatters.rate(second.rateGrosze, state.currency, locale),
-                        Formatters.decimalHours(pay.secondRateMinutes, locale),
-                    ),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                if ((state.breakValue ?: 0) > 0 && pay.secondRateMinutes > 0 && pay.baseRateMinutes > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        stringResource(R.string.break_split_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = onColor.copy(alpha = 0.75f),
+                        stringResource(
+                            R.string.rate_line_second,
+                            Formatters.time(second.from),
+                            Formatters.time(second.to),
+                            Formatters.rate(second.rateGrosze, state.currency, locale),
+                            Formatters.decimalHours(pay.secondRateMinutes, locale),
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.weight(1f, fill = false),
                     )
+                    // With a break and both rates: how the break is split, behind the ⓘ.
+                    if ((state.breakValue ?: 0) > 0 && pay.secondRateMinutes > 0 && pay.baseRateMinutes > 0) {
+                        InfoButton(title = stringResource(R.string.unpaid_break), text = stringResource(R.string.break_split_hint), tint = onColor)
+                    }
                 }
             }
             AnimatedVisibility(state.rateOutdated) {

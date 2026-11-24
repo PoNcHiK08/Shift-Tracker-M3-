@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.ui.summary
 
+import com.vkurylo.shifttracker.ui.components.InfoButton
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
@@ -158,16 +159,6 @@ fun SummaryScreen(
                 // One card that stays put: switching week/month/year or paging rolls its numbers.
                 TotalsCard(range.period, state.summary, state.defaultCurrency, Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             }
-            if (range.period == SummaryPeriod.WEEK && state.summary.fixedPayShiftCount > 0) {
-                item(key = "fixed-pay-note") {
-                    Text(
-                        stringResource(R.string.week_fixed_pay_note),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                    )
-                }
-            }
             // A month with received pay but no entries still has something to show.
             if (!state.loading && state.summary.isEmpty && state.receivedPay.isEmpty() && state.receivedPayYear.isEmpty()) {
                 item(key = "empty") {
@@ -229,14 +220,9 @@ fun SummaryScreen(
                 if (state.receivedPay.isNotEmpty()) {
                     // The salary that actually arrived, next to what the app calculates (net): the comparison of the two figures
                     // (the totals above already count what arrived).
-                    item(key = "received-pay-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
-                    item(key = "received-pay-caption") {
-                        Text(
-                            stringResource(R.string.received_pay_caption),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                        )
+                    // What the comparison means: behind the ⓘ.
+                    item(key = "received-pay-header") {
+                        SectionHeader(stringResource(R.string.received_pay_title), info = stringResource(R.string.received_pay_caption))
                     }
                     val rows = state.receivedPay
                     itemsIndexed(rows, key = { _, it -> "received-${it.job.id}" }) { index, row ->
@@ -253,14 +239,8 @@ fun SummaryScreen(
                     }
                 }
                 if (state.receivedPayYear.isNotEmpty()) {
-                    item(key = "received-pay-year-header") { SectionHeader(stringResource(R.string.received_pay_title)) }
-                    item(key = "received-pay-year-caption") {
-                        Text(
-                            stringResource(R.string.received_pay_year_caption),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp),
-                        )
+                    item(key = "received-pay-year-header") {
+                        SectionHeader(stringResource(R.string.received_pay_title), info = stringResource(R.string.received_pay_year_caption))
                     }
                     val lines = state.receivedPayYear
                     itemsIndexed(lines, key = { _, it -> "received-year-${it.job.id}" }) { index, line ->
@@ -374,6 +354,10 @@ private fun TotalsCard(period: SummaryPeriod, summary: MonthSummary, defaultCurr
                     EarningsModeTag(Modifier.padding(start = 8.dp), color = onColor)
                     // Month / year: job-months with payments count what arrived.
                     ReceivedTag(summary.receivedPart, Modifier.padding(start = 6.dp), color = onColor)
+                    // A week with salaried jobs shows only their hours: why, behind the ⓘ.
+                    if (period == SummaryPeriod.WEEK && summary.fixedPayShiftCount > 0) {
+                        InfoButton(title = stringResource(res), text = stringResource(R.string.week_fixed_pay_note), tint = onColor)
+                    }
                 }
             }
             RollingAmounts(

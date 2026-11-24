@@ -454,10 +454,8 @@ internal fun SyncStatus.describe(today: LocalDate = LocalDate.now()): List<UiMes
         running -> lines += UiMessage(R.string.sync_running)
         cloudReset -> lines += UiMessage(R.string.sync_cloud_reset)
         outcome?.problem != null -> lines += outcome.problemMessage(writesToday)
-        lastSyncedAt != null -> lines += UiMessage(
-            R.string.sync_done,
-            listOf(syncTime(lastSyncedAt, today), outcome?.downloaded ?: 0, outcome?.uploaded ?: 0, writesToday),
-        )
+        // Only when; problems, skipped records and waiting changes still get their own lines below.
+        lastSyncedAt != null -> lines += UiMessage(R.string.sync_last, listOf(syncTime(lastSyncedAt, today)))
         else -> lines += UiMessage(R.string.sync_not_yet)
     }
     if (!running && (outcome?.skipped ?: 0) > 0) lines += UiMessage(R.string.sync_skipped, listOf(outcome!!.skipped))

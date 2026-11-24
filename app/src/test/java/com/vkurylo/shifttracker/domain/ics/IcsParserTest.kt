@@ -19,6 +19,23 @@ class IcsParserTest {
     }
 
     @Test
+    fun `a file starting with a byte order mark parses like any other`() {
+        // Windows tools often save .ics as "UTF-8 with BOM": the invisible U+FEFF before BEGIN:VCALENDAR.
+        val result = parser.parse(
+            "\uFEFF" + ics(
+                """
+                BEGIN:VEVENT
+                UID:bom@test
+                DTSTART:20261102T080000
+                DTEND:20261102T160000
+                END:VEVENT
+                """,
+            ),
+        )
+        assertEquals(listOf("bom@test"), result.events.map { it.uid })
+    }
+
+    @Test
     fun `parses floating local times`() {
         val result = parser.parse(
             ics(

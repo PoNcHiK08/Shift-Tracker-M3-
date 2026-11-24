@@ -19,11 +19,11 @@
     <string name="discard_changes_keep">Keep editing</string>
     <string name="delete">Delete</string>
     <string name="ok">OK</string>
+    <string name="more_info">More about %1$s</string>
     <string name="undo">Undo</string>
     <string name="hours">Hours</string>
     <string name="hours_value">%1$s h</string>
     <string name="shifts">Shifts</string>
-    <string name="earned">Earned</string>
     <string name="earnings">Earnings</string>
     <string name="minutes_short">%1$d min</string>
     <string name="minutes_suffix">min</string>
@@ -32,8 +32,6 @@
 
     <!-- Calendar -->
     <string name="add_shift">Add shift</string>
-    <string name="no_shifts_title">No shifts this month</string>
-    <string name="no_shifts_message">Tap a day in the calendar or “Add shift” to log your first one.</string>
     <string name="day_off">Day off</string>
     <string name="day_no_shifts_yet">No shifts yet</string>
     <!-- Not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
@@ -240,7 +238,7 @@
     <string name="sync_now_summary">Without waiting for the automatic sync</string>
     <string name="sync_running">Syncing…</string>
     <string name="sync_not_yet">Not synced yet</string>
-    <string name="sync_done">Last sync: %1$s · %2$d received, %3$d sent · cloud writes today: %4$d</string>
+    <string name="sync_last">Last sync: %1$s</string>
     <string name="sync_pending">Waiting to be sent: %1$d</string>
     <string name="sync_skipped">Cloud records skipped: %1$d (perhaps made by a newer version of the app)</string>
     <string name="sync_offline">Can\'t reach the cloud. Changes will sync when the phone is online.</string>
@@ -348,6 +346,7 @@
     <string name="fixed_salary_per_month">Salary %1$s/month</string>
     <string name="salary_value">salary %1$s</string>
     <string name="fixed_salary_shift_hint">This shift counts for hours: the job is paid a monthly salary.</string>
+    <string name="fixed_salary_shift_short">Monthly salary</string>
     <string name="week_fixed_pay_note">Salaried jobs count their pay per month, so this week shows only their hours.</string>
     <string name="earnings_gross">Gross</string>
     <string name="earnings_net">Net</string>

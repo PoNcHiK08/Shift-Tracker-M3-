@@ -94,6 +94,14 @@ object Formatters {
     fun fullDate(date: LocalDate, locale: Locale): String =
         DateTimeFormatter.ofPattern("EEEE, d MMMM", locale).format(date).replaceFirstChar { it.titlecase(locale) }
 
+    /**
+     * The calendar's day card title: "Wednesday, 25 November" on its own, "Wed, 25 November" when the day's amount
+     * sits beside it, so the title stays on one line.
+     */
+    fun dayTitle(date: LocalDate, locale: Locale, besideAmount: Boolean): String =
+        if (!besideAmount) fullDate(date, locale)
+        else DateTimeFormatter.ofPattern("EEE, d MMMM", locale).format(date).replaceFirstChar { it.titlecase(locale) }
+
     fun mediumDate(date: LocalDate, locale: Locale): String =
         DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(locale).format(date)
 

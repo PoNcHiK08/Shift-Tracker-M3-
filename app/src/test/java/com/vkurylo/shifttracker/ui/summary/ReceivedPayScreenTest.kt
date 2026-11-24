@@ -140,7 +140,7 @@ class ReceivedPayScreenTest {
             assertTrue("'$text' is not in the row of job $jobId", found.fetchSemanticsNodes().isNotEmpty())
         }
     }
-    private fun text(res: Int) = context.getString(res)
+    private fun text(res: Int, vararg args: Any): String = if (args.isEmpty()) context.getString(res) else context.getString(res, *args)
 
     private fun show(
         period: SummaryPeriod = SummaryPeriod.MONTH,
@@ -168,7 +168,11 @@ class ReceivedPayScreenTest {
         show()
 
         composeRule.onNodeWithText(text(R.string.received_pay_title)).assertIsDisplayed()
+        // The explanation is behind the heading's ⓘ, not under it.
+        composeRule.onNodeWithText(text(R.string.received_pay_caption)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(text(R.string.more_info, text(R.string.received_pay_title))).performClick()
         composeRule.onNodeWithText(text(R.string.received_pay_caption)).assertIsDisplayed()
+        composeRule.onNodeWithText(text(R.string.ok)).performClick()
 
         // Calculated net (after the 10 % deductions), what arrived and the difference.
         assertRowShows(cafe.id, "Kawiarnia", money(cafeNet), money(60_000) + " · 1 payment", signed(60_000 - cafeNet))

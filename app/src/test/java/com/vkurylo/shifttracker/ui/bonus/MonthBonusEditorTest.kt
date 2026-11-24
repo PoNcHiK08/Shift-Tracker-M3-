@@ -87,7 +87,7 @@ class MonthBonusEditorTest {
         composeRule.waitUntil(5_000) { !vm.uiState.value.loading }
     }
 
-    private fun text(res: Int) = context.getString(res)
+    private fun text(res: Int, vararg args: Any): String = if (args.isEmpty()) context.getString(res) else context.getString(res, *args)
 
     @Test
     fun aNewBonusIsOnADayBySwitchedToTheWholeMonthShowsAMonthInsteadOfADate() {
@@ -98,7 +98,11 @@ class MonthBonusEditorTest {
         composeRule.onNodeWithText(text(R.string.bonus_kind_day)).assertIsDisplayed()
         composeRule.onNodeWithText(text(R.string.bonus_kind_month)).assertIsDisplayed()
         composeRule.onNodeWithText(text(R.string.date)).assertIsDisplayed()
-        composeRule.onNodeWithText(text(R.string.bonus_hint)).assertExists() // below the fold on a small screen
+        // How a day bonus counts: behind the ⓘ beside the choice, not on screen.
+        composeRule.onNodeWithText(text(R.string.bonus_hint)).assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(text(R.string.more_info, text(R.string.bonus_kind_day))).performClick()
+        composeRule.onNodeWithText(text(R.string.bonus_hint)).assertIsDisplayed()
+        composeRule.onNodeWithText(text(R.string.ok)).performClick()
         composeRule.onNodeWithTag(MONTH_STEPPER_VALUE_TAG).assertDoesNotExist()
         assertFalse(vm.uiState.value.wholeMonth)
 
@@ -107,8 +111,10 @@ class MonthBonusEditorTest {
         assertTrue(vm.uiState.value.wholeMonth)
         composeRule.onNodeWithTag(MONTH_STEPPER_VALUE_TAG).assertTextEquals(Formatters.monthYear(november, Locale.getDefault()))
         composeRule.onNodeWithText(text(R.string.date)).assertDoesNotExist()
-        composeRule.onNodeWithText(text(R.string.bonus_hint)).assertDoesNotExist()
-        composeRule.onNodeWithText(text(R.string.bonus_hint_month)).assertExists()
+        // The ⓘ now explains a month bonus.
+        composeRule.onNodeWithContentDescription(text(R.string.more_info, text(R.string.bonus_kind_month))).performClick()
+        composeRule.onNodeWithText(text(R.string.bonus_hint_month)).assertIsDisplayed()
+        composeRule.onNodeWithText(text(R.string.ok)).performClick()
 
         // And back: the day is still the one that was picked.
         composeRule.onNodeWithText(text(R.string.bonus_kind_day)).performClick()

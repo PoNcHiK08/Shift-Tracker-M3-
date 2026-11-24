@@ -211,7 +211,7 @@ class IcsParser(private val targetZone: ZoneId = ZoneId.systemDefault()) {
                 } else {
                     if (current.isNotEmpty()) result += current.toString()
                     current.clear()
-                    current.append(rawLine.removePrefix("﻿"))
+                    current.append(rawLine.removePrefix("\uFEFF"))
                 }
             }
             if (current.isNotEmpty()) result += current.toString()
