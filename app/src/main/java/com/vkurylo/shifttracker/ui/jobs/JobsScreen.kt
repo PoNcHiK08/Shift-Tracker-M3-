@@ -1,5 +1,6 @@
 package com.vkurylo.shifttracker.ui.jobs
 
+import com.vkurylo.shifttracker.ui.components.InfoButton
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -373,7 +374,8 @@ private fun JobEditorSheet(
                     readOnly = true,
                     enabled = false,
                     label = { Text(stringResource(R.string.currency)) },
-                    supportingText = { Text(stringResource(R.string.currency_locked)) },
+                    // Why it can't change: behind the ⓘ.
+                    trailingIcon = { InfoButton(title = stringResource(R.string.currency), text = stringResource(R.string.currency_locked)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -502,7 +504,11 @@ private fun JobEditorSheet(
                 suffix = { Text("%") },
                 singleLine = true,
                 isError = showErrors && deductionError,
-                supportingText = { Text(stringResource(if (showErrors && deductionError) R.string.error_percent_invalid else R.string.deduction_hint)) },
+                supportingText = if (showErrors && deductionError) {
+                    { Text(stringResource(R.string.error_percent_invalid)) }
+                } else null,
+                // What the percentage is (and isn't): behind the ⓘ.
+                trailingIcon = { InfoButton(title = stringResource(R.string.deduction_percent), text = stringResource(R.string.deduction_hint)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                 modifier = Modifier.fillMaxWidth(),
             )

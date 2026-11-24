@@ -1,5 +1,8 @@
 package com.vkurylo.shifttracker.ui.bonus
 
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.Row
+import com.vkurylo.shifttracker.ui.components.InfoButton
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -169,12 +172,21 @@ fun EditBonusScreen(
             }
             Spacer(Modifier.height(16.dp))
             // Either a bonus on a day (as before) or one for a whole month, which has no day.
-            ChoiceButtonGroup(
-                options = listOf(false, true),
-                selected = state.wholeMonth,
-                onSelect = viewModel::setWholeMonth,
-                label = { wholeMonth -> stringResource(if (wholeMonth) R.string.bonus_kind_month else R.string.bonus_kind_day) },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ChoiceButtonGroup(
+                    options = listOf(false, true),
+                    selected = state.wholeMonth,
+                    onSelect = viewModel::setWholeMonth,
+                    label = { wholeMonth -> stringResource(if (wholeMonth) R.string.bonus_kind_month else R.string.bonus_kind_day) },
+                    modifier = Modifier.weight(1f),
+                )
+                // How the chosen kind counts: behind the ⓘ.
+                InfoButton(
+                    title = stringResource(if (state.wholeMonth) R.string.bonus_kind_month else R.string.bonus_kind_day),
+                    text = stringResource(if (state.wholeMonth) R.string.bonus_hint_month else R.string.bonus_hint),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             Spacer(Modifier.height(12.dp))
             if (state.wholeMonth) {
                 MonthStepperField(
@@ -200,12 +212,6 @@ fun EditBonusScreen(
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                 minLines = 2,
                 modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(if (state.wholeMonth) R.string.bonus_hint_month else R.string.bonus_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }

@@ -127,16 +127,30 @@ fun <T> PeriodSwitcher(
     }
 }
 
+/** A list section's heading; with [info], an ⓘ beside it opens that explanation (instead of a paragraph under it). */
 @Composable
-fun SectionHeader(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-        modifier = modifier
-            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
-            .semantics { heading() },
-    )
+fun SectionHeader(text: String, modifier: Modifier = Modifier, info: String? = null) {
+    if (info == null) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = modifier
+                .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+                .semantics { heading() },
+        )
+    } else {
+        // The 48 dp button takes the place of the padding around the text, so the heading sits where it would.
+        Row(modifier.padding(start = 16.dp, end = 4.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.semantics { heading() },
+            )
+            InfoButton(title = text, text = info, tint = MaterialTheme.colorScheme.onSurfaceVariant, iconSize = 20.dp)
+        }
+    }
 }
 
 @Composable

@@ -22,6 +22,7 @@
     <string name="discard_changes_keep">Редагувати далі</string>
     <string name="delete">Видалити</string>
     <string name="ok">OK</string>
+    <string name="more_info">Докладніше: %1$s</string>
     <string name="undo">Повернути</string>
     <string name="hours">Години</string>
     <string name="hours_value">%1$s год</string>
@@ -243,7 +244,7 @@
     <string name="sync_now_summary">Не чекаючи автоматичної синхронізації</string>
     <string name="sync_running">Синхронізація…</string>
     <string name="sync_not_yet">Ще не синхронізовано</string>
-    <string name="sync_done">Остання синхронізація: %1$s · отримано %2$d, надіслано %3$d · записів у хмару сьогодні: %4$d</string>
+    <string name="sync_last">Остання синхронізація: %1$s</string>
     <string name="sync_pending">Чекають на надсилання: %1$d</string>
     <string name="sync_skipped">Пропущено записів із хмари: %1$d (можливо, їх зробила новіша версія застосунку)</string>
     <string name="sync_offline">Немає зв’язку з хмарою. Зміни синхронізуються, коли телефон буде онлайн.</string>
@@ -371,6 +372,7 @@
     <string name="fixed_salary_per_month">Оклад %1$s/міс.</string>
     <string name="salary_value">оклад %1$s</string>
     <string name="fixed_salary_shift_hint">Ця зміна рахується в години: роботі платять місячний оклад.</string>
+    <string name="fixed_salary_shift_short">Місячний оклад</string>
     <string name="week_fixed_pay_note">Роботи з окладом рахуються помісячно, тож за тиждень тут лише їхні години.</string>
     <string name="earnings_gross">Брутто</string>
     <string name="earnings_net">Нетто</string>
