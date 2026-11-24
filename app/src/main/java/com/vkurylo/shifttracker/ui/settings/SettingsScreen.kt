@@ -65,6 +65,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -103,6 +104,7 @@ fun SettingsScreen(
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(viewModel) {
@@ -118,7 +120,7 @@ fun SettingsScreen(
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             // The read grant travels with the clip data through the share sheet to the app picked.
             send.clipData = ClipData.newRawUri(null, uri)
-            context.startActivity(Intent.createChooser(send, context.getString(R.string.safety_backup_share)))
+            context.startActivity(Intent.createChooser(send, resources.getString(R.string.safety_backup_share)))
         }
     }
 

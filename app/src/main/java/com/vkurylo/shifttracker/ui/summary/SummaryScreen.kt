@@ -48,7 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -96,7 +96,7 @@ fun SummaryScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarController.current
-    val context = LocalContext.current
+    val resources = LocalResources.current
     // The job and month (yyyymm) whose received payments are open in the sheet; 0: closed.
     var sheetJobId by rememberSaveable { mutableLongStateOf(0L) }
     var sheetMonthKey by rememberSaveable { mutableIntStateOf(0) }
@@ -104,10 +104,10 @@ fun SummaryScreen(
     LaunchedEffect(payoutEditor) {
         payoutEditor.events.collect { event ->
             when (event) {
-                PayoutEvent.Saved -> snackbar.show(context.getString(R.string.received_pay_saved))
+                PayoutEvent.Saved -> snackbar.show(resources.getString(R.string.received_pay_saved))
                 is PayoutEvent.Deleted -> snackbar.show(
-                    message = context.getString(R.string.received_pay_deleted),
-                    actionLabel = context.getString(R.string.undo),
+                    message = resources.getString(R.string.received_pay_deleted),
+                    actionLabel = resources.getString(R.string.undo),
                     onAction = { payoutEditor.undoDelete(event.payout) },
                 )
             }
