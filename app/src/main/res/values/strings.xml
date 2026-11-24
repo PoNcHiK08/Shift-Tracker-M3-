@@ -27,7 +27,6 @@
     <string name="hours">Години</string>
     <string name="hours_value">%1$s год</string>
     <string name="shifts">Зміни</string>
-    <string name="earned">Зароблено</string>
     <string name="earnings">Заробіток</string>
     <string name="minutes_short">%1$d хв</string>
     <string name="minutes_suffix">хв</string>
@@ -36,8 +35,6 @@
 
     <!-- Calendar -->
     <string name="add_shift">Додати зміну</string>
-    <string name="no_shifts_title">Цього місяця змін немає</string>
-    <string name="no_shifts_message">Натисни на день у календарі або «Додати зміну», щоб записати першу.</string>
     <string name="day_off">Вихідний</string>
     <string name="day_no_shifts_yet">Змін поки нема</string>
     <!-- Not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
