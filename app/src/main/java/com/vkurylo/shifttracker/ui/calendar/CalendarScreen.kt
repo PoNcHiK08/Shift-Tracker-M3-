@@ -483,7 +483,8 @@ private fun DayPanel(
     val shifts = shiftsByDate[date].orEmpty()
     val bonuses = bonusesByDate[date].orEmpty()
     // Per currency: a day with entries in two currencies shows two amounts, never their sum.
-    val total = ShiftCalculator.earnings(shifts, bonuses, LocalEarningsDisplay.current.mode)
+    val earningsMode = LocalEarningsDisplay.current.mode
+    val total = ShiftCalculator.earnings(shifts, bonuses, earningsMode)
     val spatialOffset = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
     val spatialSize = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
     val effects = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
@@ -510,8 +511,11 @@ private fun DayPanel(
                         label = "dayTitle",
                     ) { d ->
                         val dayShifts = shiftsByDate[d].orEmpty()
+                        // With the day's amount beside it the weekday is short, so the title stays on one line.
+                        val besideAmount = ShiftCalculator.earnings(dayShifts, bonusesByDate[d].orEmpty(), earningsMode)
+                            .byCurrency.values.any { it > 0 }
                         Column {
-                            Text(Formatters.fullDate(d, locale), style = MaterialTheme.typography.titleLarge)
+                            Text(Formatters.dayTitle(d, locale, besideAmount), style = MaterialTheme.typography.titleLarge)
                             Text(
                                 text = if (dayShifts.isEmpty()) {
                                     // The only line a day without shifts has: no icon row below it.
