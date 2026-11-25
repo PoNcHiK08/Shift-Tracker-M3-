@@ -22,6 +22,20 @@ val allowDevReleaseSigning: Boolean =
     System.getenv("ALLOW_DEV_RELEASE_SIGNING").equals("true", ignoreCase = true) ||
         providers.gradleProperty("allowDevReleaseSigning").orNull.equals("true", ignoreCase = true)
 
+// The app's public site (Firebase Hosting, web/) with the privacy policy and the account deletion page, linked
+// from Settings → About: SITE_URL if set (e.g. your own domain), else https://<project_id>.web.app from
+// app/google-services.json, else none: a build without cloud sync shows no links.
+val siteUrl: String = run {
+    val fromEnv = System.getenv("SITE_URL")?.trim()?.trimEnd('/')?.takeIf { it.isNotEmpty() }
+    if (fromEnv != null) {
+        require(fromEnv.startsWith("https://") && !fromEnv.contains('"')) { "SITE_URL must be an https:// address, got: $fromEnv" }
+        return@run fromEnv
+    }
+    val config = file("google-services.json")
+    if (!config.exists()) return@run ""
+    Regex(""""project_id"\s*:\s*"([a-z0-9-]+)"""").find(config.readText())?.groupValues?.get(1)?.let { "https://$it.web.app" } ?: ""
+}
+
 android {
     namespace = "com.vkurylo.shifttracker"
     compileSdk = 37
@@ -33,6 +47,7 @@ android {
         // CI passes the run number so every build installs over the previous one.
         versionCode = (System.getenv("VERSION_CODE") ?: "1").toInt()
         versionName = "1.0.${System.getenv("VERSION_CODE") ?: "0"}"
+        buildConfigField("String", "SITE_URL", "\"$siteUrl\"")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

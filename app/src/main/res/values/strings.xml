@@ -212,6 +212,11 @@
     <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
     <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Онови Shift Tracker і спробуй ще раз. Поточні дані не змінено.</string>
     <string name="version">Версія %1$s</string>
+    <string name="privacy_policy">Політика конфіденційності</string>
+    <string name="privacy_policy_summary">Що застосунок робить із твоїми даними</string>
+    <string name="delete_account_page">Видалення акаунта й даних</string>
+    <string name="delete_account_page_summary">Як їх видалити, також без застосунку</string>
+    <string name="link_open_failed">Немає застосунку, щоб відкрити посилання: %1$s</string>
 
     <!-- Account & sync -->
     <string name="section_cloud">Акаунт і синхронізація</string>

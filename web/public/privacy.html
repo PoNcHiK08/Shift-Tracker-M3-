@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index">
+<title>Shift Tracker – Privacy policy</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #fbf8ff; --text: #1b1b21; --muted: #46464f; --accent: #3f51b5; --card: #efedf4; --line: #c6c5d0;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131318; --text: #e4e1e9; --muted: #c6c5d0; --accent: #bac3ff; --card: #1f1f25; --line: #46464f; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 16px 16px 48px; }
+  nav.switch { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 24px; }
+  nav.switch a {
+    padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); text-decoration: none;
+  }
+  nav.switch a[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; }
+  .meta { color: var(--muted); margin: 0 0 16px; }
+  .summary { background: var(--card); border-radius: 16px; padding: 12px 20px; }
+  a { color: var(--accent); }
+  ul { padding-left: 1.3em; }
+  li { margin: 4px 0; }
+  section + section { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 24px; }
+  section[hidden] + section { border-top: 0; margin-top: 0; padding-top: 0; }
+</style>
+</head>
+<body>
+<main>
+<nav class="switch" aria-label="Language / Мова / Język">
+  <a href="?lang=uk" hreflang="uk" lang="uk">Українська</a>
+  <a href="?lang=en" hreflang="en" lang="en">English</a>
+  <a href="?lang=pl" hreflang="pl" lang="pl">Polski</a>
+</nav>
+
+<section data-lang="uk" lang="uk">
+  <h1>Політика конфіденційності</h1>
+  <p class="meta">Shift Tracker · Оновлено 25 листопада 2026 року</p>
+  <p>Shift Tracker — застосунок, щоб записувати робочі зміни й бачити, скільки ти заробляєш. Тут пояснено, які дані
+    обробляє застосунок, де вони зберігаються і як ти ними керуєш.</p>
+  <div class="summary">
+    <ul>
+      <li>Твої дані зберігаються на твоєму телефоні. Вони залишають його, лише якщо ти вмикаєш синхронізацію з хмарою
+        або власноруч ділишся файлом чи звітом про збій.</li>
+      <li>Жодної реклами, аналітики чи стеження. Твої дані ніколи не продаються й нікому не передаються.</li>
+    </ul>
+  </div>
+
+  <h2>Хто відповідає</h2>
+  <p>Shift Tracker розробляє й публікує незалежний розробник, указаний на сторінці застосунку в Google Play. З
+    будь-якими питаннями щодо твоїх даних пиши на CONTACT_EMAIL_PLACEHOLDER.</p>
+
+  <h2>Дані на телефоні</h2>
+  <p>Усе, що ти вводиш, зберігається в приватному сховищі застосунку на твоєму телефоні, яке інші застосунки не
+    можуть прочитати:</p>
+  <ul>
+    <li>роботи: назва, колір, погодинні ставки й друга (нічна) ставка, валюта, умови оплати (погодинна чи місячна,
+      утримання);</li>
+    <li>зміни: дата, початок і кінець, неоплачувана перерва, ставка, нотатка;</li>
+    <li>бонуси й отримані виплати: сума, дата чи місяць, нотатка;</li>
+    <li>налаштування (мова, тема, відображення).</li>
+  </ul>
+  <p>Коли ти імпортуєш календар (.ics), застосунок читає лише вибраний тобою файл; зміни, які ти вирішиш
+    імпортувати, зберігаються як усі інші. Віджет на головному екрані показує ті самі дані й нічого окремо не
+    зберігає.</p>
+  <p>Якщо в налаштуваннях телефона ввімкнено резервне копіювання, Android може додати дані застосунку до резервної
+    копії телефона у твоєму акаунті Google і перенести їх на новий телефон. Це робить Android і Google згідно з
+    твоїми налаштуваннями копіювання; прив’язка до синхронізації в копію не потрапляє.</p>
+
+  <h2>Синхронізація з хмарою (за бажанням)</h2>
+  <p>Синхронізація вимкнена, доки ти не ввійдеш через Google і не ввімкнеш її в налаштуваннях. Вона використовує
+    Google Firebase: Google зберігає дані від імені розробника.</p>
+  <ul>
+    <li>Firebase Authentication зберігає твій акаунт: адресу електронної пошти твого акаунта Google та ідентифікатор
+      акаунта. Під час входу через Google Firebase отримує також твоє ім’я й посилання на фото профілю; застосунок
+      їх не використовує.</li>
+    <li>Cloud Firestore зберігає твої роботи, зміни, ставки, бонуси й отримані виплати (кожен запис із часом
+      останньої зміни) та позначку з датою створення твоїх даних у хмарі.</li>
+    <li>Кожен акаунт має доступ лише до власних даних. Дані передаються зашифрованим з’єднанням, і Google зберігає
+      їх зашифрованими. Це не наскрізне шифрування: як власник проєкту Firebase розробник технічно може їх бачити й
+      звертається до них лише тоді, коли це потрібно для роботи синхронізації, наприклад щоб виправити збій
+      за твоїм повідомленням.</li>
+    <li>Поки синхронізація ввімкнена, застосунок також запитує в сервера Google поточний час, щоб перевірити
+      годинник твого телефона.</li>
+    <li>Вебверсія Shift Tracker використовує той самий акаунт і ті самі дані у твоєму браузері. Вона пам’ятає
+      вхід, лише доки відкрита вкладка.</li>
+  </ul>
+  <p>Якщо вимкнути синхронізацію, дані в хмарі залишаються, тож після повторного ввімкнення все продовжиться. Як
+    їх видалити — нижче, у розділі «Видалення даних».</p>
+
+  <h2>Чого застосунок не робить</h2>
+  <ul>
+    <li>Жодної реклами й рекламних ідентифікаторів.</li>
+    <li>Жодної аналітики, стеження чи профілювання: у застосунку немає сервісів аналітики чи збору звітів про
+      збої.</li>
+    <li>Твої дані ніколи не продаються, не здаються в оренду й нікому не передаються. Google обробляє синхронізовані
+      дані лише від імені розробника за умовами Firebase.</li>
+  </ul>
+
+  <h2>Звіти про збої</h2>
+  <p>Якщо застосунок закривається через помилку, він зберігає на телефоні короткий звіт: екран, відкритий у момент
+    помилки, версію застосунку, модель телефона й версію Android і технічні подробиці помилки. Це звичайний текст, який ти
+    можеш повністю прочитати. Наступного разу застосунок покаже його тобі; звіт надсилається, лише якщо ти власноруч
+    скопіюєш його чи поділишся ним (наприклад, листом розробникові). Після показу звіт видаляється з телефона.</p>
+  <p>Якщо застосунок установлено з Google Play, Google може збирати анонімну статистику збоїв і продуктивності
+    (Android vitals) згідно з <a href="https://policies.google.com/privacy">власною політикою конфіденційності</a>;
+    застосунок нічого до неї не додає.</p>
+
+  <h2>Експорт, копії й твої файли</h2>
+  <ul>
+    <li>«Налаштування → Експорт даних» зберігає всі твої дані у файл (JSON) там, де ти вибереш; «Імпорт даних»
+      відновлює їх.</li>
+    <li>Перед тим як імпорт замінить твої дані, застосунок зберігає на телефоні страхувальну копію (5 найновіших),
+      яку можна зберегти у файл чи поділитися нею.</li>
+    <li>Файли, які ти експортуєш чи пересилаєш, під твоїм контролем: застосунок нікуди їх не надсилає.</li>
+  </ul>
+
+  <h2>Видалення даних</h2>
+  <ul>
+    <li>На телефоні: видаляй окремі записи в застосунку або видали сам застосунок (чи очисти його сховище в
+      налаштуваннях Android), щоб прибрати все, що він зберіг на телефоні.</li>
+    <li>У хмарі: «Налаштування → Акаунт і синхронізація → Видалити мої дані з хмари» видаляє синхронізовані дані;
+      «Видалити акаунт» видаляє синхронізовані дані, а потім і сам акаунт. В обох випадках дані на телефоні
+      залишаються.</li>
+    <li>Без застосунку: дивись <a href="/delete-account?lang=uk">Видалення акаунта й даних</a> або пиши на
+      CONTACT_EMAIL_PLACEHOLDER.</li>
+  </ul>
+  <p>Видалені дані зникають із Cloud Firestore одразу; Google може ще деякий час зберігати їх у своїх резервних
+    копіях, після чого вони стираються й там.</p>
+
+  <h2>Як довго зберігаються дані</h2>
+  <p>Дані на телефоні зберігаються, доки ти їх не видалиш або не видалиш застосунок. Дані в хмарі зберігаються,
+    доки існує твій акаунт, — поки ти їх не видалиш або не попросиш про це розробника.</p>
+
+  <h2>Діти</h2>
+  <p>Shift Tracker призначений для дорослих, які працюють, і не орієнтований на дітей.</p>
+
+  <h2>Твої права</h2>
+  <p>Ти будь-коли можеш переглянути, експортувати, виправити й видалити свої дані в застосунку. Також можна
+    попросити розробника (CONTACT_EMAIL_PLACEHOLDER) надати копію твоїх даних у хмарі або видалити їх. Ти маєш
+    право подати скаргу до органу із захисту персональних даних там, де живеш.</p>
+
+  <h2>Зміни</h2>
+  <p>Якщо ця політика зміниться, нова версія з’явиться на цій сторінці з новою датою.</p>
+</section>
+
+<section data-lang="en" lang="en">
+  <h1>Privacy policy</h1>
+  <p class="meta">Shift Tracker · Last updated 25 November 2026</p>
+  <p>Shift Tracker is an app for recording your work shifts and seeing what you earn. This policy explains what data
+    the app handles, where it is kept and how you control it.</p>
+  <div class="summary">
+    <ul>
+      <li>Your data is stored on your phone. It leaves the phone only if you turn on cloud sync, or if you share a
+        file or a crash report yourself.</li>
+      <li>No ads, no analytics, no tracking. Your data is never sold or shared.</li>
+    </ul>
+  </div>
+
+  <h2>Who is responsible</h2>
+  <p>Shift Tracker is developed and published by an independent developer, named on the app's page on Google Play.
+    For any question about your data, write to CONTACT_EMAIL_PLACEHOLDER.</p>
+
+  <h2>Data on your phone</h2>
+  <p>Everything you enter is stored on your phone, in the app's private storage, which other apps can't read:</p>
+  <ul>
+    <li>jobs: name, colour, hourly rates and a second (night) rate, currency, pay terms (hourly or monthly pay,
+      deductions);</li>
+    <li>shifts: date, start and end time, unpaid break, rate, note;</li>
+    <li>bonuses and received payments: amount, date or month, note;</li>
+    <li>your settings (language, theme, display options).</li>
+  </ul>
+  <p>When you import a calendar file (.ics), the app reads only the file you pick; the shifts you choose to import
+    are stored like any others. The home-screen widget shows the same data and stores nothing of its own.</p>
+  <p>If backup is turned on in your phone's settings, Android may include the app's data in your phone's backup to
+    your Google account and move it to a new phone. Android and Google do this under your backup settings; the
+    app's link to cloud sync is left out of it.</p>
+
+  <h2>Optional cloud sync</h2>
+  <p>Cloud sync is off until you sign in with Google and turn it on in Settings. It uses Google Firebase: Google
+    stores the data on the developer's behalf.</p>
+  <ul>
+    <li>Firebase Authentication keeps your account: the email address of your Google account and an account ID.
+      Signing in with Google also gives Firebase your name and a link to your profile picture; the app doesn't use
+      them.</li>
+    <li>Cloud Firestore keeps your jobs, shifts, rates, bonuses and received payments (each with the time it was
+      last changed), and a marker with the date your cloud data was created.</li>
+    <li>Each account can reach only its own data. Data travels over encrypted connections and Google stores it
+      encrypted. It is not end-to-end encrypted: as the owner of the Firebase project, the developer could
+      technically see it, and only looks at it when sync needs it, for example to fix a problem you reported.</li>
+    <li>While sync is on, the app also asks Google's server for the current time, to check your phone's clock.</li>
+    <li>The web version of Shift Tracker uses the same account and data in your browser. It keeps you signed in
+      only while the tab is open.</li>
+  </ul>
+  <p>Turning sync off keeps your cloud data, so turning it on again carries on. To remove it, see “Deleting your
+    data” below.</p>
+
+  <h2>What the app doesn't do</h2>
+  <ul>
+    <li>No ads and no advertising IDs.</li>
+    <li>No analytics, tracking or profiling: the app contains no analytics or crash-reporting service.</li>
+    <li>Your data is never sold, rented or shared with anyone. Google processes the synced data only on the
+      developer's behalf, under the Firebase terms.</li>
+  </ul>
+
+  <h2>Crash reports</h2>
+  <p>If the app closes because of an error, it saves a short report on your phone: the screen you were on, the app
+    version, the phone model and Android version, and technical details of the error. It is plain text that you can
+    read in full. The next time you open the app, it shows you the report; it is sent only if you copy or share it
+    yourself (for example by email to the developer). Once shown, it is deleted from the phone.</p>
+  <p>If you installed the app from Google Play, Google may collect anonymous crash and performance statistics
+    (Android vitals) under <a href="https://policies.google.com/privacy">its own privacy policy</a>; the app adds
+    nothing to them.</p>
+
+  <h2>Export, backups and your files</h2>
+  <ul>
+    <li>Settings → Export data saves all your data to a file (JSON) wherever you choose; Import data restores
+      it.</li>
+    <li>Before an import replaces your data, the app keeps a safety backup on the phone (the newest 5), which you
+      can save to a file or share.</li>
+    <li>Files you export or share are under your control: the app doesn't send them anywhere.</li>
+  </ul>
+
+  <h2>Deleting your data</h2>
+  <ul>
+    <li>On the phone: delete single records in the app, or uninstall the app (or clear its storage in Android
+      settings) to remove everything it stored on the phone.</li>
+    <li>In the cloud: Settings → Account &amp; sync → Delete my cloud data removes your synced data; Delete account
+      removes your synced data and then the account itself. The data on your phone stays in both cases.</li>
+    <li>Without the app: see <a href="/delete-account?lang=en">Deleting your account and data</a>, or write to
+      CONTACT_EMAIL_PLACEHOLDER.</li>
+  </ul>
+  <p>Deleted data is removed from Cloud Firestore right away; Google may keep it in its backups for a limited time
+    before it is erased there too.</p>
+
+  <h2>How long data is kept</h2>
+  <p>Data on your phone is kept until you delete it or uninstall the app. Cloud data is kept while your account
+    exists, until you delete it or ask the developer to.</p>
+
+  <h2>Children</h2>
+  <p>Shift Tracker is made for working adults and is not directed at children.</p>
+
+  <h2>Your rights</h2>
+  <p>You can view, export, correct and delete your data in the app at any time. You can also ask the developer
+    (CONTACT_EMAIL_PLACEHOLDER) for a copy of your cloud data or to delete it. You have the right to complain to the
+    data protection authority where you live.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes, the new version is published on this page with a new date.</p>
+</section>
+
+<section data-lang="pl" lang="pl">
+  <h1>Polityka prywatności</h1>
+  <p class="meta">Shift Tracker · Ostatnia aktualizacja: 25 listopada 2026 r.</p>
+  <p>Shift Tracker to aplikacja do zapisywania zmian w pracy i sprawdzania, ile zarabiasz. Tu wyjaśniamy, jakie
+    dane obsługuje aplikacja, gdzie są przechowywane i jak nimi zarządzasz.</p>
+  <div class="summary">
+    <ul>
+      <li>Twoje dane są przechowywane na Twoim telefonie. Opuszczają go tylko wtedy, gdy włączysz synchronizację z
+        chmurą albo samodzielnie udostępnisz plik lub raport o awarii.</li>
+      <li>Żadnych reklam, analityki ani śledzenia. Twoje dane nigdy nie są sprzedawane ani nikomu udostępniane.</li>
+    </ul>
+  </div>
+
+  <h2>Kto odpowiada</h2>
+  <p>Shift Tracker tworzy i publikuje niezależny deweloper, podany na stronie aplikacji w Google Play. W każdej
+    sprawie dotyczącej Twoich danych napisz na CONTACT_EMAIL_PLACEHOLDER.</p>
+
+  <h2>Dane na telefonie</h2>
+  <p>Wszystko, co wpisujesz, jest zapisywane na Twoim telefonie, w prywatnej pamięci aplikacji, do której inne
+    aplikacje nie mają dostępu:</p>
+  <ul>
+    <li>prace: nazwa, kolor, stawki godzinowe i druga (nocna) stawka, waluta, warunki wynagrodzenia (stawka
+      godzinowa lub miesięczna, potrącenia);</li>
+    <li>zmiany: data, godzina rozpoczęcia i zakończenia, bezpłatna przerwa, stawka, notatka;</li>
+    <li>premie i otrzymane wypłaty: kwota, data lub miesiąc, notatka;</li>
+    <li>ustawienia (język, motyw, sposób wyświetlania).</li>
+  </ul>
+  <p>Gdy importujesz plik kalendarza (.ics), aplikacja czyta tylko wybrany przez Ciebie plik; zmiany, które
+    postanowisz zaimportować, są zapisywane jak wszystkie inne. Widżet na ekranie głównym pokazuje te same dane i
+    nie przechowuje niczego osobno.</p>
+  <p>Jeśli w ustawieniach telefonu włączona jest kopia zapasowa, Android może dołączyć dane aplikacji do kopii
+    zapasowej telefonu na Twoim koncie Google i przenieść je na nowy telefon. Robią to Android i Google zgodnie z
+    Twoimi ustawieniami kopii; powiązanie z synchronizacją nie trafia do kopii.</p>
+
+  <h2>Synchronizacja z chmurą (opcjonalna)</h2>
+  <p>Synchronizacja jest wyłączona, dopóki nie zalogujesz się przez Google i nie włączysz jej w ustawieniach.
+    Korzysta z Google Firebase: Google przechowuje dane w imieniu dewelopera.</p>
+  <ul>
+    <li>Firebase Authentication przechowuje Twoje konto: adres e-mail Twojego konta Google i identyfikator konta.
+      Przy logowaniu przez Google Firebase dostaje też Twoje imię i nazwisko oraz link do zdjęcia profilowego;
+      aplikacja z nich nie korzysta.</li>
+    <li>Cloud Firestore przechowuje Twoje prace, zmiany, stawki, premie i otrzymane wypłaty (każdy wpis z czasem
+      ostatniej zmiany) oraz znacznik z datą utworzenia Twoich danych w chmurze.</li>
+    <li>Każde konto ma dostęp tylko do własnych danych. Dane są przesyłane szyfrowanym połączeniem, a Google
+      przechowuje je zaszyfrowane. Nie jest to szyfrowanie end-to-end: jako właściciel projektu Firebase deweloper
+      technicznie może je zobaczyć i zagląda do nich tylko wtedy, gdy wymaga tego synchronizacja, np. żeby naprawić
+      zgłoszony przez Ciebie problem.</li>
+    <li>Gdy synchronizacja jest włączona, aplikacja pyta też serwer Google o aktualną godzinę, żeby sprawdzić zegar
+      Twojego telefonu.</li>
+    <li>Wersja internetowa Shift Tracker korzysta z tego samego konta i tych samych danych w Twojej przeglądarce.
+      Pamięta zalogowanie tylko, dopóki karta jest otwarta.</li>
+  </ul>
+  <p>Po wyłączeniu synchronizacji dane w chmurze zostają, więc po ponownym włączeniu wszystko działa dalej. Jak je
+    usunąć — niżej, w części „Usuwanie danych”.</p>
+
+  <h2>Czego aplikacja nie robi</h2>
+  <ul>
+    <li>Żadnych reklam ani identyfikatorów reklamowych.</li>
+    <li>Żadnej analityki, śledzenia ani profilowania: aplikacja nie zawiera usług analitycznych ani usług zbierania
+      raportów o awariach.</li>
+    <li>Twoje dane nigdy nie są sprzedawane, wynajmowane ani nikomu udostępniane. Google przetwarza
+      synchronizowane dane wyłącznie w imieniu dewelopera, na warunkach Firebase.</li>
+  </ul>
+
+  <h2>Raporty o awariach</h2>
+  <p>Jeśli aplikacja zamknie się z powodu błędu, zapisuje na telefonie krótki raport: ekran otwarty w chwili
+    błędu, wersję aplikacji, model telefonu i wersję Androida oraz techniczne szczegóły błędu. To zwykły tekst, który
+    możesz w całości przeczytać. Przy następnym uruchomieniu aplikacja pokaże Ci raport; zostanie wysłany tylko
+    wtedy, gdy go samodzielnie skopiujesz lub udostępnisz (np. w e-mailu do dewelopera). Po pokazaniu raport jest usuwany z
+    telefonu.</p>
+  <p>Jeśli aplikacja pochodzi z Google Play, Google może zbierać anonimowe statystyki awarii i wydajności (Android
+    vitals) zgodnie z <a href="https://policies.google.com/privacy">własną polityką prywatności</a>; aplikacja nic
+    do nich nie dodaje.</p>
+
+  <h2>Eksport, kopie i Twoje pliki</h2>
+  <ul>
+    <li>„Ustawienia → Eksportuj dane” zapisuje wszystkie Twoje dane w pliku (JSON) w wybranym przez Ciebie miejscu;
+      „Importuj dane” je przywraca.</li>
+    <li>Zanim import zastąpi Twoje dane, aplikacja zachowuje na telefonie kopię zabezpieczającą (5 najnowszych),
+      którą możesz zapisać w pliku lub udostępnić.</li>
+    <li>Pliki, które eksportujesz lub udostępniasz, są pod Twoją kontrolą: aplikacja nigdzie ich nie wysyła.</li>
+  </ul>
+
+  <h2>Usuwanie danych</h2>
+  <ul>
+    <li>Na telefonie: usuwaj pojedyncze wpisy w aplikacji albo odinstaluj aplikację (lub wyczyść jej pamięć w
+      ustawieniach Androida), żeby usunąć wszystko, co zapisała na telefonie.</li>
+    <li>W chmurze: „Ustawienia → Konto i synchronizacja → Usuń moje dane z chmury” usuwa synchronizowane dane;
+      „Usuń konto” usuwa synchronizowane dane, a potem samo konto. W obu przypadkach dane na telefonie
+      zostają.</li>
+    <li>Bez aplikacji: zobacz <a href="/delete-account?lang=pl">Usuwanie konta i danych</a> albo napisz na
+      CONTACT_EMAIL_PLACEHOLDER.</li>
+  </ul>
+  <p>Usunięte dane znikają z Cloud Firestore od razu; Google może jeszcze przez pewien czas przechowywać je w swoich
+    kopiach zapasowych, po czym zostają usunięte także stamtąd.</p>
+
+  <h2>Jak długo przechowujemy dane</h2>
+  <p>Dane na telefonie są przechowywane, dopóki ich nie usuniesz albo nie odinstalujesz aplikacji. Dane w chmurze są
+    przechowywane, dopóki istnieje Twoje konto — aż je usuniesz albo poprosisz o to dewelopera.</p>
+
+  <h2>Dzieci</h2>
+  <p>Shift Tracker jest przeznaczony dla pracujących dorosłych i nie jest skierowany do dzieci.</p>
+
+  <h2>Twoje prawa</h2>
+  <p>W każdej chwili możesz w aplikacji przeglądać, eksportować, poprawiać i usuwać swoje dane. Możesz też poprosić
+    dewelopera (CONTACT_EMAIL_PLACEHOLDER) o kopię swoich danych z chmury albo o ich usunięcie. Masz prawo wnieść
+    skargę do organu ochrony danych osobowych w miejscu zamieszkania (w Polsce: Prezes UODO).</p>
+
+  <h2>Zmiany</h2>
+  <p>Jeśli ta polityka się zmieni, nowa wersja zostanie opublikowana na tej stronie z nową datą.</p>
+</section>
+</main>
+<script>
+  (function () {
+    var LANGS = ['uk', 'en', 'pl'];
+    function pick() {
+      var asked = new URLSearchParams(location.search).get('lang');
+      if (LANGS.indexOf(asked) >= 0) return asked;
+      var preferred = navigator.languages || [navigator.language || 'en'];
+      for (var i = 0; i < preferred.length; i++) {
+        var lang = String(preferred[i]).slice(0, 2).toLowerCase();
+        if (LANGS.indexOf(lang) >= 0) return lang;
+      }
+      return 'en';
+    }
+    function show(lang, remember) {
+      document.documentElement.lang = lang;
+      document.querySelectorAll('section[data-lang]').forEach(function (s) { s.hidden = s.getAttribute('data-lang') !== lang; });
+      document.querySelectorAll('nav.switch a').forEach(function (a) {
+        a.setAttribute('aria-current', a.getAttribute('hreflang') === lang ? 'true' : 'false');
+      });
+      document.title = 'Shift Tracker – ' + document.querySelector('section[data-lang="' + lang + '"] h1').textContent;
+      if (remember) history.replaceState(null, '', '?lang=' + lang + location.hash);
+    }
+    document.querySelectorAll('nav.switch a').forEach(function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); show(a.getAttribute('hreflang'), true); });
+    });
+    show(pick(), false);
+  })();
+</script>
+</body>
+</html>

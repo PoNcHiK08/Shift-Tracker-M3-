@@ -2,6 +2,7 @@ package com.vkurylo.shifttracker.ui.settings
 
 import android.app.Activity
 import android.content.Context
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ContextWrapper
 import android.content.Intent
@@ -20,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.CloudOff
@@ -32,9 +34,11 @@ import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.NoAccounts
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PersonRemove
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -87,6 +91,7 @@ import com.vkurylo.shifttracker.ui.components.SectionHeader
 import com.vkurylo.shifttracker.ui.components.SegmentedItem
 import com.vkurylo.shifttracker.ui.components.SegmentedListDefaults
 import com.vkurylo.shifttracker.ui.theme.supportsDynamicColor
+import com.vkurylo.shifttracker.ui.util.currentLocale
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -99,11 +104,19 @@ fun SettingsScreen(
     onManageJobs: () -> Unit,
     onImportIcs: (Uri) -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
+    siteUrl: String = BuildConfig.SITE_URL,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val cloud by viewModel.cloud.collectAsStateWithLifecycle()
     val snackbar = LocalSnackbarController.current
     val context = LocalContext.current
+    // Settings → About: the privacy policy and how to delete the account (also without the app), on the app's
+    // site; a build without one (no cloud sync) shows only the version.
+    val language = currentLocale().language
+    val links = listOfNotNull(
+        SiteLinks.privacy(siteUrl, language)?.let { Triple(it, R.string.privacy_policy, R.string.privacy_policy_summary) },
+        SiteLinks.deleteAccount(siteUrl, language)?.let { Triple(it, R.string.delete_account_page, R.string.delete_account_page_summary) },
+    )
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     LaunchedEffect(viewModel) {
@@ -543,7 +556,7 @@ fun SettingsScreen(
 
             item { SectionHeader(stringResource(R.string.section_about)) }
             item {
-                SettingsRow(index = 0, count = 1) {
+                SettingsRow(index = 0, count = 1 + links.size) {
                     ListItem(
                         modifier = it,
                         colors = TransparentListItem,
@@ -551,6 +564,33 @@ fun SettingsScreen(
                         headlineContent = { Text(stringResource(R.string.app_name)) },
                         supportingContent = { Text(stringResource(R.string.version, BuildConfig.VERSION_NAME)) },
                     )
+                }
+            }
+            links.forEachIndexed { i, (url, title, summary) ->
+                item {
+                    val openFailed = stringResource(R.string.link_open_failed, url)
+                    SettingsRow(
+                        index = 1 + i,
+                        count = 1 + links.size,
+                        onClick = {
+                            try {
+                                context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                            } catch (e: ActivityNotFoundException) {
+                                snackbar.show(openFailed)
+                            }
+                        },
+                    ) {
+                        ListItem(
+                            modifier = it,
+                            colors = TransparentListItem,
+                            leadingContent = {
+                                Icon(if (i == 0) Icons.Filled.Policy else Icons.Filled.NoAccounts, contentDescription = null)
+                            },
+                            headlineContent = { Text(stringResource(title)) },
+                            supportingContent = { Text(stringResource(summary)) },
+                            trailingContent = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                        )
+                    }
                 }
             }
         }

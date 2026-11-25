@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="index">
+<title>Shift Tracker – Deleting your account and data</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --bg: #fbf8ff; --text: #1b1b21; --muted: #46464f; --accent: #3f51b5; --card: #efedf4; --line: #c6c5d0;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #131318; --text: #e4e1e9; --muted: #c6c5d0; --accent: #bac3ff; --card: #1f1f25; --line: #46464f; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 16px 16px 48px; }
+  nav.switch { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0 24px; }
+  nav.switch a {
+    padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); text-decoration: none;
+  }
+  nav.switch a[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 32px 0 8px; }
+  .meta { color: var(--muted); margin: 0 0 16px; }
+  .summary { background: var(--card); border-radius: 16px; padding: 12px 20px; }
+  a { color: var(--accent); }
+  ul { padding-left: 1.3em; }
+  li { margin: 4px 0; }
+  section + section { border-top: 1px solid var(--line); margin-top: 40px; padding-top: 24px; }
+  section[hidden] + section { border-top: 0; margin-top: 0; padding-top: 0; }
+</style>
+</head>
+<body>
+<main>
+<nav class="switch" aria-label="Language / Мова / Język">
+  <a href="?lang=uk" hreflang="uk" lang="uk">Українська</a>
+  <a href="?lang=en" hreflang="en" lang="en">English</a>
+  <a href="?lang=pl" hreflang="pl" lang="pl">Polski</a>
+</nav>
+
+<section data-lang="uk" lang="uk">
+  <h1>Видалення акаунта й даних</h1>
+  <p class="meta">Shift Tracker · Оновлено 25 листопада 2026 року</p>
+  <p>Shift Tracker зберігає твої дані на телефоні. Якщо ти вмикаєш синхронізацію з хмарою, у Google Firebase
+    також зберігаються твій акаунт (адреса пошти акаунта Google) і синхронізовані дані. Ось як їх видалити.</p>
+
+  <h2>У застосунку</h2>
+  <ol>
+    <li>Відкрий Shift Tracker → <strong>Налаштування → Акаунт і синхронізація</strong>.</li>
+    <li>Торкнися <strong>Видалити акаунт</strong> і підтвердь.</li>
+    <li>Якщо Google попросить увійти ще раз, увійди тим самим акаунтом Google.</li>
+  </ol>
+  <p>Це видаляє синхронізовані дані (роботи, зміни, ставки, бонуси й отримані виплати) з Cloud Firestore, потім твій
+    акаунт із Firebase Authentication, і виконує вихід. Дані на телефоні залишаються: щоб прибрати й їх, видали
+    застосунок або очисти його сховище в налаштуваннях Android.</p>
+  <p>Хочеш прибрати лише дані з хмари, а акаунт залишити? Тоді вибери <strong>Видалити мої дані з хмари</strong>.</p>
+
+  <h2>Без застосунку</h2>
+  <p>Якщо застосунку чи телефона вже немає, напиши на CONTACT_EMAIL_PLACEHOLDER з того акаунта Google, який
+    використовувався для синхронізації, з темою «Видалити мій акаунт Shift Tracker». Розробник видалить акаунт і всі
+    його синхронізовані дані протягом 30 днів і підтвердить це у відповіді. Щоб захистити твої дані, запит має
+    надійти з цієї адреси (або розробник попросить підтвердити, що акаунт твій).</p>
+
+  <h2>Що видаляється, а що ні</h2>
+  <ul>
+    <li>Видаляється: твій акаунт у Firebase (адреса пошти, ідентифікатор акаунта) і всі синхронізовані записи.</li>
+    <li>У хмарі нічого не лишається. Google може ще деякий час зберігати видалені дані у своїх резервних копіях,
+      після чого вони стираються й там.</li>
+    <li>Не зачіпається: дані на твоїх телефонах (доки ти не видалиш застосунок) і файли, які ти
+      експортуєш власноруч.</li>
+  </ul>
+  <p>Питання — на CONTACT_EMAIL_PLACEHOLDER. Дивись також <a href="/privacy?lang=uk">політику конфіденційності</a>.</p>
+</section>
+
+<section data-lang="en" lang="en">
+  <h1>Deleting your account and data</h1>
+  <p class="meta">Shift Tracker · Last updated 25 November 2026</p>
+  <p>Shift Tracker stores your data on your phone. If you used cloud sync, your account (your Google account's email
+    address) and your synced data are also stored in Google Firebase. Here is how to delete them.</p>
+
+  <h2>In the app</h2>
+  <ol>
+    <li>Open Shift Tracker → <strong>Settings → Account &amp; sync</strong>.</li>
+    <li>Tap <strong>Delete account</strong> and confirm.</li>
+    <li>If Google asks you to sign in again, sign in with the same Google account.</li>
+  </ol>
+  <p>This deletes your synced data (jobs, shifts, rates, bonuses and received payments) from Cloud Firestore, then
+    your account from Firebase Authentication, and signs you out. The data on your phone stays: to remove it too,
+    uninstall the app or clear its storage in Android settings.</p>
+  <p>Only want to remove the cloud data and keep the account? Choose <strong>Delete my cloud data</strong>
+    instead.</p>
+
+  <h2>Without the app</h2>
+  <p>If you no longer have the app or the phone, email CONTACT_EMAIL_PLACEHOLDER from the Google account you used for
+    sync, with the subject “Delete my Shift Tracker account”. The developer deletes the account and all its synced
+    data within 30 days and replies to confirm. To protect your data, the request must come from that address (or
+    the developer will ask you to confirm the account is yours).</p>
+
+  <h2>What is deleted and what is not</h2>
+  <ul>
+    <li>Deleted: your Firebase account (email address, account ID) and all your synced records.</li>
+    <li>Nothing is kept in the cloud. Google may keep deleted data in its backups for a limited time before it is
+      erased there too.</li>
+    <li>Not affected: the data on your phones (until you uninstall the app) and files you exported yourself.</li>
+  </ul>
+  <p>Questions: CONTACT_EMAIL_PLACEHOLDER. See also the <a href="/privacy?lang=en">privacy policy</a>.</p>
+</section>
+
+<section data-lang="pl" lang="pl">
+  <h1>Usuwanie konta i danych</h1>
+  <p class="meta">Shift Tracker · Ostatnia aktualizacja: 25 listopada 2026 r.</p>
+  <p>Shift Tracker przechowuje Twoje dane na telefonie. Jeśli korzystasz z synchronizacji z chmurą, w Google
+    Firebase są też przechowywane Twoje konto (adres e-mail konta Google) i synchronizowane dane. Oto jak je
+    usunąć.</p>
+
+  <h2>W aplikacji</h2>
+  <ol>
+    <li>Otwórz Shift Tracker → <strong>Ustawienia → Konto i synchronizacja</strong>.</li>
+    <li>Dotknij <strong>Usuń konto</strong> i potwierdź.</li>
+    <li>Jeśli Google poprosi o ponowne zalogowanie, zaloguj się tym samym kontem Google.</li>
+  </ol>
+  <p>To usuwa synchronizowane dane (prace, zmiany, stawki, premie i otrzymane wypłaty) z Cloud Firestore, potem
+    Twoje konto z Firebase Authentication i wylogowuje Cię. Dane na telefonie zostają: żeby je też usunąć,
+    odinstaluj aplikację lub wyczyść jej pamięć w ustawieniach Androida.</p>
+  <p>Chcesz usunąć tylko dane z chmury, a konto zachować? Wybierz wtedy <strong>Usuń moje dane z
+    chmury</strong>.</p>
+
+  <h2>Bez aplikacji</h2>
+  <p>Jeśli nie masz już aplikacji ani telefonu, napisz na CONTACT_EMAIL_PLACEHOLDER z konta Google używanego do
+    synchronizacji, z tematem „Usuń moje konto Shift Tracker”. Deweloper usunie konto i wszystkie jego
+    synchronizowane dane w ciągu 30 dni i potwierdzi to w odpowiedzi. Dla ochrony Twoich danych prośba musi przyjść
+    z tego adresu (albo deweloper poprosi o potwierdzenie, że konto należy do Ciebie).</p>
+
+  <h2>Co jest usuwane, a co nie</h2>
+  <ul>
+    <li>Usuwane: Twoje konto w Firebase (adres e-mail, identyfikator konta) i wszystkie synchronizowane wpisy.</li>
+    <li>W chmurze nic nie zostaje. Google może jeszcze przez pewien czas przechowywać usunięte dane w swoich kopiach
+      zapasowych, po czym zostają usunięte także stamtąd.</li>
+    <li>Bez zmian: dane na Twoich telefonach (dopóki nie odinstalujesz aplikacji) i pliki wyeksportowane
+      przez Ciebie.</li>
+  </ul>
+  <p>Pytania: CONTACT_EMAIL_PLACEHOLDER. Zobacz też <a href="/privacy?lang=pl">politykę prywatności</a>.</p>
+</section>
+</main>
+<script>
+  (function () {
+    var LANGS = ['uk', 'en', 'pl'];
+    function pick() {
+      var asked = new URLSearchParams(location.search).get('lang');
+      if (LANGS.indexOf(asked) >= 0) return asked;
+      var preferred = navigator.languages || [navigator.language || 'en'];
+      for (var i = 0; i < preferred.length; i++) {
+        var lang = String(preferred[i]).slice(0, 2).toLowerCase();
+        if (LANGS.indexOf(lang) >= 0) return lang;
+      }
+      return 'en';
+    }
+    function show(lang, remember) {
+      document.documentElement.lang = lang;
+      document.querySelectorAll('section[data-lang]').forEach(function (s) { s.hidden = s.getAttribute('data-lang') !== lang; });
+      document.querySelectorAll('nav.switch a').forEach(function (a) {
+        a.setAttribute('aria-current', a.getAttribute('hreflang') === lang ? 'true' : 'false');
+      });
+      document.title = 'Shift Tracker – ' + document.querySelector('section[data-lang="' + lang + '"] h1').textContent;
+      if (remember) history.replaceState(null, '', '?lang=' + lang + location.hash);
+    }
+    document.querySelectorAll('nav.switch a').forEach(function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); show(a.getAttribute('hreflang'), true); });
+    });
+    show(pick(), false);
+  })();
+</script>
+</body>
+</html>
