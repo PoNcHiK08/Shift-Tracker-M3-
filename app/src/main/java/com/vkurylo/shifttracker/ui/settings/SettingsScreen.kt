@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PersonRemove
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.SettingsBackupRestore
@@ -336,8 +337,8 @@ fun SettingsScreen(
                 }
                 else -> {
                     val sync = cloud.sync
-                    val deleting = cloud.cloudDeletion == CloudDeletion.DELETING
-                    val rows = if (sync.enabled) 5 else 4
+                    val deleting = cloud.deleting
+                    val rows = if (sync.enabled) 6 else 5
                     item {
                         // Sync off: whether the cloud lets this account in (tap to check again after an error).
                         // Sync on: how sync stands (tap after the cloud data was deleted to decide what to do).
@@ -426,7 +427,7 @@ fun SettingsScreen(
                     item {
                         // The account's data in the cloud, deleted after a confirmation; this phone keeps its own.
                         SettingsRow(
-                            index = rows - 2,
+                            index = rows - 3,
                             count = rows,
                             onClick = viewModel::requestDeleteCloudData,
                             enabled = !deleting && !cloud.switchingOn && !sync.running,
@@ -437,7 +438,35 @@ fun SettingsScreen(
                                 leadingContent = { Icon(Icons.Filled.DeleteForever, contentDescription = null) },
                                 headlineContent = { Text(stringResource(R.string.cloud_delete)) },
                                 supportingContent = {
-                                    Text(stringResource(if (deleting) R.string.cloud_deleting else R.string.cloud_delete_summary))
+                                    Text(
+                                        stringResource(
+                                            if (cloud.cloudDeletion == CloudDeletion.DELETING) R.string.cloud_deleting else R.string.cloud_delete_summary,
+                                        ),
+                                    )
+                                },
+                            )
+                        }
+                    }
+                    item {
+                        // The account itself and its cloud data (Google Play requires this in the app); this phone
+                        // keeps its own data.
+                        SettingsRow(
+                            index = rows - 2,
+                            count = rows,
+                            onClick = viewModel::requestDeleteAccount,
+                            enabled = !deleting && !cloud.switchingOn && !sync.running,
+                        ) {
+                            ListItem(
+                                modifier = it,
+                                colors = TransparentListItem,
+                                leadingContent = { Icon(Icons.Filled.PersonRemove, contentDescription = null) },
+                                headlineContent = { Text(stringResource(R.string.account_delete)) },
+                                supportingContent = {
+                                    Text(
+                                        stringResource(
+                                            if (cloud.accountDeletion == AccountDeletion.DELETING) R.string.account_deleting else R.string.account_delete_summary,
+                                        ),
+                                    )
                                 },
                             )
                         }
@@ -590,6 +619,35 @@ fun SettingsScreen(
             },
             dismissButton = { TextButton(onClick = viewModel::cancelDeleteCloudData) { Text(stringResource(R.string.cancel)) } },
         )
+    }
+
+    val accountEmail = cloud.account?.email ?: stringResource(R.string.cloud_google_account)
+    when (cloud.accountDeletion) {
+        AccountDeletion.CONFIRMING -> AlertDialog(
+            onDismissRequest = viewModel::cancelDeleteAccount,
+            icon = { Icon(Icons.Filled.PersonRemove, contentDescription = null) },
+            title = { Text(stringResource(R.string.account_delete_title)) },
+            text = { Text(stringResource(R.string.account_delete_message, accountEmail)) },
+            confirmButton = {
+                TextButton(onClick = viewModel::deleteAccount) {
+                    Text(stringResource(R.string.account_delete_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::cancelDeleteAccount) { Text(stringResource(R.string.cancel)) } },
+        )
+        AccountDeletion.NEEDS_SIGN_IN -> AlertDialog(
+            onDismissRequest = viewModel::cancelDeleteAccount,
+            icon = { Icon(Icons.Filled.PersonRemove, contentDescription = null) },
+            title = { Text(stringResource(R.string.account_reauth_title)) },
+            text = { Text(stringResource(R.string.account_reauth_message, accountEmail)) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.signInAgainAndDeleteAccount(context.findActivity() ?: context) }) {
+                    Text(stringResource(R.string.account_reauth_confirm), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = viewModel::cancelDeleteAccount) { Text(stringResource(R.string.cancel)) } },
+        )
+        else -> Unit
     }
 }
 

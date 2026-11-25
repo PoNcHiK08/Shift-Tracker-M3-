@@ -1,29 +1,21 @@
 rules_version = '2';
 
-// Security rules for Shift Tracker's cloud sync (Cloud Firestore).
+// Security rules for Shift Tracker's cloud sync (Cloud Firestore). Publish them as they are: Firebase console ->
+// Firestore Database -> Rules (or, in firebase/: firebase deploy --only firestore:rules --project PROJECT_ID).
 //
-// BEFORE PUBLISHING: replace YOUR_EMAIL_HERE below with the address of the Google account you sign in with,
-// in the Firebase console (Firestore Database -> Rules), then Publish. Do not commit your real address: this
-// repository is public. As committed, these rules let nobody in.
-//
-// Who: only the signed-in owner of users/{uid}, signed in with Google, with that verified email.
+// Who: every user signed in with Google, with a verified email, in their own users/{uid} only. Nobody can see or
+// change another user's data, and there is no list of allowed addresses.
 // What: only the documents the app writes, field by field (layout: app/src/main/java/com/vkurylo/shifttracker/
 // data/sync/firebase/FirestoreDocuments.kt), and a record only ever replaced by a later version of it.
 // Everything else is refused. Tests: firebase/rules-test.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function allowedEmail() {
-      return 'YOUR_EMAIL_HERE';
-    }
-
     function isOwner(uid) {
-      return allowedEmail().matches('[^@ ]+@[^@ ]+')
-        && request.auth != null
+      return request.auth != null
         && request.auth.uid == uid
         && request.auth.token.firebase.sign_in_provider == 'google.com'
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() == allowedEmail().lower();
+        && request.auth.token.email_verified == true;
     }
 
     // The marker of the account's cloud data (CloudMeta): created once, never changed; deleted by

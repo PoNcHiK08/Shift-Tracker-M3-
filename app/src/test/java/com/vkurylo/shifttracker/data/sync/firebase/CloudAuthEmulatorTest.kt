@@ -99,4 +99,20 @@ class CloudAuthEmulatorTest {
         assertNull(FirebaseAuth.getInstance(app).currentUser)
         println("Firebase rejected the token with: ${failure.code}")
     }
+
+    /** "Delete account": the Firebase user is really gone (the same Google account comes back as a new user). */
+    @Test
+    fun deletingTheAccountRemovesTheFirebaseUser() {
+        val token = Emulators.googleIdToken()
+        val auth = cloudAuth { _, _ -> token }
+        val activity = Activity()
+        val first = Emulators.onBackground { auth.signIn(activity) }!!
+        Emulators.onBackground { auth.deleteUser() }
+        assertNull(FirebaseAuth.getInstance(app).currentUser)
+        assertNull(auth.currentAccount())
+
+        val again = Emulators.onBackground { auth.signIn(activity) }!!
+        assertEquals(first.email, again.email)
+        assertTrue("a deleted user signs in as a new one", first.uid != again.uid)
+    }
 }

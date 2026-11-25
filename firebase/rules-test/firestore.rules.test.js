@@ -20,7 +20,8 @@ import {
 
 const EMAIL = 'owner@example.com';
 const UID = 'owner-uid';
-const PLACEHOLDER = 'YOUR_EMAIL_HERE';
+const OTHER_EMAIL = 'someone@example.org';
+const OTHER_UID = 'other-uid';
 const committedRules = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
 
 const JOB_ID = '11111111-1111-4111-8111-111111111111';
@@ -37,6 +38,11 @@ function google(email = EMAIL, extra = {}) {
 
 function owner() {
   return env.authenticatedContext(UID, google()).firestore();
+}
+
+/** Another tester: signed in with Google, verified email, their own uid. */
+function otherUser() {
+  return env.authenticatedContext(OTHER_UID, google(OTHER_EMAIL)).firestore();
 }
 
 const now = () => Date.now();
@@ -82,13 +88,14 @@ function payout(fields = {}) {
 }
 
 const jobRef = (db, uid = UID, id = JOB_ID) => doc(db, 'users', uid, 'jobs', id);
+const shiftRef = (db, uid = UID, id = SHIFT_ID) => doc(db, 'users', uid, 'shifts', id);
 const bonusRef = (db, id = BONUS_ID) => doc(db, 'users', UID, 'bonuses', id);
 const payoutRef = (db, uid = UID, id = PAYOUT_ID) => doc(db, 'users', uid, 'payouts', id);
 
 before(async () => {
   env = await initializeTestEnvironment({
     projectId: 'demo-shift-tracker',
-    firestore: { rules: committedRules.replaceAll(PLACEHOLDER, EMAIL) },
+    firestore: { rules: committedRules },
   });
 });
 
@@ -101,53 +108,71 @@ beforeEach(async () => {
 });
 
 describe('as committed', () => {
-  test('nobody gets in until the placeholder is replaced', async () => {
-    const placeholderEnv = await initializeTestEnvironment({
-      projectId: 'demo-shift-tracker-placeholder',
-      firestore: { rules: committedRules },
-    });
-    try {
-      for (const email of [EMAIL, PLACEHOLDER, PLACEHOLDER.toLowerCase()]) {
-        const db = placeholderEnv.authenticatedContext(UID, google(email)).firestore();
-        await assertFails(getDoc(doc(db, 'users', UID)));
-        await assertFails(setDoc(jobRef(db), job()));
-      }
-    } finally {
-      await placeholderEnv.cleanup();
-    }
+  test('the rules are tested exactly as committed and hold no list of addresses', () => {
+    assert.doesNotMatch(committedRules, /YOUR_EMAIL_HERE|allowedEmail|token\.email\b(?!_verified)/);
+    assert.doesNotMatch(committedRules, /[^@\s'"]+@[^@\s'"]+\.[a-z]{2,}/i, 'no email address in the rules');
   });
 });
 
 describe('who', () => {
-  test('the owner, signed in with Google with the allowed verified email, reads and writes their data', async () => {
-    const db = owner();
-    await assertSucceeds(setDoc(doc(db, 'users', UID), { epoch: 'e1', createdAt: serverTimestamp() }));
-    await assertSucceeds(getDoc(doc(db, 'users', UID)));
-    await assertSucceeds(setDoc(jobRef(db), job()));
-    await assertSucceeds(setDoc(doc(db, 'users', UID, 'shifts', SHIFT_ID), shift()));
-    await assertSucceeds(setDoc(doc(db, 'users', UID, 'bonuses', BONUS_ID), bonus()));
-    await assertSucceeds(setDoc(payoutRef(db), payout()));
-    await assertSucceeds(getDocs(collection(db, 'users', UID, 'shifts')));
-    await assertSucceeds(getDocs(collection(db, 'users', UID, 'payouts')));
-    await assertSucceeds(getDoc(payoutRef(db)));
-    await assertSucceeds(deleteDoc(doc(db, 'users', UID, 'bonuses', BONUS_ID)));
-    await assertSucceeds(deleteDoc(payoutRef(db)));
-    await assertSucceeds(deleteDoc(doc(db, 'users', UID)));
+  test('anyone signed in with Google with a verified email reads and writes their own data', async () => {
+    for (const [uid, email] of [[UID, EMAIL], [OTHER_UID, OTHER_EMAIL], ['third-uid', 'Tester.Three@Gmail.com']]) {
+      const db = env.authenticatedContext(uid, google(email)).firestore();
+      await assertSucceeds(setDoc(doc(db, 'users', uid), { epoch: 'e1', createdAt: serverTimestamp() }));
+      await assertSucceeds(getDoc(doc(db, 'users', uid)));
+      await assertSucceeds(setDoc(jobRef(db, uid), job()));
+      await assertSucceeds(setDoc(shiftRef(db, uid), shift()));
+      await assertSucceeds(setDoc(doc(db, 'users', uid, 'bonuses', BONUS_ID), bonus()));
+      await assertSucceeds(setDoc(payoutRef(db, uid), payout()));
+      await assertSucceeds(getDocs(collection(db, 'users', uid, 'shifts')));
+      await assertSucceeds(getDocs(collection(db, 'users', uid, 'payouts')));
+      await assertSucceeds(getDoc(payoutRef(db, uid)));
+      await assertSucceeds(deleteDoc(doc(db, 'users', uid, 'bonuses', BONUS_ID)));
+      await assertSucceeds(deleteDoc(payoutRef(db, uid)));
+      await assertSucceeds(deleteDoc(doc(db, 'users', uid)));
+    }
   });
 
-  test('the email check ignores letter case', async () => {
-    const db = env.authenticatedContext(UID, google('Owner@Example.COM')).firestore();
-    await assertSucceeds(setDoc(jobRef(db), job()));
+  test("user A can't read or write user B's data", async () => {
+    await env.withSecurityRulesDisabled(async (context) => {
+      const admin = context.firestore();
+      await setDoc(doc(admin, 'users', OTHER_UID), { epoch: 'b', createdAt: Timestamp.now() });
+      await setDoc(jobRef(admin, OTHER_UID), job({ serverUpdatedAt: Timestamp.now() }));
+      await setDoc(shiftRef(admin, OTHER_UID), shift({ serverUpdatedAt: Timestamp.now() }));
+      await setDoc(doc(admin, 'users', OTHER_UID, 'bonuses', BONUS_ID), bonus({ serverUpdatedAt: Timestamp.now() }));
+      await setDoc(payoutRef(admin, OTHER_UID), payout({ serverUpdatedAt: Timestamp.now() }));
+    });
+    const a = owner();
+    const later = { updatedAt: now() + 1000 };
+    await assertFails(getDoc(doc(a, 'users', OTHER_UID)));
+    await assertFails(setDoc(doc(a, 'users', OTHER_UID), { epoch: 'a', createdAt: serverTimestamp() }));
+    await assertFails(deleteDoc(doc(a, 'users', OTHER_UID)));
+    for (const name of ['jobs', 'shifts', 'bonuses', 'payouts']) {
+      await assertFails(getDocs(collection(a, 'users', OTHER_UID, name)), name);
+    }
+    await assertFails(getDoc(jobRef(a, OTHER_UID)));
+    await assertFails(setDoc(jobRef(a, OTHER_UID), job(later)));
+    await assertFails(deleteDoc(jobRef(a, OTHER_UID)));
+    await assertFails(getDoc(shiftRef(a, OTHER_UID)));
+    await assertFails(setDoc(shiftRef(a, OTHER_UID), shift(later)));
+    await assertFails(deleteDoc(shiftRef(a, OTHER_UID)));
+    await assertFails(setDoc(doc(a, 'users', OTHER_UID, 'bonuses', BONUS_ID), bonus(later)));
+    await assertFails(deleteDoc(doc(a, 'users', OTHER_UID, 'bonuses', BONUS_ID)));
+    await assertFails(getDoc(payoutRef(a, OTHER_UID)));
+    await assertFails(setDoc(payoutRef(a, OTHER_UID), payout(later)));
+    await assertFails(deleteDoc(payoutRef(a, OTHER_UID)));
+    // B's own data is untouched and still theirs.
+    await assertSucceeds(getDoc(jobRef(otherUser(), OTHER_UID)));
   });
 
   test('nobody else gets in', async () => {
     const strangers = {
       'signed out': env.unauthenticatedContext(),
-      'another email': env.authenticatedContext(UID, google('someone@example.com')),
       'unverified email': env.authenticatedContext(UID, google(EMAIL, { email_verified: false })),
       'no email': env.authenticatedContext(UID, { firebase: { sign_in_provider: 'google.com' } }),
       'not signed in with Google': env.authenticatedContext(UID, google(EMAIL, { firebase: { sign_in_provider: 'password' } })),
       'anonymous': env.authenticatedContext(UID, google(EMAIL, { firebase: { sign_in_provider: 'anonymous' } })),
+      'another Google user': env.authenticatedContext(OTHER_UID, google(OTHER_EMAIL)),
     };
     for (const [who, context] of Object.entries(strangers)) {
       const db = context.firestore();
@@ -158,20 +183,6 @@ describe('who', () => {
       await assertFails(setDoc(payoutRef(db), payout()), who);
       await assertFails(getDocs(collection(db, 'users', UID, 'payouts')), who);
     }
-  });
-
-  test("the allowed email can't touch another uid's data", async () => {
-    await env.withSecurityRulesDisabled(async (context) => {
-      await setDoc(jobRef(context.firestore(), 'other-uid'), job({ serverUpdatedAt: Timestamp.now() }));
-      await setDoc(payoutRef(context.firestore(), 'other-uid'), payout({ serverUpdatedAt: Timestamp.now() }));
-    });
-    const db = owner();
-    await assertFails(getDoc(jobRef(db, 'other-uid')));
-    await assertFails(setDoc(jobRef(db, 'other-uid'), job()));
-    await assertFails(deleteDoc(jobRef(db, 'other-uid')));
-    await assertFails(getDoc(payoutRef(db, 'other-uid')));
-    await assertFails(setDoc(payoutRef(db, 'other-uid'), payout({ updatedAt: now() + 1000 })));
-    await assertFails(deleteDoc(payoutRef(db, 'other-uid')));
   });
 
   test('nothing outside users/{uid} is reachable', async () => {
@@ -417,8 +428,7 @@ describe('payouts', () => {
   test('the owner can delete a payout; others cannot', async () => {
     const db = owner();
     await assertSucceeds(setDoc(payoutRef(db), payout()));
-    const stranger = env.authenticatedContext(UID, google('someone@example.com')).firestore();
-    await assertFails(deleteDoc(payoutRef(stranger)));
+    await assertFails(deleteDoc(payoutRef(otherUser())));
     await assertSucceeds(deleteDoc(payoutRef(db)));
   });
 });

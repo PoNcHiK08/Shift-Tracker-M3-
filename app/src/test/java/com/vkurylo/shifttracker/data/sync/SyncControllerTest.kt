@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import com.vkurylo.shifttracker.data.sync.firebase.RecentLoginRequiredException
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -397,6 +398,66 @@ class SyncControllerTest {
         cloud.reachable = true
         assertEquals(4, a.controller.deleteCloudData())
         assertTrue(cloud.records(ana.uid).isEmpty())
+    }
+
+    /** What the phone holds: jobs, shifts and bonuses. */
+    private suspend fun Phone.counts() = listOf(db.jobDao().getAll().size, db.shiftDao().getAll().size, db.bonusDao().getAll().size)
+
+    @Test
+    fun deletingTheAccountDeletesItsCloudDataFirstThenTheAccountAndKeepsThePhonesData() = runBlocking {
+        val a = phone()
+        a.someData()
+        a.turnOn()
+        assertEquals(4, cloud.records(ana.uid).size)
+        var leftInTheCloudWhenTheAccountWent: Int? = null
+        a.auth.onDeleteUser = { leftInTheCloudWhenTheAccountWent = cloud.records(it.uid).size + (if (cloud.meta(it.uid) != null) 1 else 0) }
+
+        assertEquals(4, a.controller.deleteAccount())
+
+        assertEquals("the cloud data is deleted before the account", 0, leftInTheCloudWhenTheAccountWent)
+        assertEquals(1, a.auth.deleteUserCalls)
+        assertNull("signed out", a.auth.currentAccount())
+        assertTrue(cloud.records(ana.uid).isEmpty())
+        assertNull(cloud.meta(ana.uid))
+        assertFalse(a.settings().enabled)
+        assertTrue(a.scheduler.cancels > 0)
+        assertEquals("this phone keeps its data", listOf(1, 2, 1), a.counts())
+    }
+
+    @Test
+    fun whenFirebaseWantsAFreshSignInTheAccountStaysAndDeletingAgainFinishes() = runBlocking {
+        val a = phone()
+        a.someData()
+        a.turnOn()
+        var attempts = 0
+        a.auth.onDeleteUser = { if (attempts++ == 0) throw RecentLoginRequiredException(null) }
+
+        val failure = runCatching { a.controller.deleteAccount() }.exceptionOrNull()
+        assertTrue(failure.toString(), failure is RecentLoginRequiredException)
+        assertEquals("still signed in", ana, a.auth.currentAccount())
+        assertTrue("the cloud data is already gone", cloud.records(ana.uid).isEmpty())
+        assertFalse("nothing can upload it again meanwhile", a.settings().enabled)
+
+        // After signing in again: the same call finishes (there is nothing left to delete in the cloud).
+        assertEquals(0, a.controller.deleteAccount())
+        assertNull(a.auth.currentAccount())
+        assertEquals(listOf(1, 2, 1), a.counts())
+    }
+
+    @Test
+    fun deletingTheAccountOfflineKeepsTheAccountAndItsCloudData() = runBlocking {
+        val a = phone()
+        a.someData()
+        a.turnOn()
+        cloud.reachable = false
+
+        val failure = runCatching { a.controller.deleteAccount() }.exceptionOrNull()
+        assertTrue(failure.toString(), failure is java.io.IOException)
+        assertEquals("the account is never deleted while its cloud data stays", 0, a.auth.deleteUserCalls)
+        assertEquals(ana, a.auth.currentAccount())
+        assertEquals(4, cloud.records(ana.uid).size)
+        assertFalse(a.settings().enabled)
+        assertEquals(listOf(1, 2, 1), a.counts())
     }
 
     @Test

@@ -111,10 +111,8 @@ account the app syncs with.
 
 Run it **in `web\`**: the site's Hosting settings are `web\firebase.json`, which has nothing but Hosting in it.
 
-> **Never run `firebase deploy` in `firebase\`.** That folder's `firebase.json` is for the rules: a deploy there
-> would publish the committed `firestore.rules`, whose placeholder address lets nobody in, and the app on your
-> phone would be refused until you publish your real rules again (README → Security rules). If that happens,
-> nothing is lost: republish the rules with your address in the console.
+> **Deploy the site from `web\`, not from `firebase\`.** That folder's `firebase.json` is for the rules only:
+> `firebase deploy` there publishes `firestore.rules` (README → Security rules) and no site.
 
 ### Publishing a newer version (redeploy)
 
@@ -202,11 +200,11 @@ Settings → Data).
 - **Unsaved changes:** closing a form (×, Cancel, Esc) or the tab with changes asks first.
 - **Your computer's clock** counts as the time of a change, as the phone's does. The cloud refuses a change from a
   clock more than 10 minutes ahead; the site says so. Set the date and time automatically.
-- The Firestore rules don't change for this: they already allow exactly these writes, and only for your account.
+- The Firestore rules don't change for this: they already allow exactly these writes, each account only in its own data.
 
 **If a save is refused:**
 - "This changed on another device": press **Reload**, open the record again, redo your change.
-- "The cloud refused the change": check the computer's date and time, and that the published rules have your address.
+- "The cloud refused the change": check the computer's date and time, and that the latest rules are published.
 - "This record was saved by a newer version of the app": update the app; change it there.
 
 ## If something goes wrong

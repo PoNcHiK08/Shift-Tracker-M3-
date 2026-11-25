@@ -190,6 +190,8 @@ this build".
 - **Your data stays yours to manage:**
   - **Delete my cloud data** (after a confirmation) turns sync off and deletes the account's data from the
     cloud. The phone keeps its data; other phones stop and ask.
+  - **Delete account** (after a confirmation) deletes the account's cloud data and then the account itself, and
+    signs out. The phone keeps its data. If Google wants a fresh sign-in first, the app asks for one.
   - With sync on, **Import data** warns that it replaces the data on all your devices.
   - Every import first saves a safety backup of the data it replaces. **Settings → Data → Safety backups**
     lists the newest 5; save one to a file or share it, and restore it with Import data.
@@ -232,14 +234,14 @@ full exception, the app's package and the SHA-1 of the key it is signed with.
 
 ### Security rules
 
-[`firebase/firestore.rules`](firebase/firestore.rules) lets only you in: the signed-in owner of
-`users/{uid}`, signed in with Google, whose verified email is the one in the rules. It also checks every
-field of every document, and lets a record be replaced only by a later version of it.
+[`firebase/firestore.rules`](firebase/firestore.rules) gives every user their own space: someone signed in
+with Google, with a verified email, can read and write only `users/{their uid}`, and nobody can see or change
+anyone else's data. There is no list of allowed addresses. The rules also check every field of every document,
+and let a record be replaced only by a later version of it.
 
-The repository is public, so the committed file has the placeholder `YOUR_EMAIL_HERE`, and as committed it
-lets nobody in. To publish: **Firestore Database → Rules**, paste the whole file, replace `YOUR_EMAIL_HERE`
-with your Google account's address **there, in the console only**, then **Publish**. (With the Firebase CLI:
-deploy a local copy with your address in it, never a committed one.) Republish whenever the file changes.
+Publish them as committed: **Firestore Database → Rules**, paste the whole file, **Publish** (or, in
+`firebase/`: `firebase deploy --only firestore:rules --project PROJECT_ID`). Republish whenever the file
+changes.
 
 **Publish the rules before installing a build that adds a kind of record** (the whole-month bonus flag and the
 received-pay `payouts` collection came this way). The rules accept both the previous app version's documents and the

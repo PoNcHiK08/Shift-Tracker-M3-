@@ -11,6 +11,8 @@ import androidx.credentials.GetCredentialRequest
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.vkurylo.shifttracker.data.sync.CloudAccount
@@ -23,6 +25,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -47,7 +50,26 @@ interface CloudAuth {
     suspend fun signIn(activityContext: Context): CloudAccount?
 
     suspend fun signOut()
+
+    /**
+     * Deletes the signed-in account itself (not its cloud data: delete that first) and signs out. Throws
+     * [RecentLoginRequiredException] when Firebase wants a fresh sign-in first: [reauthenticate], then call again.
+     */
+    suspend fun deleteUser()
+
+    /**
+     * Shows Google's account sheet over [activityContext] again and refreshes the signed-in account's sign-in, for
+     * [deleteUser]. False when the user closed the sheet; throws [WrongAccountException] when they picked another
+     * account (nothing changes then), and [SignInException] for anything else.
+     */
+    suspend fun reauthenticate(activityContext: Context): Boolean
 }
+
+/** Firebase deletes an account only shortly after signing in to it; [CloudAuth.reauthenticate] first. */
+class RecentLoginRequiredException(cause: Throwable?) : Exception("Firebase wants a recent sign-in to delete the account", cause)
+
+/** Signing in again picked another Google account than the signed-in one. */
+class WrongAccountException(cause: Throwable? = null) : Exception("Another Google account was picked", cause)
 
 /** Gets a Google ID token from Android's account sheet. Separate from [FirebaseCloudAuth] so tests can stand in for it. */
 fun interface GoogleIdTokenSource {
@@ -108,11 +130,17 @@ class FirebaseCloudAuth internal constructor(
     override fun currentAccount(): CloudAccount? = if (configured()) auth().currentUser?.toAccount() else null
 
     override suspend fun signIn(activityContext: Context): CloudAccount? {
+        val idToken = googleIdToken(activityContext) ?: return null
+        return signInWithGoogleIdToken(idToken)
+    }
+
+    /** A Google ID token from the account sheet, or null when the user closed it. */
+    private suspend fun googleIdToken(activityContext: Context): String? {
         val clientId = webClientId()
         if (!configured() || clientId == null) {
             throw logged("setup", SignInException(SignInException.Reason.OTHER, "NOT_CONFIGURED: this build has no google-services.json"))
         }
-        val idToken = try {
+        return try {
             tokens.idToken(activityContext, clientId)
         } catch (e: CancellationException) {
             throw e
@@ -123,7 +151,6 @@ class FirebaseCloudAuth internal constructor(
             }
             throw logged("Credential Manager", SignInFailures.fromCredentialManager(e))
         }
-        return signInWithGoogleIdToken(idToken)
     }
 
     /** The Firebase half of [signIn]: signs in with a Google ID token. */
@@ -142,12 +169,58 @@ class FirebaseCloudAuth internal constructor(
     override suspend fun signOut() {
         if (!configured()) return
         auth().signOut()
+        forgetAccountChoice()
+    }
+
+    override suspend fun deleteUser() {
+        if (!configured()) return
+        val user = auth().currentUser ?: return
         try {
-            // Forget the account choice too, so the next sign-in asks which account.
-            CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
+            user.delete().await()
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            throw RecentLoginRequiredException(e)
+        }
+        // Firebase has signed out of the deleted account; make sure, and forget the account choice too.
+        auth().signOut()
+        forgetAccountChoice()
+    }
+
+    override suspend fun reauthenticate(activityContext: Context): Boolean {
+        val user = auth().currentUser ?: throw IllegalStateException("Not signed in")
+        val idToken = googleIdToken(activityContext) ?: return false
+        try {
+            user.reauthenticate(GoogleAuthProvider.getCredential(idToken, null)).await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: FirebaseAuthException) {
+            if (e.errorCode == "ERROR_USER_MISMATCH") throw WrongAccountException(e)
+            throw logged("Firebase", SignInFailures.fromFirebase(e))
+        } catch (e: Exception) {
+            throw logged("Firebase", SignInFailures.fromFirebase(e))
+        }
+        return true
+    }
+
+    /**
+     * Forgets the account choice, so the next sign-in asks which account. The sign-out (or deletion) is already
+     * done, so this never holds it up: it gives up after [FORGET_CHOICE_TIMEOUT_MS] (a provider that never
+     * answers would otherwise leave "Deleting…" on screen for good).
+     */
+    private suspend fun forgetAccountChoice() {
+        try {
+            val done = withTimeoutOrNull(FORGET_CHOICE_TIMEOUT_MS) {
+                CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
+            }
+            if (done == null) Log.e(SIGN_IN_LOG_TAG, "Credential Manager: clearing the account choice didn't answer (the sign-out itself is done)")
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(SIGN_IN_LOG_TAG, "Credential Manager: clearing the account choice failed (the sign-out itself is done)", e)
         }
+    }
+
+    private companion object {
+        const val FORGET_CHOICE_TIMEOUT_MS = 5_000L
     }
 
     /** Logs [failure] with what Google needs to recognise this app, and adds that to it for the message. */
