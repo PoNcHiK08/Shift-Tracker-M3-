@@ -20,8 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Offset keeps CI builds above the versionCodes of APKs built by hand (1, 2, …),
-      # so every CI build installs as an update.
+      # versionCode = this workflow's run number + 100. The run number counts every run of this workflow (any
+      # branch, pull requests too), so each new run's code is higher than every earlier run's: an APK installs as
+      # an update, and Google Play, which only takes a versionCode higher than the last one uploaded, takes each
+      # new run's AAB. A re-run keeps its run number (and code), so upload the AAB of a new run instead. The +100
+      # keeps CI builds above hand builds (versionCode 1 without VERSION_CODE: never upload those to Play).
+      # Renaming this workflow file restarts the run number at 1: raise the offset above the last uploaded code.
       - name: Set version code
         run: echo "VERSION_CODE=$((GITHUB_RUN_NUMBER + 100))" >> "$GITHUB_ENV"
 
@@ -114,12 +118,21 @@ jobs:
 
       # The release key was chosen above: the dev key (ALLOW_DEV_RELEASE_SIGNING, set there only without your
       # key: the release build refuses the dev key unless it is allowed) or yours (SIGNING_KEYSTORE_PATH + these).
-      - name: Build APKs
+      # The Play bundle (AAB) is built only with your key, which becomes the Play upload key: anyone can sign
+      # with the public dev key, so an AAB signed with it must never reach Play.
+      - name: Build APKs and the Play bundle
         env:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease assembleDebug --stacktrace
+        run: |
+          tasks="assembleRelease assembleDebug"
+          if [ -n "$SIGNING_KEYSTORE_PATH" ]; then
+            tasks="$tasks bundleRelease"
+          else
+            echo "::warning::No release key (SIGNING_KEYSTORE_BASE64 secret): this build has no Play bundle (AAB)."
+          fi
+          ./gradlew $tasks --stacktrace
 
       # The release build's shrinkers remove anything nothing visibly refers to, and cloud sync looks some things
       # up by name (the Google sign-in client id, Credential Manager's Google provider). Check the APKs themselves,
@@ -132,17 +145,23 @@ jobs:
           fi
           .github/scripts/check-apk-cloud-sync.sh app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Rename APKs
+      - name: Rename APKs and the bundle
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release.apk dist/ShiftTracker.apk
           cp app/build/outputs/apk/debug/app-debug.apk dist/ShiftTracker-debug.apk
+          if [ -f app/build/outputs/bundle/release/app-release.aab ]; then
+            cp app/build/outputs/bundle/release/app-release.aab "dist/ShiftTracker-${VERSION_CODE}.aab"
+          fi
 
-      - name: Upload APKs as workflow artifact
+      # The APKs (to install by hand) and, with your key, ShiftTracker-<versionCode>.aab (to upload to Google Play).
+      - name: Upload APKs and the bundle as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: ShiftTracker-${{ env.VERSION_CODE }}
-          path: dist/*.apk
+          path: |
+            dist/*.apk
+            dist/*.aab
           retention-days: 30
 
       - name: Upload test reports on failure
