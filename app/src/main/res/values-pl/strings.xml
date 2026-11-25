@@ -1,0 +1,457 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Navigation -->
+    <string name="nav_calendar">Kalendarz</string>
+    <string name="nav_summary">Podsumowanie</string>
+    <string name="nav_settings">Ustawienia</string>
+    <string name="back">Wstecz</string>
+    <string name="close">Zamknij</string>
+    <string name="previous_month">Poprzedni miesiąc</string>
+    <string name="next_month">Następny miesiąc</string>
+    <string name="today">Dziś</string>
+
+    <!-- Common -->
+    <string name="save">Zapisz</string>
+    <string name="cancel">Anuluj</string>
+    <string name="discard_changes_title">Odrzucić zmiany?</string>
+    <string name="discard_changes_message">Niezapisane zmiany przepadną.</string>
+    <string name="discard_changes_confirm">Odrzuć</string>
+    <string name="discard_changes_keep">Edytuj dalej</string>
+    <string name="delete">Usuń</string>
+    <string name="ok">OK</string>
+    <string name="more_info">Więcej: %1$s</string>
+    <string name="undo">Cofnij</string>
+    <string name="hours">Godziny</string>
+    <string name="hours_value">%1$s h</string>
+    <string name="shifts">Zmiany</string>
+    <string name="earnings">Zarobki</string>
+    <string name="minutes_short">%1$d min</string>
+    <string name="minutes_suffix">min</string>
+    <string name="break_short">przerwa %1$d min</string>
+    <string name="overnight_shift">Zmiana nocna</string>
+
+    <!-- Calendar -->
+    <string name="add_shift">Dodaj zmianę</string>
+    <string name="day_off">Dzień wolny</string>
+    <string name="day_no_shifts_yet">Jeszcze bez zmian</string>
+    <!-- Not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
+    <string name="day_free">Dzień wolny — bez zmian</string>
+    <string name="no_shifts_this_day">Brak zmian tego dnia.</string>
+    <string name="no_jobs_title">Najpierw dodaj pracę</string>
+    <string name="no_jobs_message">Podaj jej nazwę i stawkę godzinową, a potem możesz zapisywać zmiany.</string>
+
+    <!-- Summary -->
+    <string name="summary_title">Podsumowanie</string>
+    <string name="average_rate">Średnia stawka</string>
+    <string name="by_job">Według pracy</string>
+    <string name="share_of_earnings">%1$d%% zarobków w tym miesiącu</string>
+    <string name="summary_empty_title">Na razie nie ma czego liczyć</string>
+    <string name="summary_empty_message">Gdy dodasz zmiany w tym okresie, pojawią się tu godziny i zarobki.</string>
+
+    <!-- Summary periods -->
+    <string name="period_week">Tydzień</string>
+    <string name="period_month">Miesiąc</string>
+    <string name="period_year">Rok</string>
+    <string name="earnings_week">Zarobione w tym tygodniu</string>
+    <string name="earnings_month">Zarobione w tym miesiącu</string>
+    <string name="earnings_year">Zarobione w tym roku</string>
+    <string name="by_day">Według dni</string>
+    <string name="by_month">Według miesięcy</string>
+    <string name="previous_period">Poprzedni okres</string>
+    <string name="next_period">Następny okres</string>
+    <string name="current_period">Bieżący okres</string>
+
+    <!-- Second (timed) rate -->
+    <string name="base_rate">Stawka podstawowa</string>
+    <string name="second_rate_toggle">Druga stawka w wybranych godzinach</string>
+    <string name="second_rate_toggle_summary">Inna stawka w określonych godzinach, np. w nocy 23:00–06:00</string>
+    <string name="second_rate">Druga stawka</string>
+    <string name="second_rate_from">Od</string>
+    <string name="second_rate_to">Do</string>
+    <string name="error_window_empty">Początek i koniec muszą się różnić</string>
+    <string name="second_rate_summary">%1$s–%2$s: %3$s</string>
+    <string name="rate_line_base">%1$s · %2$s h</string>
+    <string name="rate_line_second">%1$s–%2$s: %3$s · %4$s h</string>
+    <string name="break_split_hint">Przerwa jest odliczana od obu stawek proporcjonalnie</string>
+
+    <!-- Bonuses -->
+    <string name="bonus">Premia</string>
+    <string name="new_bonus">Nowa premia</string>
+    <string name="edit_bonus">Edytuj premię</string>
+    <string name="delete_bonus">Usuń premię</string>
+    <string name="delete_bonus_title">Usunąć tę premię?</string>
+    <string name="bonus_saved">Premia zapisana</string>
+    <string name="bonus_deleted">Premia usunięta</string>
+    <string name="bonus_amount">Kwota</string>
+    <string name="error_amount_invalid">Wpisz kwotę, np. 75</string>
+    <string name="bonus_note">Za co (opcjonalnie)</string>
+    <string name="bonus_hint">Premia zwiększa zarobki z danego dnia, ale nie zmienia godzin ani średniej stawki.</string>
+    <string name="bonus_for_job">Premia · %1$s</string>
+    <string name="including_bonuses">w tym premie %1$s</string>
+    <string name="bonuses_value">premie %1$s</string>
+
+    <!-- Crash report -->
+    <string name="crash_title">Ostatnio aplikacja zamknęła się z powodu błędu</string>
+    <string name="crash_message">Skopiuj ten tekst i wyślij go deweloperowi, żeby dało się dokładnie naprawić błąd.</string>
+    <string name="crash_copy">Kopiuj</string>
+    <string name="crash_share">Udostępnij</string>
+    <string name="crash_copied">Skopiowano</string>
+
+    <!-- Jobs -->
+    <string name="jobs_title">Prace</string>
+    <string name="add_job">Dodaj pracę</string>
+    <string name="new_job">Nowa praca</string>
+    <string name="edit_job">Edytuj pracę</string>
+    <string name="job_name">Nazwa</string>
+    <string name="hourly_rate">Stawka godzinowa</string>
+    <string name="job_color">Kolor</string>
+    <string name="error_name_required">Wpisz nazwę</string>
+    <string name="text_length">%1$s / %2$s znaków</string>
+    <string name="text_too_long">%1$s / %2$s znaków — za dużo. Skróć, żeby zapisać.</string>
+    <string name="error_rate_invalid">Wpisz stawkę, np. 30,50</string>
+    <string name="delete_job_named">Usuń „%1$s”</string>
+    <string name="delete_job_title">Usunąć „%1$s”?</string>
+    <string name="delete_job_no_shifts">Ta praca nie ma zmian.</string>
+    <string-array name="palette_color_names">
+        <item>Niebieski</item>
+        <item>Zielony</item>
+        <item>Czerwony</item>
+        <item>Pomarańczowy</item>
+        <item>Fioletowy</item>
+        <item>Cyjan</item>
+        <item>Różowy</item>
+        <item>Żółty</item>
+        <item>Brązowy</item>
+        <item>Indygo</item>
+        <item>Morski</item>
+        <item>Jasnozielony</item>
+    </string-array>
+
+    <!-- Shift editor -->
+    <string name="new_shift">Nowa zmiana</string>
+    <string name="edit_shift">Edytuj zmianę</string>
+    <string name="job">Praca</string>
+    <string name="date">Data</string>
+    <string name="start_time">Początek</string>
+    <string name="end_time">Koniec</string>
+    <string name="ends_next_day">Kończy się następnego dnia</string>
+    <string name="unpaid_break">Bezpłatna przerwa</string>
+    <string name="no_break">Bez przerwy</string>
+    <string name="break_minutes">Przerwa</string>
+    <string name="note_optional">Notatka (opcjonalnie)</string>
+    <string name="paid_hours">Płatne godziny</string>
+    <string name="rate_used">Stawka: %1$s</string>
+    <string name="rate_changed_hint">Obecna stawka tej pracy jest inna: %1$s</string>
+    <string name="use_current_rate">Użyj obecnej stawki</string>
+    <string name="apply_rate_all">Zastosuj do wszystkich zmian tej pracy…</string>
+    <string name="apply_rate_title">Zastosować obecną stawkę?</string>
+    <string name="apply_rate_scope_all">Wszystkie zmiany tej pracy</string>
+    <string name="apply_rate_scope_from">Od daty tej zmiany (%1$s)</string>
+    <string name="apply_rate_none">Żadna inna zmiana tego nie potrzebuje: wszystkie mają już tę stawkę.</string>
+    <string name="apply_rate_warning">To przelicza zarobki z minionych zmian, także z miesięcy, za które wypłata mogła już przyjść. Ta zmiana dostaje stawkę widoczną na ekranie: dotknij Zapisz, żeby ją zachować. Najpierw zapisywana jest kopia zabezpieczająca wszystkich Twoich danych.</string>
+    <string name="apply_rate_confirm">Zastosuj</string>
+    <string name="apply_rate_failed">Nie udało się zastosować stawki. Nic się nie zmieniło.</string>
+    <string name="apply_rate_undo_failed">Nie udało się cofnąć zmiany stawki.</string>
+    <string name="error_job_required">Wybierz pracę</string>
+    <string name="error_break_too_long">Przerwa jest dłuższa niż zmiana</string>
+    <string name="delete_shift">Usuń zmianę</string>
+    <string name="delete_shift_title">Usunąć tę zmianę?</string>
+    <string name="delete_shift_message">Jej godziny i zarobki znikną z podsumowań.</string>
+    <string name="shift_saved">Zmiana zapisana</string>
+    <string name="shift_deleted">Zmiana usunięta</string>
+    <string name="shift_missing">Ta zmiana już nie istnieje</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ustawienia</string>
+    <string name="section_work">Praca</string>
+    <string name="section_appearance">Wygląd</string>
+    <string name="section_data">Dane</string>
+    <string name="section_about">O aplikacji</string>
+    <string name="jobs_and_rates">Prace i stawki</string>
+    <string name="theme">Motyw</string>
+    <string name="theme_system">Systemowy</string>
+    <string name="theme_light">Jasny</string>
+    <string name="theme_dark">Ciemny</string>
+    <string name="dynamic_color">Dynamiczne kolory</string>
+    <string name="dynamic_color_summary">Kolory z Twojej tapety (Material You)</string>
+    <string name="dynamic_color_unsupported">Dostępne od Androida 12</string>
+    <string name="language">Język</string>
+    <string name="language_ukrainian">Українська</string>
+    <string name="language_english">English</string>
+    <string name="language_polish">Polski</string>
+    <string name="language_system">Systemowy</string>
+    <string name="export_data">Eksportuj dane</string>
+    <string name="export_data_summary">Zapisz wszystkie prace, zmiany, premie i otrzymane wypłaty w pliku JSON</string>
+    <string name="export_done">Dane wyeksportowane</string>
+    <string name="import_data">Importuj dane</string>
+    <string name="import_data_summary">Przywróć z pliku JSON (zastępuje obecne dane)</string>
+    <string name="import_backup_title">Zastąpić wszystkie dane?</string>
+    <string name="import_backup_message">Wszystkie obecne prace, zmiany, premie i otrzymane wypłaty zostaną usunięte i zastąpione danymi z pliku. Najpierw zapisywana jest kopia zabezpieczająca obecnych danych.</string>
+    <string name="import_backup_message_linked">Wszystkie obecne prace, zmiany, premie i otrzymane wypłaty zostaną usunięte i zastąpione danymi z pliku. Najpierw zapisywana jest kopia zabezpieczająca obecnych danych.\n\nSynchronizacja jest wyłączona, ale ten telefon nadal jest powiązany z Twoim kontem: gdy ją znów włączysz, dane zostaną zastąpione także na Twoich innych urządzeniach.</string>
+    <string name="import_backup_title_everywhere">Zastąpić dane na wszystkich urządzeniach?</string>
+    <string name="import_backup_message_synced">To zastąpi dane na wszystkich Twoich urządzeniach. Synchronizacja jest włączona, więc prace, zmiany, premie i otrzymane wypłaty, których nie ma w pliku, zostaną usunięte także na Twoich innych telefonach przy ich najbliższej synchronizacji, a ich miejsce zajmą dane z pliku.\n\nNajpierw zapisywana jest kopia zabezpieczająca obecnych danych z tego telefonu.</string>
+    <string name="replace_data">Zastąp</string>
+    <string name="replace_data_everywhere">Zastąp wszędzie</string>
+    <string name="safety_backups">Kopie zabezpieczające</string>
+    <string name="safety_backups_none">Na razie brak. Kopia zapisuje się sama, zanim Twoje dane zostaną zastąpione (import pliku albo dane konta), i zanim obecna stawka zostanie zastosowana do wielu zmian.</string>
+    <string name="safety_backups_summary">Zapisane przed zastąpieniem danych: %1$d. Dotknij, żeby zapisać którąś w pliku.</string>
+    <string name="safety_backups_message">Aplikacja zapisuje je sama, zanim zastąpi dane na tym telefonie (zostaje %1$d najnowszych). Zapisz którąś w pliku albo ją udostępnij (Dysk, komunikator, e-mail); przywrócisz ją przez Importuj dane.</string>
+    <string name="safety_backup_reason_import">Przed importem pliku</string>
+    <string name="safety_backup_reason_rates">Przed zastosowaniem obecnej stawki do wielu zmian</string>
+    <string name="safety_backup_reason_cloud">Przed pobraniem danych konta</string>
+    <string name="safety_backup_counts">prace: %1$d, zmiany: %2$d, premie: %3$d, otrzymane wypłaty: %4$d</string>
+    <string name="safety_backup_unreadable">Nie da się odczytać</string>
+    <string name="safety_backup_save">Zapisz w pliku</string>
+    <string name="safety_backup_share">Udostępnij</string>
+    <string name="safety_backup_saved">Kopia zabezpieczająca zapisana</string>
+    <string name="import_safety_backup_failed">Nie udało się zapisać kopii zabezpieczającej obecnych danych, więc nic nie zaimportowano. Twoje dane się nie zmieniły.</string>
+    <string name="import_backup_done">Przywrócono: prace — %1$d, zmiany — %2$d, premie — %3$d, otrzymane wypłaty — %4$d</string>
+    <string name="error_file_operation">Nie udało się przetworzyć pliku</string>
+    <string name="error_backup_invalid">To nie jest prawidłowa kopia Shift Tracker. Twoje obecne dane się nie zmieniły.</string>
+    <string name="error_backup_newer_version">Tę kopię utworzyła nowsza wersja aplikacji. Zaktualizuj Shift Tracker i spróbuj ponownie. Twoje obecne dane się nie zmieniły.</string>
+    <string name="version">Wersja %1$s</string>
+    <string name="privacy_policy">Polityka prywatności</string>
+    <string name="privacy_policy_summary">Co aplikacja robi z Twoimi danymi</string>
+    <string name="delete_account_page">Usuwanie konta i danych</string>
+    <string name="delete_account_page_summary">Jak je usunąć, także bez aplikacji</string>
+    <string name="link_open_failed">Żadna aplikacja nie otworzy tego linku: %1$s</string>
+
+    <!-- Account & sync -->
+    <string name="section_cloud">Konto i synchronizacja</string>
+    <string name="cloud_sync">Synchronizacja z chmurą</string>
+    <string name="cloud_unavailable">Niedostępne w tej wersji</string>
+    <string name="cloud_sign_in">Zaloguj się przez Google</string>
+    <string name="cloud_sign_in_summary">Opcjonalnie. Bez tego wszystkie Twoje dane zostają tylko na tym telefonie.</string>
+    <string name="cloud_signing_in">Logowanie…</string>
+    <string name="cloud_google_account">Konto Google</string>
+    <string name="cloud_access_checking">Sprawdzam dostęp do chmury…</string>
+    <string name="cloud_access_ok">Chmura jest dostępna</string>
+    <string name="cloud_access_denied">Chmura odmówiła dostępu. Sprawdź, czy logowanie odbyło się przez Google i czy opublikowano najnowsze firestore.rules. Dotknij, żeby spróbować ponownie.</string>
+    <string name="cloud_access_offline">Brak połączenia z chmurą. Dotknij, żeby spróbować ponownie.</string>
+    <string name="cloud_access_error">Błąd chmury: %1$s</string>
+    <string name="cloud_sign_out">Wyloguj się</string>
+    <string name="cloud_sign_out_summary">Dane na tym telefonie zostają</string>
+    <string name="cloud_signed_in">Zalogowano jako %1$s</string>
+    <string name="cloud_signed_out">Wylogowano. Dane na tym telefonie zostają.</string>
+    <string name="cloud_sign_in_no_account">Na tym telefonie nie ma konta Google. Dodaj je w ustawieniach Androida i spróbuj ponownie. Kod: %1$s</string>
+    <string name="cloud_sign_in_offline">Brak połączenia. Spróbuj ponownie, gdy będziesz online. Kod: %1$s</string>
+    <string name="cloud_sign_in_failed">Nie udało się zalogować. Kod: %1$s</string>
+    <string name="cloud_sign_in_setup">Google odrzuciło logowanie. Kod: %1$s. Najczęściej oznacza to, że w Firebase brakuje odcisku SHA-1 %3$s dla aplikacji %2$s.</string>
+    <string name="sync_switch">Synchronizacja</string>
+    <string name="sync_switch_summary">Dane tego telefonu na bieżąco zgodne z Twoim kontem</string>
+    <string name="sync_turning_on">Przygotowuję…</string>
+    <string name="sync_now">Synchronizuj teraz</string>
+    <string name="sync_now_summary">Bez czekania na automatyczną synchronizację</string>
+    <string name="sync_running">Synchronizuję…</string>
+    <string name="sync_not_yet">Jeszcze nie zsynchronizowano</string>
+    <string name="sync_last">Ostatnia synchronizacja: %1$s</string>
+    <string name="sync_pending">Czeka na wysłanie: %1$d</string>
+    <string name="sync_skipped">Pominięte wpisy z chmury: %1$d (może z nowszej wersji aplikacji)</string>
+    <string name="sync_offline">Brak połączenia z chmurą. Zmiany zsynchronizują się, gdy telefon będzie online.</string>
+    <string name="sync_clock_ahead">Chmura odrzuciła zmiany: zegar tego telefonu spieszy się o %1$s min. Sprawdź datę i godzinę (włącz automatyczny czas).</string>
+    <string name="sync_refused_check_clock">Chmura odrzuciła zmiany. Sprawdź datę i godzinę w telefonie oraz to, czy w Firebase opublikowano najnowsze reguły Firestore.</string>
+    <string name="sync_refused_rules">Chmura odrzuciła zmiany, choć zegar jest w porządku. Opublikuj w Firebase najnowsze firestore.rules.</string>
+    <string name="sync_cloud_reset">Dane tego konta w chmurze zostały usunięte (pewnie z innego telefonu). Dotknij, żeby zdecydować, co dalej.</string>
+    <string name="sync_budget">Automatyczna synchronizacja wstrzymana do jutra: dziś %1$d zapisów w chmurze (limit %2$d). Synchronizuj teraz nadal działa.</string>
+    <string name="sync_error">Błąd synchronizacji: %1$s</string>
+    <string name="sync_turned_on">Synchronizacja włączona</string>
+    <string name="sync_first_sync_failed">Synchronizacja jest włączona, ale pierwsza synchronizacja się nie skończyła. %1$s</string>
+    <string name="sync_turn_on_failed">Nie udało się włączyć synchronizacji. %1$s</string>
+    <string name="sync_merge_title">Połączyć dane?</string>
+    <string name="sync_merge_message">I ten telefon, i Twoje konto mają już dane.\n\nTen telefon: prace — %1$d, zmiany — %2$d, premie — %3$d.\nTwoje konto: prace — %4$d, zmiany — %5$d, premie — %6$d.\nWyglądają tak samo: %7$d (zostaną raz).\n\n„Użyj danych z konta” zastępuje dane tego telefonu (najpierw zapisywana jest kopia zabezpieczająca; zobacz Kopie zabezpieczające w Ustawieniach).</string>
+    <string name="sync_merge">Połącz</string>
+    <string name="sync_use_account_data">Użyj danych z konta</string>
+    <string name="sync_account_switch_title">Dane innego konta</string>
+    <string name="sync_account_switch_message">Dane na tym telefonie były synchronizowane z %1$s. Co z nimi zrobić na koncie %2$s?\n\nTen telefon: prace — %3$d, zmiany — %4$d, premie — %5$d.\nTo konto: prace — %6$d, zmiany — %7$d, premie — %8$d.\n\n„Zastąp” najpierw zapisuje kopię zabezpieczającą danych tego telefonu (zobacz Kopie zabezpieczające w Ustawieniach).</string>
+    <string name="sync_add_phone_data">Dodaj dane tego telefonu do tego konta</string>
+    <string name="sync_replace_with_account">Zastąp danymi tego konta</string>
+    <string name="sync_other_account">innym kontem</string>
+    <string name="sync_reset_title">Dane w chmurze usunięte</string>
+    <string name="sync_reset_message">Dane tego konta w chmurze zostały usunięte, pewnie z innego telefonu. Wysłać tam ponownie dane z tego telefonu czy wyłączyć synchronizację?</string>
+    <string name="sync_upload_again">Wyślij ponownie</string>
+    <string name="sync_turn_off">Wyłącz synchronizację</string>
+    <string name="cloud_delete">Usuń moje dane z chmury</string>
+    <string name="cloud_delete_summary">Usuwa z chmury Twoje prace, zmiany, premie i otrzymane wypłaty. Ten telefon je zachowa.</string>
+    <string name="cloud_deleting">Usuwam z chmury…</string>
+    <string name="cloud_delete_title">Usunąć dane z chmury?</string>
+    <string name="cloud_delete_message">Wszystkie prace, zmiany, premie i otrzymane wypłaty konta %1$s zostaną usunięte z chmury, a synchronizacja zostanie wyłączona. Dane na tym telefonie zostają.\n\nTwoje inne telefony, które synchronizują się z tym kontem, przestaną się synchronizować i zapytają, co dalej. To, co jest tylko w chmurze (np. z telefonu, którego już nie masz), przepadnie. Tego nie da się cofnąć.</string>
+    <string name="cloud_delete_confirm">Usuń</string>
+    <string name="cloud_delete_done">Usunięto z chmury (wpisów: %1$d). Synchronizacja wyłączona; dane na telefonie zostają.</string>
+    <string name="cloud_delete_offline">Nie udało się usunąć danych z chmury: brak połączenia. Spróbuj ponownie, gdy będziesz online; to, czego jeszcze nie usunięto, nadal tam jest.</string>
+    <string name="cloud_delete_failed">Nie udało się usunąć danych z chmury. Kod: %1$s. Spróbuj ponownie; to, czego jeszcze nie usunięto, nadal tam jest.</string>
+    <string name="account_delete">Usuń konto</string>
+    <string name="account_delete_summary">Usuwa Twoje konto i jego dane w chmurze. Ten telefon zachowa swoje dane.</string>
+    <string name="account_deleting">Usuwam konto…</string>
+    <string name="account_delete_title">Usunąć konto?</string>
+    <string name="account_delete_message">Konto %1$s zostanie usunięte razem ze wszystkimi danymi w chmurze: pracami, zmianami, premiami i otrzymanymi wypłatami. Synchronizacja zostanie wyłączona i nastąpi wylogowanie.\n\nDane na tym telefonie zostają: możesz dalej korzystać z aplikacji bez konta. Inne telefony, które synchronizowały się z tym kontem, stracą do niego dostęp. Tego nie da się cofnąć.</string>
+    <string name="account_delete_confirm">Usuń konto</string>
+    <string name="account_delete_done">Konto usunięte, nastąpiło wylogowanie. Dane na tym telefonie zostają.</string>
+    <string name="account_delete_offline">Nie udało się usunąć konta: brak połączenia. Konto i jego dane w chmurze nadal istnieją. Spróbuj ponownie, gdy będziesz online.</string>
+    <string name="account_delete_failed">Nie udało się usunąć konta. Kod: %1$s. Spróbuj ponownie.</string>
+    <string name="account_reauth_title">Zaloguj się ponownie, żeby usunąć konto</string>
+    <string name="account_reauth_message">Dane z chmury są już usunięte. Żeby usunąć samo konto, Google chce potwierdzić, że to Ty: zaloguj się ponownie jako %1$s.</string>
+    <string name="account_reauth_confirm">Zaloguj się i usuń</string>
+    <string name="account_reauth_wrong_account">To inne konto Google. Żeby usunąć konto, zaloguj się jako %1$s.</string>
+
+    <!-- .ics import -->
+    <string name="import_schedule">Importuj grafik (.ics)</string>
+    <string name="import_schedule_summary">Dodaj zmiany z pliku kalendarza</string>
+    <string name="import_assign_job">Do której pracy należą te zmiany</string>
+    <string name="import_events">Wydarzenia</string>
+    <string name="select_new">Nowe</string>
+    <string name="select_none">Żadne</string>
+    <string name="duplicate">Istnieje</string>
+    <string name="import_error_title">Nie udało się odczytać pliku</string>
+    <string name="import_error_message">Upewnij się, że to plik kalendarza w formacie .ics.</string>
+    <string name="import_empty_title">Nie znaleziono wydarzeń</string>
+    <string name="import_empty_message">W pliku nie ma wydarzeń z godziną rozpoczęcia i zakończenia. Wydarzenia całodniowe są pomijane.</string>
+    <string name="import_needs_job">Żeby zaimportować grafik, najpierw utwórz pracę, do której należą te zmiany.</string>
+
+    <plurals name="apply_rate_summary">
+        <item quantity="one">Zmieni się %1$d zmiana · %2$s</item>
+        <item quantity="few">Zmienią się %1$d zmiany · %2$s</item>
+        <item quantity="many">Zmieni się %1$d zmian · %2$s</item>
+        <item quantity="other">Zmieni się %1$d zmiany · %2$s</item>
+    </plurals>
+    <plurals name="apply_rate_done">
+        <item quantity="one">Stawka zaktualizowana w %1$d zmianie</item>
+        <item quantity="few">Stawka zaktualizowana w %1$d zmianach</item>
+        <item quantity="many">Stawka zaktualizowana w %1$d zmianach</item>
+        <item quantity="other">Stawka zaktualizowana w %1$d zmiany</item>
+    </plurals>
+    <plurals name="shift_count">
+        <item quantity="one">%1$d zmiana</item>
+        <item quantity="few">%1$d zmiany</item>
+        <item quantity="many">%1$d zmian</item>
+        <item quantity="other">%1$d zmiany</item>
+    </plurals>
+    <plurals name="job_count">
+        <item quantity="one">%1$d praca</item>
+        <item quantity="few">%1$d prace</item>
+        <item quantity="many">%1$d prac</item>
+        <item quantity="other">%1$d pracy</item>
+    </plurals>
+    <plurals name="delete_job_with_shifts">
+        <item quantity="one">Usunięta zostanie też jej %1$d zmiana.</item>
+        <item quantity="few">Usunięte zostaną też jej %1$d zmiany.</item>
+        <item quantity="many">Usuniętych zostanie też jej %1$d zmian.</item>
+        <item quantity="other">Usunięte zostanie też jej %1$d zmiany.</item>
+    </plurals>
+    <plurals name="import_found_events">
+        <item quantity="one">Znaleziono %1$d wydarzenie</item>
+        <item quantity="few">Znaleziono %1$d wydarzenia</item>
+        <item quantity="many">Znaleziono %1$d wydarzeń</item>
+        <item quantity="other">Znaleziono %1$d wydarzenia</item>
+    </plurals>
+    <plurals name="import_duplicates">
+        <item quantity="one">%1$d już istnieje — odznaczone</item>
+        <item quantity="few">%1$d już istnieją — odznaczone</item>
+        <item quantity="many">%1$d już istnieje — odznaczone</item>
+        <item quantity="other">%1$d już istnieje — odznaczone</item>
+    </plurals>
+    <string name="import_unknown_zones">Nieznana strefa czasowa w pliku: %1$s. Godziny tych wydarzeń odczytano jako czas lokalny (jak na tym telefonie) — sprawdź je przed importem.</string>
+    <plurals name="import_skipped">
+        <item quantity="one">%1$d pominięte (całodniowe, bez godziny lub uszkodzone)</item>
+        <item quantity="few">%1$d pominięte (całodniowe, bez godziny lub uszkodzone)</item>
+        <item quantity="many">%1$d pominiętych (całodniowe, bez godziny lub uszkodzone)</item>
+        <item quantity="other">%1$d pominiętego (całodniowe, bez godziny lub uszkodzone)</item>
+    </plurals>
+    <plurals name="import_n_shifts">
+        <item quantity="one">Importuj %1$d zmianę</item>
+        <item quantity="few">Importuj %1$d zmiany</item>
+        <item quantity="many">Importuj %1$d zmian</item>
+        <item quantity="other">Importuj %1$d zmiany</item>
+    </plurals>
+    <plurals name="imported_shifts">
+        <item quantity="one">Zaimportowano %1$d zmianę</item>
+        <item quantity="few">Zaimportowano %1$d zmiany</item>
+        <item quantity="many">Zaimportowano %1$d zmian</item>
+        <item quantity="other">Zaimportowano %1$d zmiany</item>
+    </plurals>
+    <string name="currency">Waluta</string>
+    <string name="currency_pick_title">Waluta pracy</string>
+    <string name="currency_search">Szukaj: kod lub nazwa</string>
+    <string name="currency_locked">Waluty nie można zmienić, gdy praca ma już zmiany lub premie. Dla innej waluty utwórz nową pracę.</string>
+    <string name="pay_type">Wynagrodzenie</string>
+    <string name="pay_type_hourly">Godzinowe</string>
+    <string name="pay_type_fixed_monthly">Pensja miesięczna</string>
+    <string name="monthly_amount">Pensja miesięczna</string>
+    <string name="pay_applies_from">Obowiązuje od</string>
+    <string name="pay_applies_from_hint">Wcześniejsze miesiące zachowują swoje wynagrodzenie.</string>
+    <string name="pay_replace_later_title">Zastąpić późniejsze ustawienia wynagrodzenia?</string>
+    <string name="pay_replace_later_message">Późniejsze miesiące mają już własne ustawienia wynagrodzenia: %2$s. Nowe ustawienia od %1$s obejmą też te miesiące, a ich zapisane ustawienia zostaną usunięte.</string>
+    <string name="pay_replace_later_confirm">Zastąp</string>
+    <string name="fixed_salary">Pensja</string>
+    <string name="fixed_salary_per_month">Pensja %1$s/mies.</string>
+    <string name="salary_value">pensja %1$s</string>
+    <string name="fixed_salary_shift_hint">Ta zmiana liczy się do godzin: za tę pracę dostajesz pensję miesięczną.</string>
+    <string name="fixed_salary_shift_short">Pensja miesięczna</string>
+    <string name="week_fixed_pay_note">Prace z pensją liczą wynagrodzenie za cały miesiąc, więc w tym tygodniu widać tylko ich godziny.</string>
+    <string name="earnings_gross">Brutto</string>
+    <string name="earnings_net">Netto</string>
+    <string name="earnings_mode">Pokazuj zarobki</string>
+    <string name="earnings_mode_summary">Netto = brutto minus procent potrąceń każdej pracy.</string>
+    <string name="deduction_percent">Potrącenia</string>
+    <string name="deduction_hint">0 = brak. Twój własny procent (podatki, składki); aplikacja nie liczy podatków.</string>
+    <string name="error_percent_invalid">Od 0 do 100, najwyżej dwa miejsca po przecinku</string>
+    <string name="deduction_value">potrącenia %1$s %%</string>
+    <string name="widget_description">Kalendarz zmian i Twoja najbliższa zmiana</string>
+    <string name="widget_add_shift">+ Zmiana</string>
+    <string name="widget_add_first_job">Dodaj pierwszą pracę</string>
+    <string name="widget_no_upcoming">Brak nadchodzących zmian</string>
+    <string name="widget_today">Dziś</string>
+    <string name="widget_tomorrow">Jutro</string>
+    <string name="widget_until">Do %1$s</string>
+    <string name="widget_preview_month">Listopad</string>
+    <string name="widget_preview_calendar">"Pn Wt Śr Cz Pt So Nd\n                   1\n 2  3  4  5  6  7  8\n 9 10 11 12 13 14 15\n16 17 18 19 20 21 22\n23 24 25 26 27 28 29\n30"</string>
+    <string name="widget_preview_when">Jutro · 18:30–01:30</string>
+    <string name="bonus_kind_day">W konkretnym dniu</string>
+    <string name="bonus_kind_month">Za cały miesiąc</string>
+    <string name="bonus_month">Miesiąc</string>
+    <string name="bonus_hint_month">Premia liczy się do zarobków z tego miesiąca, ale nie pojawia się w żadnym dniu ani w podsumowaniach tygodni. Nie zmienia godzin ani średniej stawki.</string>
+    <string name="bonus_for_whole_month">Za cały miesiąc</string>
+    <string name="bonuses_line_none">Brak premii</string>
+    <string name="bonuses_line_one">premia %1$s</string>
+    <plurals name="bonuses_line_many">
+        <item quantity="one">%1$s · %2$d premia</item>
+        <item quantity="few">%1$s · %2$d premie</item>
+        <item quantity="many">%1$s · %2$d premii</item>
+        <item quantity="other">%1$s · %2$d premii</item>
+    </plurals>
+    <string name="bonuses_sheet_title">Premie · %1$s</string>
+    <string name="bonuses_sheet_none">Brak premii w tym miesiącu</string>
+    <!-- month_bonuses_row and month_bonuses_sheet_title: not used by the app any more; the web version copies them (web/scripts/sync-strings.mjs). -->
+    <string name="month_bonuses_title">Premie za miesiąc</string>
+    <string name="month_bonuses_row">Premie za miesiąc · %1$d</string>
+    <string name="month_bonuses_sheet_title">Premie za miesiąc · %1$s</string>
+    <string name="month_bonuses_none">Brak premii za cały miesiąc</string>
+    <string name="add_month_bonus">Dodaj premię za miesiąc</string>
+    <string name="received_pay_title">Otrzymane wynagrodzenie</string>
+    <string name="received_pay_caption">To, co faktycznie wpłynęło, obok wyliczonego wynagrodzenia po potrąceniach (netto). Miesiąc pracy, w którym są wypłaty, liczy to, co wpłynęło, zamiast wyliczonej kwoty: takie sumy mają oznaczenie „Otrzymane”.</string>
+    <string name="received_pay_year_caption">To, co wpłynęło, w porównaniu z wyliczonym netto za miesiące, w których wpisano wypłaty. W sumach te miesiące liczą to, co wpłynęło.</string>
+    <string name="received_tag_all">Otrzymane</string>
+    <string name="received_tag_part">W tym otrzymane</string>
+    <string name="received_pay_calculated">Wyliczone (netto)</string>
+    <string name="received_pay_received">Otrzymane</string>
+    <string name="received_pay_not_entered">nie wpisano</string>
+    <string name="received_pay_difference">Różnica</string>
+    <string name="received_pay_sheet_title">Otrzymane wynagrodzenie · %1$s</string>
+    <string name="received_pay_add">Dodaj wypłatę</string>
+    <string name="received_pay_new">Nowa wypłata</string>
+    <string name="received_pay_edit">Wypłata</string>
+    <string name="received_pay_amount">Otrzymana kwota</string>
+    <string name="received_pay_month">Za miesiąc</string>
+    <string name="received_pay_month_hint">Miesiąc, za który ją zarobiono</string>
+    <string name="received_pay_received_on">Data otrzymania (opcjonalnie)</string>
+    <string name="received_pay_received_on_value">Otrzymano %1$s</string>
+    <string name="received_pay_received_on_clear">Wyczyść datę</string>
+    <string name="received_pay_note">Notatka (opcjonalnie)</string>
+    <string name="received_pay_saved">Wypłata zapisana</string>
+    <string name="received_pay_deleted">Wypłata usunięta</string>
+    <plurals name="received_pay_count">
+        <item quantity="one">%d wypłata</item>
+        <item quantity="few">%d wypłaty</item>
+        <item quantity="many">%d wypłat</item>
+        <item quantity="other">%d wypłaty</item>
+    </plurals>
+</resources>

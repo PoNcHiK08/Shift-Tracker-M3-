@@ -12,5 +12,13 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 enum class AppLanguage(val tag: String) {
     UKRAINIAN("uk"),
     ENGLISH("en"),
+    POLISH("pl"),
     SYSTEM(""),
+    ;
+
+    companion object {
+        /** The language of the very first launch: the phone's language when the app has it, otherwise English. */
+        fun forFirstLaunch(phone: java.util.Locale?): AppLanguage =
+            entries.firstOrNull { it != SYSTEM && it.tag == phone?.language } ?: ENGLISH
+    }
 }

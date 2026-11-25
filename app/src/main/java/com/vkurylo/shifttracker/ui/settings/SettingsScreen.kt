@@ -290,14 +290,17 @@ fun SettingsScreen(
                         headlineContent = { Text(stringResource(R.string.language)) },
                         supportingContent = {
                             ChoiceButtonGroup(
-                                options = listOf(AppLanguage.UKRAINIAN, AppLanguage.ENGLISH, AppLanguage.SYSTEM),
+                                options = listOf(AppLanguage.UKRAINIAN, AppLanguage.ENGLISH, AppLanguage.POLISH, AppLanguage.SYSTEM),
                                 selected = state.language,
                                 onSelect = viewModel::setLanguage,
+                                // Four language names on one line: less padding, so they keep a readable size.
+                                contentPadding = PaddingValues(horizontal = 4.dp),
                                 label = { language ->
                                     stringResource(
                                         when (language) {
                                             AppLanguage.UKRAINIAN -> R.string.language_ukrainian
                                             AppLanguage.ENGLISH -> R.string.language_english
+                                            AppLanguage.POLISH -> R.string.language_polish
                                             AppLanguage.SYSTEM -> R.string.language_system
                                         },
                                     )

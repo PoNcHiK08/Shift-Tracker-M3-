@@ -178,6 +178,7 @@
     <string name="language">Language</string>
     <string name="language_ukrainian">Українська</string>
     <string name="language_english">English</string>
+    <string name="language_polish">Polski</string>
     <string name="language_system">System</string>
     <string name="export_data">Export data</string>
     <string name="export_data_summary">Save all jobs, shifts, bonuses and received payments to a JSON file</string>

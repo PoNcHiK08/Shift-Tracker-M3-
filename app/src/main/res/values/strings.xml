@@ -181,6 +181,7 @@
     <string name="language">Мова</string>
     <string name="language_ukrainian">Українська</string>
     <string name="language_english">English</string>
+    <string name="language_polish">Polski</string>
     <string name="language_system">Системна</string>
     <string name="export_data">Експорт даних</string>
     <string name="export_data_summary">Зберегти всі роботи, зміни, бонуси й виплати у файл JSON</string>
