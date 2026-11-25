@@ -87,7 +87,7 @@ class PressMorphDrawTest {
     fun pressFeedbackDrawsEveryFrame() {
         val today = LocalDate.now()
         runBlocking {
-            val id = jobs.upsert(Job(name = "Burger King", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt()))
+            val id = jobs.upsert(Job(name = "Corner Cafe", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt()))
             shifts.upsert(Shift(jobId = id, date = today, start = LocalTime.of(18, 30), end = LocalTime.of(1, 30), hourlyRateGrosze = 3300))
             bonuses.upsert(Bonus(jobId = id, date = today, amountGrosze = 7500, note = "Premia"))
         }
@@ -96,7 +96,7 @@ class PressMorphDrawTest {
         composeRule.mainClock.autoAdvance = false
 
         // Calendar: both segments of today's group (shift on top, bonus below) and another day's cell.
-        pressAndCancel(hasText("Burger King") and hasClickAction())
+        pressAndCancel(hasText("Corner Cafe") and hasClickAction())
         pressAndCancel(hasText("Premia", substring = true) and hasClickAction())
         val locale = composeRule.activity.resources.configuration.locales[0]
         val otherDay = if (today.dayOfMonth == 1) today.plusDays(1) else today.minusDays(1)

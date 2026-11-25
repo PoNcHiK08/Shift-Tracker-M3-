@@ -196,6 +196,24 @@ class SyncController @Inject constructor(
         deleted
     }
 
+    /**
+     * "Delete account" (Google Play requires it in the app): turns sync off, deletes the account's cloud data as
+     * [deleteCloudData] does, then deletes the account itself, which signs out. The data on this phone stays.
+     * The account is never deleted while its cloud data could still be there: if deleting the data fails (offline),
+     * the account stays. Throws [com.vkurylo.shifttracker.data.sync.firebase.RecentLoginRequiredException] when
+     * Firebase wants a fresh sign-in first; the cloud data is gone by then, and calling this again after
+     * [CloudAuth.reauthenticate] finishes. Returns the number of records deleted.
+     */
+    suspend fun deleteAccount(): Int = withContext(Dispatchers.Default) {
+        val account = auth.currentAccount() ?: throw IllegalStateException("Not signed in")
+        disable()
+        val deleted = engine.deleteCloudData(account)
+        prefs.updateSettings { it.copy(cloudReset = false) }
+        auth.deleteUser()
+        Log.i(TAG, "Deleted the account and its cloud data: $deleted records")
+        deleted
+    }
+
     // --- Syncing ----------------------------------------------------------------------------------------
 
     /** "Sync now": a sync right away, without the daily write limit. Null when sync isn't on (or must wait). */

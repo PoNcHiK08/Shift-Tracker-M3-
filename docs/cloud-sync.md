@@ -8,8 +8,9 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
 
 ## Limitations
 
-- **One person.** `firestore.rules` lets in only the Google account whose address you put in them. Sharing data
-  between two people isn't supported.
+- **Each account sees only its own data.** Every Google account has its own space in the cloud
+  (`users/{uid}`); `firestore.rules` lets nobody read or write anyone else's. Sharing data between two people
+  isn't supported.
 - **Not live.** A phone picks up other phones' changes when it syncs: when the app starts or comes back to the
   foreground (at most once a minute), 3 seconds after its own change, or with **Sync now**. There is no push.
 - **Conflicts: the newer record wins, whole.** If two phones change the same shift before syncing, the change
@@ -42,7 +43,8 @@ UI names below are the English ones; the Ukrainian ones are in brackets where yo
   to the account: turning on Sync there asks to **Merge**, and records that look the same are kept once.
 - **No end-to-end encryption.** Google encrypts Firestore at rest, and the rules keep everyone else out, but
   you (the project owner, in the Firebase console) and Google can read the documents.
-- **Deleting your Google account doesn't delete the Firestore data.** Use **Delete my cloud data** first.
+- **Deleting your Google account doesn't delete the Firestore data.** Use **Delete account** (or **Delete my
+  cloud data**) in the app first.
 - **Needs Google Play services** for signing in.
 - **Weekly totals leave out bonuses for a whole month.** A week can span two months, so such a bonus is part of
   its month and of the year, never of a week or of a day (it is not in the calendar grid or the day panel).
@@ -67,7 +69,7 @@ the run → Artifacts**. It is a separate app (`com.vkurylo.shifttracker.debug`)
 touched.
 
 Before testing:
-- Publish the current `firestore.rules`, with your address in them.
+- Publish the current `firestore.rules`.
 - Sign in with that account.
 - `adb logcat -s CloudSync CloudSignIn` shows what happens.
 - **Firebase console → Firestore Database → Data** shows the documents; **Usage** shows reads and writes.
@@ -119,7 +121,13 @@ Both phones run the debug APK and are signed in with the same account. A has dat
      from the console.
    - B: **Sync now** → "This account's cloud data was deleted…". Tap the row → **Upload again** (B's data goes
      up) or **Turn sync off**.
-9. **Write counter.** "today N" in the status grows only when records are sent.
+9. **Delete account** (on a test account).
+   - A: **Delete account** → confirm. The cloud data goes first, then the Firebase account; A is signed out and
+     keeps its data. In the console the user disappears from **Authentication → Users** and its documents from
+     Firestore.
+   - If Firebase wants a fresh sign-in (the sign-in is older than a few minutes), the app asks to sign in again
+     with the same account and then finishes. Another account changes nothing.
+10. **Write counter.** "today N" in the status grows only when records are sent.
 
 ### Month bonuses and received pay
 
@@ -185,7 +193,7 @@ newer one. That is why the export below comes first.
    - Otherwise the real app's first sync asks you to merge with your test data.
 4. **Check Firebase:**
    - The app `com.vkurylo.shifttracker` has the dev key's SHA-1 (README, "Setting up Firebase", step 3).
-   - The current rules are published with your address.
+   - The current rules are published.
    - The Build APK run for the new APK shows no "no SHA-1 fingerprint … for com.vkurylo.shifttracker"
      warning.
 
@@ -237,7 +245,7 @@ app untouched. Do this before the PR is merged, while `latest-build` still has t
 
 This update adds a flag to bonuses and a table for received pay. Do it in this order.
 
-1. **Publish the new `firestore.rules`** (with your address) in the Firebase console, *before* installing the
+1. **Publish the new `firestore.rules`** in the Firebase console, *before* installing the
    update on any phone. They accept the previous version's documents as well as the new ones, so a phone that
    hasn't updated yet keeps syncing. If you install first, the new version's sync is refused until you publish:
    Settings says "The cloud refused access…", nothing is lost, and the changes wait.

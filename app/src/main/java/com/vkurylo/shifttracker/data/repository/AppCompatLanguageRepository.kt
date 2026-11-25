@@ -9,6 +9,7 @@ import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.repository.LanguageRepository
 import android.app.LocaleManager
 import android.content.Context
+import android.content.res.Resources
 import android.os.Build
 import dagger.hilt.android.qualifiers.ApplicationContext
 import com.vkurylo.shifttracker.di.ApplicationScope
@@ -22,14 +23,35 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class AppCompatLanguageRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
+class AppCompatLanguageRepository internal constructor(
+    private val context: Context,
     private val dataStore: DataStore<Preferences>,
-    @param:ApplicationScope private val scope: CoroutineScope,
+    private val scope: CoroutineScope,
+    /** The phone's own language (Android's system setting, not the app's). */
+    private val phoneLocale: () -> Locale?,
+    /** The app's own language list: AppCompat's per-app language setting. */
+    private val appLocales: AppLocales = AppCompatLocales,
 ) : LanguageRepository {
 
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        dataStore: DataStore<Preferences>,
+        @ApplicationScope scope: CoroutineScope,
+    ) : this(context, dataStore, scope, { Resources.getSystem().configuration.locales[0] })
+
+    /** Where the app's language is kept; tests stand in for AppCompat, which needs a live activity on Android 13+. */
+    interface AppLocales {
+        fun get(): LocaleListCompat
+        fun set(locales: LocaleListCompat)
+    }
+
+    private object AppCompatLocales : AppLocales {
+        override fun get(): LocaleListCompat = AppCompatDelegate.getApplicationLocales()
+        override fun set(locales: LocaleListCompat) = AppCompatDelegate.setApplicationLocales(locales)
+    }
+
     override fun current(): AppLanguage {
-        val locales = AppCompatDelegate.getApplicationLocales()
+        val locales = appLocales.get()
         if (locales.isEmpty) return AppLanguage.SYSTEM
         val language = locales[0]?.language
         return AppLanguage.entries.firstOrNull { it.tag.isNotEmpty() && it.tag == language } ?: AppLanguage.SYSTEM
@@ -41,7 +63,7 @@ class AppCompatLanguageRepository @Inject constructor(
         } else {
             LocaleListCompat.forLanguageTags(language.tag)
         }
-        AppCompatDelegate.setApplicationLocales(list)
+        appLocales.set(list)
         // Also kept for the widget (see appLocale); fire-and-forget, the platform setting is the truth.
         scope.launch { store(language.tag) }
     }
@@ -57,12 +79,12 @@ class AppCompatLanguageRepository @Inject constructor(
         }
         val stored = dataStore.data.first()[DataStorePreferencesRepository.APP_LANGUAGE]
         if (stored != null) return stored.takeIf { it.isNotEmpty() }?.let(Locale::forLanguageTag)
-        return AppCompatDelegate.getApplicationLocales()[0]
+        return appLocales.get()[0]
     }
 
     /** Keeps the stored tag in step with AppCompat's (e.g. a language set before the widget existed). */
     suspend fun syncStoredTag() {
-        val locales = AppCompatDelegate.getApplicationLocales()
+        val locales = appLocales.get()
         store(if (locales.isEmpty) "" else locales[0]?.toLanguageTag().orEmpty())
     }
 
@@ -70,10 +92,15 @@ class AppCompatLanguageRepository @Inject constructor(
         dataStore.edit { if (it[DataStorePreferencesRepository.APP_LANGUAGE] != tag) it[DataStorePreferencesRepository.APP_LANGUAGE] = tag }
     }
 
+    /**
+     * The very first launch: the phone's language when the app has it (Ukrainian, English, Polish), otherwise
+     * English. Only once per install, and never over a language already chosen (in the app or in Android's
+     * per-app language settings).
+     */
     override suspend fun applyDefaultOnFirstLaunch() {
         val key = DataStorePreferencesRepository.LANGUAGE_INITIALIZED
         if (dataStore.data.first()[key] != true) {
-            if (AppCompatDelegate.getApplicationLocales().isEmpty) set(AppLanguage.UKRAINIAN)
+            if (appLocales.get().isEmpty) set(AppLanguage.forFirstLaunch(phoneLocale()))
             dataStore.edit { it[key] = true }
         }
         syncStoredTag()

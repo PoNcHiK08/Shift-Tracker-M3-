@@ -66,7 +66,7 @@ class WidgetSizesTest {
     fun setUp() {
         hiltRule.inject()
         runBlocking {
-            jobId = jobs.upsert(Job(name = "Burger King", hourlyRateGrosze = 3400, color = 0xFFE53935.toInt()))
+            jobId = jobs.upsert(Job(name = "Night Cafe", hourlyRateGrosze = 3400, color = 0xFFE53935.toInt()))
             shifts.upsert(shift(today.plusDays(1), 18, 0, 1, 30)) // the next shift
             shifts.upsert(shift(firstDay, 8, 0, 16, 0)) // a shift day in the calendar
         }
@@ -157,7 +157,7 @@ class WidgetSizesTest {
     fun x2x1CompactRow() {
         val drawn = draw(DpSize(150.dp, 70.dp))
         checkAdd(drawn, add1Row, "2x1")
-        assertNotTruncated(assertShown(drawn, "Burger King", "2x1"), "2x1")
+        assertNotTruncated(assertShown(drawn, "Night Cafe", "2x1"), "2x1")
         // Too narrow for "Завтра · 18:00–01:30" on one line: two lines, both whole.
         assertNotTruncated(assertShown(drawn, "Завтра", "2x1"), "2x1")
         assertNotTruncated(assertShown(drawn, "18:00–01:30", "2x1"), "2x1")
@@ -168,7 +168,7 @@ class WidgetSizesTest {
     fun x4x1IsOneWideRowWithThisWeek() {
         val drawn = draw(DpSize(350.dp, 70.dp))
         checkAdd(drawn, add1Row, "4x1")
-        val shift = assertShown(drawn, "Burger King", "4x1")
+        val shift = assertShown(drawn, "Night Cafe", "4x1")
         assertNotTruncated(assertShown(drawn, "Завтра · 18:00–01:30", "4x1"), "4x1")
         assertNull("4x1 must not stack a '+ Зміна' pill", drawn.find(addTall))
         assertNoAmounts(drawn, "4x1")
@@ -200,7 +200,7 @@ class WidgetSizesTest {
     fun x2x3AlsoShowsTheNextShift() {
         val drawn = draw(DpSize(150.dp, 250.dp))
         assertMonth(drawn, "2x3")
-        assertShown(drawn, "Burger King", "2x3")
+        assertShown(drawn, "Night Cafe", "2x3")
         checkAdd(drawn, addTall, "2x3")
     }
 
@@ -209,7 +209,7 @@ class WidgetSizesTest {
         val drawn = draw(DpSize(250.dp, 160.dp))
         checkAdd(drawn, addTall, "3x2")
         assertMonth(drawn, "3x2")
-        assertShown(drawn, "Burger King", "3x2")
+        assertShown(drawn, "Night Cafe", "3x2")
         assertNoAmounts(drawn, "3x2")
     }
 
@@ -218,11 +218,11 @@ class WidgetSizesTest {
         val drawn = draw(DpSize(350.dp, 160.dp))
         checkAdd(drawn, addTall, "4x2")
         assertMonth(drawn, "4x2")
-        assertShown(drawn, "Burger King", "4x2")
+        assertShown(drawn, "Night Cafe", "4x2")
         assertShown(drawn, "18:00–01:30", "4x2")
         // The month is on the left, the shift card on the right.
         val month = bounds(drawn.find(monthTitle)!!, drawn.root).first
-        val name = bounds(drawn.find("Burger King")!!, drawn.root).first
+        val name = bounds(drawn.find("Night Cafe")!!, drawn.root).first
         assertTrue("4x2: $month | $name", month.right <= name.left)
     }
 

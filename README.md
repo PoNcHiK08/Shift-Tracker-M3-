@@ -3,7 +3,8 @@
 Offline Android app for tracking work shifts and earnings across several jobs.
 Started for part-time work in Poland (PLN by default, week starts on **Monday**), now usable anywhere: each job has its
 own currency, is paid hourly or a fixed monthly salary, and earnings can be shown gross or net.
-UI in **Ukrainian** by default with **English** as an alternative.
+UI in **Ukrainian**, **English** and **Polish**; the first launch picks the phone's language when it is one of them,
+otherwise English.
 
 100% native: Kotlin, Jetpack Compose, Material 3 — no WebViews, Flutter or React Native.
 
@@ -81,7 +82,10 @@ UI in **Ukrainian** by default with **English** as an alternative.
   within about 10 minutes), so a new day shows within minutes; a finished shift can take up to 30 min to show. A tap on a shift that is gone since (deleted here or by
   sync) opens the calendar instead of an editor.
 - **Settings** — jobs & rates, **Gross / Net** for every earnings figure (when any job has deductions, amounts carry a
-  small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language, JSON export/import.
+  small "Gross" / "Net" tag), theme (system/light/dark), dynamic color (Android 12+), language (Ukrainian, English,
+  Polish, or the phone's), JSON export/import. **About** shows the version and links to the privacy policy and the
+  account deletion page (when the build knows the site: `SITE_URL`, else `https://<project_id>.web.app` from
+  `google-services.json`).
   Exports are format version 6 (every job, shift, bonus and received payment carries its sync id, so a backup restored
   on another phone holds the same records rather than look-alike copies; bonuses say whether they are for the whole
   month, and the received payments are a list of their own).
@@ -119,6 +123,9 @@ Every push builds the app on GitHub Actions:
   `https://github.com/PoNcHiK08/Shift-Tracker-M3-/releases/download/latest-build/ShiftTracker.apk`
   (only pushes to the default branch update it).
 - Builds of other branches and pull requests: **Actions → Build APK → that run → Artifacts**.
+- **Google Play bundle:** with your release key in the `SIGNING_*` secrets, every run's artifact also holds
+  `ShiftTracker-<versionCode>.aab`, signed with that key (the Play upload key). Releasing on Play, step by step:
+  [docs/play-release.md](docs/play-release.md).
 
 All builds are signed with the same development key (`app/signing/dev.keystore`), so a new build installs
 as an update over the old one and keeps your data. Android will ask to allow installs from your browser /
@@ -190,6 +197,8 @@ this build".
 - **Your data stays yours to manage:**
   - **Delete my cloud data** (after a confirmation) turns sync off and deletes the account's data from the
     cloud. The phone keeps its data; other phones stop and ask.
+  - **Delete account** (after a confirmation) deletes the account's cloud data and then the account itself, and
+    signs out. The phone keeps its data. If Google wants a fresh sign-in first, the app asks for one.
   - With sync on, **Import data** warns that it replaces the data on all your devices.
   - Every import first saves a safety backup of the data it replaces. **Settings → Data → Safety backups**
     lists the newest 5; save one to a file or share it, and restore it with Import data.
@@ -232,14 +241,14 @@ full exception, the app's package and the SHA-1 of the key it is signed with.
 
 ### Security rules
 
-[`firebase/firestore.rules`](firebase/firestore.rules) lets only you in: the signed-in owner of
-`users/{uid}`, signed in with Google, whose verified email is the one in the rules. It also checks every
-field of every document, and lets a record be replaced only by a later version of it.
+[`firebase/firestore.rules`](firebase/firestore.rules) gives every user their own space: someone signed in
+with Google, with a verified email, can read and write only `users/{their uid}`, and nobody can see or change
+anyone else's data. There is no list of allowed addresses. The rules also check every field of every document,
+and let a record be replaced only by a later version of it.
 
-The repository is public, so the committed file has the placeholder `YOUR_EMAIL_HERE`, and as committed it
-lets nobody in. To publish: **Firestore Database → Rules**, paste the whole file, replace `YOUR_EMAIL_HERE`
-with your Google account's address **there, in the console only**, then **Publish**. (With the Firebase CLI:
-deploy a local copy with your address in it, never a committed one.) Republish whenever the file changes.
+Publish them as committed: **Firestore Database → Rules**, paste the whole file, **Publish** (or, in
+`firebase/`: `firebase deploy --only firestore:rules --project PROJECT_ID`). Republish whenever the file
+changes.
 
 **Publish the rules before installing a build that adds a kind of record** (the whole-month bonus flag and the
 received-pay `payouts` collection came this way). The rules accept both the previous app version's documents and the
@@ -270,7 +279,7 @@ firebase/run-emulator-tests.sh                 # the app's Firestore code and sy
 | Cloud sync (optional) | Firebase Auth (Google sign-in through Credential Manager) + Cloud Firestore; Room stays the source of truth |
 | DI | Hilt 2.60 (KSP) |
 | Build | AGP 9.5 (built-in Kotlin), Kotlin 2.4, Gradle 9.8, version catalog, R8 for release |
-| Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English) |
+| Language | Per-app language via AppCompat (`values/` = Ukrainian, `values-en/` = English, `values-pl/` = Polish; `locale_config` is generated) |
 
 ## Known questions
 
@@ -294,4 +303,6 @@ app/src/test/      calculator (incl. second rate and the nights the clocks chang
                    engine (last write wins, first sign-in, several phones) and its Firestore documents
 firebase/          firestore.rules, its tests (rules-test/) and the emulator test runner
 docs/cloud-sync.md cloud sync's limitations, phone tests, moving the everyday app, your own release key
+docs/play-release.md Google Play: the AAB, versionCode, Firebase and Play Console checklist up to a closed test
+web/public/        the privacy policy and account deletion pages (uk/en/pl), served at /privacy and /delete-account
 ```

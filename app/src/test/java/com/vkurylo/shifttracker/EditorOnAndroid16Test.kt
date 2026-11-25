@@ -48,12 +48,12 @@ class EditorOnAndroid16Test {
         val today = LocalDate.now()
         val night = TimedRate(3700, LocalTime.of(23, 0), LocalTime.of(6, 0))
         runBlocking {
-            val id = jobs.upsert(Job(name = "Burger King", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt(), secondRate = night))
+            val id = jobs.upsert(Job(name = "Corner Cafe", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt(), secondRate = night))
             shifts.upsert(Shift(jobId = id, date = today, start = LocalTime.of(18, 30), end = LocalTime.of(1, 30), hourlyRateGrosze = 3300, secondRate = night))
         }
-        composeRule.waitUntilAtLeastOneExists(hasText("Burger King"), 10_000)
+        composeRule.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
         composeRule.waitForIdle()
-        composeRule.onNode(hasText("Burger King") and hasClickAction()).performClick()
+        composeRule.onNode(hasText("Corner Cafe") and hasClickAction()).performClick()
         composeRule.waitUntilAtLeastOneExists(hasText(str(R.string.edit_shift)), 10_000)
         composeRule.mainClock.advanceTimeBy(3000)
         composeRule.waitForIdle()

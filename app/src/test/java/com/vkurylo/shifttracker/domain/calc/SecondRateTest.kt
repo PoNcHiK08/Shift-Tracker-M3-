@@ -7,7 +7,7 @@ import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
 
-/** Burger King example: 33 zł/h base, 37 zł/h between 23:00 and 06:00. */
+/** Corner Cafe example: 33 zł/h base, 37 zł/h between 23:00 and 06:00. */
 class SecondRateTest {
 
     private fun t(h: Int, m: Int = 0) = LocalTime.of(h, m)

@@ -178,6 +178,7 @@
     <string name="language">Language</string>
     <string name="language_ukrainian">Українська</string>
     <string name="language_english">English</string>
+    <string name="language_polish">Polski</string>
     <string name="language_system">System</string>
     <string name="export_data">Export data</string>
     <string name="export_data_summary">Save all jobs, shifts, bonuses and received payments to a JSON file</string>
@@ -209,6 +210,11 @@
     <string name="error_backup_invalid">This isn\'t a valid Shift Tracker backup. Your current data is unchanged.</string>
     <string name="error_backup_newer_version">This backup was made by a newer version of the app. Update Shift Tracker and try again. Your current data is unchanged.</string>
     <string name="version">Version %1$s</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="privacy_policy_summary">What the app does with your data</string>
+    <string name="delete_account_page">Deleting your account and data</string>
+    <string name="delete_account_page_summary">How to delete them, also without the app</string>
+    <string name="link_open_failed">No app can open this link: %1$s</string>
 
     <!-- Account & sync -->
     <string name="section_cloud">Account &amp; sync</string>
@@ -220,7 +226,7 @@
     <string name="cloud_google_account">Google account</string>
     <string name="cloud_access_checking">Checking access to the cloud…</string>
     <string name="cloud_access_ok">Cloud is reachable</string>
-    <string name="cloud_access_denied">The cloud refused access. Check that this address is in the Firestore rules and that the latest firestore.rules are published. Tap to try again.</string>
+    <string name="cloud_access_denied">The cloud refused access. Check that you signed in with Google and that the latest firestore.rules are published. Tap to try again.</string>
     <string name="cloud_access_offline">Can\'t reach the cloud. Tap to try again.</string>
     <string name="cloud_access_error">Cloud error: %1$s</string>
     <string name="cloud_sign_out">Sign out</string>
@@ -273,6 +279,19 @@
     <string name="cloud_delete_done">Deleted from the cloud (%1$d records). Sync is off; the data on this phone stays.</string>
     <string name="cloud_delete_offline">Couldn\'t delete the cloud data: no connection. Try again when you\'re online; whatever wasn\'t deleted yet is still there.</string>
     <string name="cloud_delete_failed">Couldn\'t delete the cloud data. Code: %1$s. Try again; whatever wasn\'t deleted yet is still there.</string>
+    <string name="account_delete">Delete account</string>
+    <string name="account_delete_summary">Deletes your account and its cloud data. This phone keeps its data.</string>
+    <string name="account_deleting">Deleting the account…</string>
+    <string name="account_delete_title">Delete your account?</string>
+    <string name="account_delete_message">The account %1$s will be deleted with all its data in the cloud: jobs, shifts, bonuses and received payments. Sync turns off and you\'re signed out.\n\nThe data on this phone stays: you can keep using the app without an account. Other phones that synced with this account lose access to it. This can\'t be undone.</string>
+    <string name="account_delete_confirm">Delete account</string>
+    <string name="account_delete_done">Account deleted and you\'re signed out. The data on this phone stays.</string>
+    <string name="account_delete_offline">Couldn\'t delete the account: no connection. The account and its cloud data are still there. Try again when you\'re online.</string>
+    <string name="account_delete_failed">Couldn\'t delete the account. Code: %1$s. Try again.</string>
+    <string name="account_reauth_title">Sign in again to delete your account</string>
+    <string name="account_reauth_message">Your cloud data is already deleted. To delete the account itself, Google wants to confirm it\'s you: sign in again as %1$s.</string>
+    <string name="account_reauth_confirm">Sign in and delete</string>
+    <string name="account_reauth_wrong_account">That\'s a different Google account. To delete your account, sign in as %1$s.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Import schedule (.ics)</string>

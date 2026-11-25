@@ -21,12 +21,12 @@ const apps: FirebaseApp[] = [];
 let appCount = 0;
 
 /** A signed-in client as the rules require: Google sign-in, verified address of the owner. */
-function client(uid: string, email = 'owner@example.com', provider = 'google.com'): Firestore {
+function client(uid: string, email = 'owner@example.com', provider = 'google.com', emailVerified = true): Firestore {
   const app = initializeApp({ projectId: 'demo-shift-tracker', apiKey: 'emulator' }, `client-${appCount++}`);
   apps.push(app);
   const db = getFirestore(app);
   connectFirestoreEmulator(db, emulatorHost, Number(emulatorPort), {
-    mockUserToken: { sub: uid, user_id: uid, email, email_verified: true, firebase: { sign_in_provider: provider as never, identities: {} } },
+    mockUserToken: { sub: uid, user_id: uid, email, email_verified: emailVerified, firebase: { sign_in_provider: provider as never, identities: {} } },
   });
   return db;
 }
@@ -108,11 +108,11 @@ describe('every write the web makes passes the rules', () => {
 });
 
 describe('the rules refuse what isn’t the owner’s or isn’t the app’s shape', () => {
-  test('another user’s data, a wrong account, a non-Google sign-in', async () => {
+  test('another user’s data, an unverified email, a non-Google sign-in', async () => {
     const owner = newUid();
     const op: WriteOp = { kind: 'create', collection: 'shifts', id: uuid(), values: shift };
-    await expect(writeRecord(client(newUid()), owner, op, LIVE)).rejects.toMatchObject({ code: 'permission-denied' });
-    await expect(writeRecord(client(owner, 'someone@example.com'), owner, op, LIVE)).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(writeRecord(client(newUid(), 'someone@example.org'), owner, op, LIVE)).rejects.toMatchObject({ code: 'permission-denied' });
+    await expect(writeRecord(client(owner, 'owner@example.com', 'google.com', false), owner, op, LIVE)).rejects.toMatchObject({ code: 'permission-denied' });
     await expect(writeRecord(client(owner, 'owner@example.com', 'password'), owner, op, LIVE)).rejects.toMatchObject({ code: 'permission-denied' });
     expect(await stored(client(owner), owner, 'shifts', op.id)).toBeNull();
   });

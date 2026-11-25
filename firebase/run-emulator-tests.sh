@@ -9,8 +9,8 @@ root="$(dirname "$here")"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# The committed rules let nobody in (placeholder email); the tests sign in as owner@example.com.
-sed 's/YOUR_EMAIL_HERE/owner@example.com/g' "$here/firestore.rules" > "$work/firestore.rules"
+# The rules exactly as committed (per-user access).
+cp "$here/firestore.rules" "$work/firestore.rules"
 cp "$here/firebase.json" "$work/firebase.json"
 
 cd "$work"

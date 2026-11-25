@@ -181,6 +181,7 @@
     <string name="language">Мова</string>
     <string name="language_ukrainian">Українська</string>
     <string name="language_english">English</string>
+    <string name="language_polish">Polski</string>
     <string name="language_system">Системна</string>
     <string name="export_data">Експорт даних</string>
     <string name="export_data_summary">Зберегти всі роботи, зміни, бонуси й виплати у файл JSON</string>
@@ -212,6 +213,11 @@
     <string name="error_backup_invalid">Це не коректна резервна копія Shift Tracker. Поточні дані не змінено.</string>
     <string name="error_backup_newer_version">Цю копію створила новіша версія застосунку. Онови Shift Tracker і спробуй ще раз. Поточні дані не змінено.</string>
     <string name="version">Версія %1$s</string>
+    <string name="privacy_policy">Політика конфіденційності</string>
+    <string name="privacy_policy_summary">Що застосунок робить із твоїми даними</string>
+    <string name="delete_account_page">Видалення акаунта й даних</string>
+    <string name="delete_account_page_summary">Як їх видалити, також без застосунку</string>
+    <string name="link_open_failed">Немає застосунку, щоб відкрити посилання: %1$s</string>
 
     <!-- Account & sync -->
     <string name="section_cloud">Акаунт і синхронізація</string>
@@ -223,7 +229,7 @@
     <string name="cloud_google_account">Акаунт Google</string>
     <string name="cloud_access_checking">Перевірка доступу до хмари…</string>
     <string name="cloud_access_ok">Хмара доступна</string>
-    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що ця адреса є в правилах Firestore і що опубліковано найновіший firestore.rules. Торкнися, щоб спробувати ще раз.</string>
+    <string name="cloud_access_denied">Хмара відмовила в доступі. Перевір, що вхід виконано через Google і що опубліковано найновіший firestore.rules. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_offline">Немає зв’язку з хмарою. Торкнися, щоб спробувати ще раз.</string>
     <string name="cloud_access_error">Помилка хмари: %1$s</string>
     <string name="cloud_sign_out">Вийти</string>
@@ -276,6 +282,21 @@
     <string name="cloud_delete_done">Дані видалено з хмари (записів: %1$d). Синхронізацію вимкнено, дані на телефоні залишилися.</string>
     <string name="cloud_delete_offline">Не вдалося видалити дані з хмари: немає зв’язку. Спробуй ще раз, коли будеш онлайн; те, що ще не видалено, залишилося.</string>
     <string name="cloud_delete_failed">Не вдалося видалити дані з хмари. Код: %1$s. Спробуй ще раз; те, що ще не видалено, залишилося.</string>
+    <string name="account_delete">Видалити акаунт</string>
+    <string name="account_delete_summary">Акаунт і його дані в хмарі буде видалено. Дані на цьому телефоні залишаться.</string>
+    <string name="account_deleting">Видаляю акаунт…</string>
+    <string name="account_delete_title">Видалити акаунт?</string>
+    <string name="account_delete_message">Акаунт %1$s буде видалено разом з усіма його даними в хмарі: роботами, змінами, бонусами й виплатами. Синхронізацію буде вимкнено, і ти вийдеш з акаунта.
+
+Дані на цьому телефоні залишаться: можна й далі користуватися застосунком без акаунта. Інші телефони, що синхронізувалися з цим акаунтом, втратять до нього доступ. Скасувати це не можна.</string>
+    <string name="account_delete_confirm">Видалити акаунт</string>
+    <string name="account_delete_done">Акаунт видалено, вихід виконано. Дані на цьому телефоні залишилися.</string>
+    <string name="account_delete_offline">Не вдалося видалити акаунт: немає зв’язку. Акаунт і його дані в хмарі поки залишилися. Спробуй ще раз, коли будеш онлайн.</string>
+    <string name="account_delete_failed">Не вдалося видалити акаунт. Код: %1$s. Спробуй ще раз.</string>
+    <string name="account_reauth_title">Увійди ще раз, щоб видалити акаунт</string>
+    <string name="account_reauth_message">Дані з хмари вже видалено. Щоб видалити сам акаунт, Google просить підтвердити, що це ти: увійди ще раз як %1$s.</string>
+    <string name="account_reauth_confirm">Увійти й видалити</string>
+    <string name="account_reauth_wrong_account">Це інший акаунт Google. Щоб видалити акаунт, увійди як %1$s.</string>
 
     <!-- .ics import -->
     <string name="import_schedule">Імпорт графіку (.ics)</string>

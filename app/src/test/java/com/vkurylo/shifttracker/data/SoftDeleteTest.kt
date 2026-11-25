@@ -64,7 +64,7 @@ class SoftDeleteTest {
     @After
     fun tearDown() = db.close()
 
-    private suspend fun job(name: String = "Burger King", currency: String = "PLN") =
+    private suspend fun job(name: String = "Corner Cafe", currency: String = "PLN") =
         jobs.upsert(Job(name = name, hourlyRateGrosze = 3300, color = 1, currency = currency))
 
     private suspend fun shift(jobId: Long, date: LocalDate = day, startHour: Int = 8) = shifts.upsert(
@@ -106,7 +106,7 @@ class SoftDeleteTest {
         val shiftBefore = db.shiftDao().getAny(shiftId)!!
 
         now -= 60_000 // this phone's clock is behind the time the rows were written
-        jobs.upsert(jobs.getJob(jobId)!!.copy(name = "BK"))
+        jobs.upsert(jobs.getJob(jobId)!!.copy(name = "CC"))
         shifts.upsert(shifts.getShift(shiftId)!!.copy(note = "edited"))
 
         val jobAfter = db.jobDao().getAny(jobId)!!
@@ -115,7 +115,7 @@ class SoftDeleteTest {
         assertEquals(shiftBefore.syncId, shiftAfter.syncId)
         assertEquals(jobBefore.updatedAt + 1, jobAfter.updatedAt)
         assertEquals(shiftBefore.updatedAt + 1, shiftAfter.updatedAt)
-        assertEquals("BK", jobAfter.name)
+        assertEquals("CC", jobAfter.name)
 
         // Changing only the pay settings counts as a change of the job (they sync inside it).
         now += 120_000
@@ -270,7 +270,7 @@ class SoftDeleteTest {
         val job = db.jobDao().getAny(jobId)!!
         assertFalse(job.deleted)
         assertEquals("revived at the shift's change time", db.shiftDao().getAny(undone.id)!!.updatedAt, job.updatedAt)
-        assertEquals(listOf("Burger King"), jobs.observeJobs().first().map { it.name })
+        assertEquals(listOf("Corner Cafe"), jobs.observeJobs().first().map { it.name })
         assertEquals(listOf(undone.id), shifts.observeMonth(month).first().map { it.shift.id })
         assertTrue("deleted together with the job, stays deleted", db.shiftDao().getAny(other)!!.deleted)
     }

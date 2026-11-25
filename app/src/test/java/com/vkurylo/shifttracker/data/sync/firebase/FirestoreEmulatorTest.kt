@@ -64,7 +64,7 @@ import java.util.UUID
  *
  *   firebase/run-emulator-tests.sh
  *
- * which starts them with the rules (the placeholder email replaced by [Emulators.EMAIL]) and runs this class.
+ * which starts them with the rules as committed and runs this class.
  */
 @RunWith(AndroidJUnit4::class)
 @Config(sdk = [35], application = Application::class)
@@ -233,14 +233,20 @@ class FirestoreEmulatorTest {
         assertTrue(!store.hasRecords(account.uid))
     }
 
+    /** Per-user access: another Google user gets their own space, and can't read or write this account's data. */
     @Test
-    fun theRulesRefuseAnotherAccount() = onBackground {
+    fun anotherUserHasTheirOwnSpaceButCantReachThisAccount() = onBackground {
         val auth = FirebaseAuth.getInstance(app)
-        val stranger = """{"sub":"stranger-${id()}","email":"someone@example.com","email_verified":true}"""
+        val stranger = """{"sub":"stranger-${id()}","email":"someone@example.org","email_verified":true}"""
         auth.signInWithCredential(GoogleAuthProvider.getCredential(stranger, null)).await()
-        val error = runCatching { store.readMeta(auth.currentUser!!.uid) }.exceptionOrNull()
+        val strangerUid = auth.currentUser!!.uid
+        assertTrue(strangerUid != account.uid)
+        assertEquals(null, store.readMeta(strangerUid))
+
+        val error = runCatching { store.readMeta(account.uid) }.exceptionOrNull()
         assertEquals(FirebaseFirestoreException.Code.PERMISSION_DENIED, (error as FirebaseFirestoreException).code)
         assertEquals(CloudProblem.ACCESS_DENIED, error.cloudProblem())
+        assertTrue(runCatching { store.deleteAll(account.uid) }.isFailure)
     }
 
     /** Two phones with their own databases sync through the emulator: what one does, the other gets. */

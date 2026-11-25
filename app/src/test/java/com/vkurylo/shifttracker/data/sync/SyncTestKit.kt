@@ -38,6 +38,12 @@ class FakeCloudAuth(override val isAvailable: Boolean = true, signedInAs: CloudA
     var onSignIn: suspend () -> CloudAccount? = { null }
     var signInCalls = 0
 
+    /** Runs before the account is deleted; throw from it to stand in for Firebase refusing. */
+    var onDeleteUser: suspend (CloudAccount) -> Unit = {}
+    var deleteUserCalls = 0
+    var onReauthenticate: suspend () -> Boolean = { true }
+    var reauthenticateCalls = 0
+
     override val account: Flow<CloudAccount?> = signedIn
 
     override fun currentAccount(): CloudAccount? = signedIn.value
@@ -49,6 +55,18 @@ class FakeCloudAuth(override val isAvailable: Boolean = true, signedInAs: CloudA
 
     override suspend fun signOut() {
         signedIn.value = null
+    }
+
+    override suspend fun deleteUser() {
+        val account = signedIn.value ?: return
+        deleteUserCalls++
+        onDeleteUser(account)
+        signedIn.value = null
+    }
+
+    override suspend fun reauthenticate(activityContext: Context): Boolean {
+        reauthenticateCalls++
+        return onReauthenticate()
     }
 }
 

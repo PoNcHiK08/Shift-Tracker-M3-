@@ -20,8 +20,8 @@ import java.net.URL
 import java.util.UUID
 
 /**
- * The Firebase emulators for the emulator tests (firebase/run-emulator-tests.sh starts them with firestore.rules,
- * the placeholder email replaced by [EMAIL]). Tests skip unless they run.
+ * The Firebase emulators for the emulator tests (firebase/run-emulator-tests.sh starts them with firestore.rules as
+ * committed). Tests skip unless they run.
  */
 internal object Emulators {
     const val PROJECT = "demo-shift-tracker"

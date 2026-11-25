@@ -25,9 +25,11 @@ import com.vkurylo.shifttracker.data.sync.SyncProblem
 import com.vkurylo.shifttracker.data.sync.SyncStatus
 import com.vkurylo.shifttracker.data.sync.firebase.CloudAuth
 import com.vkurylo.shifttracker.data.sync.firebase.CloudProblem
+import com.vkurylo.shifttracker.data.sync.firebase.RecentLoginRequiredException
 import com.vkurylo.shifttracker.data.sync.firebase.SIGN_IN_LOG_TAG
 import com.vkurylo.shifttracker.data.sync.firebase.SignInException
 import com.vkurylo.shifttracker.data.sync.firebase.SignInFailures
+import com.vkurylo.shifttracker.data.sync.firebase.WrongAccountException
 import com.vkurylo.shifttracker.data.sync.firebase.cloudProblem
 import com.vkurylo.shifttracker.domain.model.AppLanguage
 import com.vkurylo.shifttracker.domain.model.EarningsMode
@@ -87,9 +89,23 @@ data class CloudUiState(
     val decision: SyncDecision? = null,
     /** "Delete my cloud data": waiting for the confirmation, or deleting. */
     val cloudDeletion: CloudDeletion = CloudDeletion.NONE,
-)
+    /** "Delete account": waiting for the confirmation, deleting, or waiting for a fresh sign-in. */
+    val accountDeletion: AccountDeletion = AccountDeletion.NONE,
+) {
+    /** Either deletion is running: the other account actions wait. */
+    val deleting: Boolean get() = cloudDeletion == CloudDeletion.DELETING || accountDeletion == AccountDeletion.DELETING
+}
 
 enum class CloudDeletion { NONE, CONFIRMING, DELETING }
+
+enum class AccountDeletion {
+    NONE,
+    CONFIRMING,
+    DELETING,
+
+    /** Firebase wants a fresh sign-in before it deletes the account; the cloud data is already deleted. */
+    NEEDS_SIGN_IN,
+}
 
 /** A question to answer before sync can be turned on (or go on). */
 sealed interface SyncDecision {
@@ -147,6 +163,8 @@ class SettingsViewModel @Inject constructor(
     private val switchingOn = MutableStateFlow(false)
     private val decision = MutableStateFlow<SyncDecision?>(null)
     private val cloudDeletion = MutableStateFlow(CloudDeletion.NONE)
+    private val accountDeletion = MutableStateFlow(AccountDeletion.NONE)
+    private val deletions = combine(cloudDeletion, accountDeletion) { cloud, account -> cloud to account }
 
     private val account = combine(cloudAuth.account, cloudAccess, signingIn, signInError) { account, access, busy, error ->
         val check = access.takeIf { account != null }
@@ -158,9 +176,16 @@ class SettingsViewModel @Inject constructor(
         syncController.status,
         switchingOn,
         decision,
-        cloudDeletion,
-    ) { base, sync, switching, question, deletion ->
-        base.copy(sync = sync, syncLines = sync.describe(), switchingOn = switching, decision = question, cloudDeletion = deletion)
+        deletions,
+    ) { base, sync, switching, question, (cloudDeleting, accountDeleting) ->
+        base.copy(
+            sync = sync,
+            syncLines = sync.describe(),
+            switchingOn = switching,
+            decision = question,
+            cloudDeletion = cloudDeleting,
+            accountDeletion = accountDeleting,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CloudUiState(available = cloudAuth.isAvailable))
 
     init {
@@ -317,6 +342,70 @@ class SettingsViewModel @Inject constructor(
             } finally {
                 cloudDeletion.update { CloudDeletion.NONE }
             }
+        }
+    }
+
+    // --- Delete account ------------------------------------------------------------------------------------
+
+    fun requestDeleteAccount() = accountDeletion.update { if (it == AccountDeletion.NONE) AccountDeletion.CONFIRMING else it }
+
+    fun cancelDeleteAccount() = accountDeletion.update {
+        if (it == AccountDeletion.CONFIRMING || it == AccountDeletion.NEEDS_SIGN_IN) AccountDeletion.NONE else it
+    }
+
+    /** Confirmed: the account's cloud data, then the account itself, deleted; signed out. This phone's data stays. */
+    fun deleteAccount() {
+        if (accountDeletion.value != AccountDeletion.CONFIRMING) return
+        accountDeletion.update { AccountDeletion.DELETING }
+        viewModelScope.launch { finishDeletingAccount() }
+    }
+
+    /**
+     * Firebase wanted a fresh sign-in: shows Google's account sheet over [activityContext] (the Activity), then
+     * deletes the account. Closing the sheet keeps the question; another account changes nothing and says so.
+     */
+    fun signInAgainAndDeleteAccount(activityContext: Context) {
+        if (accountDeletion.value != AccountDeletion.NEEDS_SIGN_IN) return
+        accountDeletion.update { AccountDeletion.DELETING }
+        viewModelScope.launch {
+            val email = cloudAuth.currentAccount()?.email.orEmpty()
+            val signedInAgain = try {
+                cloudAuth.reauthenticate(activityContext)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: WrongAccountException) {
+                _messages.send(UiMessage(R.string.account_reauth_wrong_account, listOf(email)))
+                false
+            } catch (e: SignInException) {
+                _messages.send(e.toMessage())
+                false
+            } catch (e: Exception) {
+                Log.e(SyncController.TAG, "Signing in again to delete the account failed", e)
+                _messages.send(UiMessage(R.string.account_delete_failed, listOf("${e.javaClass.simpleName}: ${e.message}")))
+                false
+            }
+            if (signedInAgain) finishDeletingAccount() else accountDeletion.update { AccountDeletion.NEEDS_SIGN_IN }
+        }
+    }
+
+    private suspend fun finishDeletingAccount() {
+        var next = AccountDeletion.NONE
+        try {
+            syncController.deleteAccount()
+            decision.update { null }
+            _messages.send(UiMessage(R.string.account_delete_done))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: RecentLoginRequiredException) {
+            next = AccountDeletion.NEEDS_SIGN_IN
+        } catch (e: Exception) {
+            Log.e(SyncController.TAG, "Deleting the account failed", e)
+            _messages.send(
+                if (e.cloudProblem() == CloudProblem.OFFLINE) UiMessage(R.string.account_delete_offline)
+                else UiMessage(R.string.account_delete_failed, listOf("${e.javaClass.simpleName}: ${e.message}")),
+            )
+        } finally {
+            accountDeletion.update { next }
         }
     }
 
