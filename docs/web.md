@@ -111,6 +111,10 @@ account the app syncs with.
 
 Run it **in `web\`**: the site's Hosting settings are `web\firebase.json`, which has nothing but Hosting in it.
 
+The same deploy publishes the app's policy pages from `web\public\`: `https://PROJECT_ID.web.app/privacy` and
+`https://PROJECT_ID.web.app/delete-account` (Ukrainian, English, Polish). Replace `CONTACT_EMAIL_PLACEHOLDER` in both
+files first (docs/play-release.md, step 3).
+
 > **Deploy the site from `web\`, not from `firebase\`.** That folder's `firebase.json` is for the rules only:
 > `firebase deploy` there publishes `firestore.rules` (README → Security rules) and no site.
 

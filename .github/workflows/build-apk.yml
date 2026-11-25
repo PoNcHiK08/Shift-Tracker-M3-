@@ -125,6 +125,8 @@ jobs:
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
           SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          # Optional repository variable: the site with the privacy policy, if not https://<project_id>.web.app.
+          SITE_URL: ${{ vars.SITE_URL }}
         run: |
           tasks="assembleRelease assembleDebug"
           if [ -n "$SIGNING_KEYSTORE_PATH" ]; then
