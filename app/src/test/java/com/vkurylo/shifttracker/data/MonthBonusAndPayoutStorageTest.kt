@@ -52,7 +52,7 @@ class MonthBonusAndPayoutStorageTest {
     @After
     fun tearDown() = db.close()
 
-    private suspend fun job(name: String = "Burger King", currency: String = "PLN") =
+    private suspend fun job(name: String = "Corner Cafe", currency: String = "PLN") =
         jobs.upsert(Job(name = name, hourlyRateGrosze = 3300, color = 1, currency = currency))
 
     private suspend fun payout(
@@ -220,13 +220,13 @@ class MonthBonusAndPayoutStorageTest {
 
     @Test
     fun payoutsComeWithTheirJob() = runBlocking {
-        val burger = job("Burger King")
+        val corner = job("Corner Cafe")
         val office = job("Biuro", currency = "EUR")
-        payout(burger)
+        payout(corner)
         payout(office, amountMinor = 3_000_00)
 
         val listed = payouts.observePayouts(november, november).first()
-        assertEquals(listOf("Burger King" to "PLN", "Biuro" to "EUR"), listed.map { it.job.name to it.job.currency })
+        assertEquals(listOf("Corner Cafe" to "PLN", "Biuro" to "EUR"), listed.map { it.job.name to it.job.currency })
     }
 
     @Test

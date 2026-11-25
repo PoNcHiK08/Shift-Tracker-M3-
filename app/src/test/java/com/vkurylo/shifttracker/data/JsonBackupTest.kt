@@ -56,7 +56,7 @@ class JsonBackupTest {
     fun exportThenImportRestoresEverything() = runBlocking {
         val source = newDb()
         val night = TimedRate(3700, LocalTime.of(23, 0), LocalTime.of(6, 0))
-        source.jobDao().upsert(Job(id = 1, name = "Burger King", hourlyRateGrosze = 3300, color = 42, secondRate = night).toEntity())
+        source.jobDao().upsert(Job(id = 1, name = "Corner Cafe", hourlyRateGrosze = 3300, color = 42, secondRate = night).toEntity())
         source.shiftDao().upsert(
             Shift(jobId = 1, date = LocalDate.of(2026, 8, 30), start = LocalTime.of(20, 0), end = LocalTime.of(1, 0),
                 hourlyRateGrosze = 3300, secondRate = night, note = "late").toEntity(),
@@ -145,7 +145,7 @@ class JsonBackupTest {
     fun importsVersion2WithSecondRates() = runBlocking {
         val v2 = """
             {"format":"shift-tracker-backup","version":2,"exported_at":"2026-11-01T10:00:00Z",
-             "jobs":[{"id":3,"name":"Burger King","hourly_rate_grosze":3300,"color":1,
+             "jobs":[{"id":3,"name":"Corner Cafe","hourly_rate_grosze":3300,"color":1,
                       "second_rate":{"rate_grosze":3700,"from":"23:00","to":"06:00"}}],
              "shifts":[{"job_id":3,"date":"2026-08-30","start":"20:00","end":"01:00","hourly_rate_grosze":3300,
                         "second_rate":{"rate_grosze":3700,"from":"23:00","to":"06:00"}}]}

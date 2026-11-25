@@ -114,14 +114,14 @@ class ShiftCalculatorTest {
 
     @Test
     fun `bonuses add to earnings but not to hours or the average rate`() {
-        val bk = Job(id = 1, name = "Burger King", hourlyRateGrosze = 3300, color = 0)
+        val corner = Job(id = 1, name = "Corner Cafe", hourlyRateGrosze = 3300, color = 0)
         val gift = Job(id = 2, name = "Only bonus", hourlyRateGrosze = 3000, color = 0)
         val date = LocalDate.of(2026, 8, 31)
         val shifts = listOf(
-            ShiftWithJob(Shift(id = 1, jobId = 1, date = date, start = t(10), end = t(18), hourlyRateGrosze = 3300), bk),
+            ShiftWithJob(Shift(id = 1, jobId = 1, date = date, start = t(10), end = t(18), hourlyRateGrosze = 3300), corner),
         )
         val bonuses = listOf(
-            BonusWithJob(Bonus(id = 1, jobId = 1, date = date, amountGrosze = 7500, note = "Premia"), bk),
+            BonusWithJob(Bonus(id = 1, jobId = 1, date = date, amountGrosze = 7500, note = "Premia"), corner),
             BonusWithJob(Bonus(id = 2, jobId = 2, date = date, amountGrosze = 1000), gift),
         )
 
@@ -135,14 +135,14 @@ class ShiftCalculatorTest {
         assertEquals(1, summary.shiftCount)
         assertEquals(2, summary.bonusCount)
         // A job with only a bonus in the period still shows up in the breakdown.
-        assertEquals(listOf("Burger King", "Only bonus"), summary.perJob.map { it.job.name })
+        assertEquals(listOf("Corner Cafe", "Only bonus"), summary.perJob.map { it.job.name })
         assertEquals(33900L, summary.perJob[0].earningsGrosze)
         assertEquals(0, summary.perJob[1].shiftCount)
     }
 
     @Test
     fun `bonuses alone make a non-empty summary`() {
-        val job = Job(id = 1, name = "BK", hourlyRateGrosze = 3300, color = 0)
+        val job = Job(id = 1, name = "CC", hourlyRateGrosze = 3300, color = 0)
         val summary = ShiftCalculator.summarize(
             emptyList(),
             listOf(BonusWithJob(Bonus(jobId = 1, date = LocalDate.of(2026, 8, 31), amountGrosze = 7500), job)),

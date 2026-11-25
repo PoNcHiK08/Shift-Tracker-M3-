@@ -67,17 +67,17 @@ class ContainerTransformDrawTest {
     @Test
     fun cardToEditorAndBackDrawsEveryFrame() {
         runBlocking {
-            val id = jobs.upsert(Job(name = "Burger King", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt()))
+            val id = jobs.upsert(Job(name = "Corner Cafe", hourlyRateGrosze = 3300, color = 0xFFFB8C00.toInt()))
             shifts.upsert(
                 Shift(jobId = id, date = LocalDate.now(), start = LocalTime.of(18, 30), end = LocalTime.of(1, 30), hourlyRateGrosze = 3300),
             )
         }
-        composeRule.waitUntilAtLeastOneExists(hasText("Burger King"), 10_000)
+        composeRule.waitUntilAtLeastOneExists(hasText("Corner Cafe"), 10_000)
         composeRule.waitForIdle()
         composeRule.mainClock.autoAdvance = false
 
         // Card -> editor.
-        composeRule.onNode(hasText("Burger King") and hasClickAction()).performClick()
+        composeRule.onNode(hasText("Corner Cafe") and hasClickAction()).performClick()
         drawEveryFrame(1_500)
         // Editor -> card.
         composeRule.onNode(hasContentDescription(str(R.string.close)) and hasClickAction()).performClick()

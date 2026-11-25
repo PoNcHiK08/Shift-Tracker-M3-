@@ -169,7 +169,7 @@ private fun WideRow(state: WidgetState, actions: WidgetActions, inner: DpSize, f
 }
 
 /**
- * "● Burger King" over "Tomorrow · 18:00–01:30" (or the empty message), each on one line and sized to
+ * "● Cafe" over "Tomorrow · 18:00–01:30" (or the empty message), each on one line and sized to
  * fit [width]; the second line is dropped only when [height] has no room for it.
  */
 @Composable

@@ -74,7 +74,7 @@ class DatabaseMigrationTest {
 
     private fun createVersion1Database() {
         val db = createDatabase(1)
-        db.execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color) VALUES (1, 'Burger King', 3300, -1)")
+        db.execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color) VALUES (1, 'Corner Cafe', 3300, -1)")
         db.execSQL(
             "INSERT INTO shifts (id, job_id, date_epoch_day, start_minute, end_minute, unpaid_break_minutes, " +
                 "hourly_rate_grosze, note, external_uid) VALUES (1, 1, 20400, 480, 960, 30, 3300, 'old shift', NULL)",
@@ -92,7 +92,7 @@ class DatabaseMigrationTest {
             val shifts = db.shiftDao().getAll().map { it.toDomain() }
 
             assertEquals(1, jobs.size)
-            assertEquals("Burger King", jobs.single().name)
+            assertEquals("Corner Cafe", jobs.single().name)
             assertNull(jobs.single().secondRate)
 
             assertEquals(1, shifts.size)
@@ -137,7 +137,7 @@ class DatabaseMigrationTest {
     @Test
     fun migrateFrom6To7KeepsDataAndAddsSyncMetadata(): Unit = runBlocking {
         createDatabase(6).apply {
-            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, second_rate_grosze, second_rate_from_minute, second_rate_to_minute, currency) VALUES (1, 'Burger King', 3300, -1, 3700, 1380, 360, 'PLN')")
+            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, second_rate_grosze, second_rate_from_minute, second_rate_to_minute, currency) VALUES (1, 'Corner Cafe', 3300, -1, 3700, 1380, 360, 'PLN')")
             execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, currency) VALUES (5, 'Biuro', 0, -2, 'EUR')")
             execSQL("INSERT INTO job_pay_settings (job_id, from_month, pay_type, monthly_amount_minor, deduction_bp) VALUES (5, 0, 'FIXED_MONTHLY', 450000, 1371)")
             execSQL("INSERT INTO shifts (id, job_id, date_epoch_day, start_minute, end_minute, unpaid_break_minutes, hourly_rate_grosze, note, external_uid, second_rate_grosze, second_rate_from_minute, second_rate_to_minute) VALUES (10, 1, 20400, 1200, 60, 30, 3300, 'late', 'uid-1@cal', 3700, 1380, 360)")
@@ -160,9 +160,9 @@ class DatabaseMigrationTest {
             assertEquals(listOf(3L to 1L), bonuses.map { it.id to it.jobId })
 
             // Same values.
-            val burgerKing = jobs.first().toDomain()
-            assertEquals("Burger King", burgerKing.name)
-            assertEquals(TimedRate(3700, LocalTime.of(23, 0), LocalTime.of(6, 0)), burgerKing.secondRate)
+            val cornerCafe = jobs.first().toDomain()
+            assertEquals("Corner Cafe", cornerCafe.name)
+            assertEquals(TimedRate(3700, LocalTime.of(23, 0), LocalTime.of(6, 0)), cornerCafe.secondRate)
             assertEquals("EUR", jobs.last().currency)
             val late = shifts.first().toDomain()
             assertEquals("late", late.note)
@@ -209,7 +209,7 @@ class DatabaseMigrationTest {
         val tables = listOf("jobs", "shifts", "bonuses", "job_pay_settings")
         val before = createDatabase(7).run {
             // Uploaded, deleted-and-uploaded, and waiting for upload: all three states must survive.
-            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, second_rate_grosze, second_rate_from_minute, second_rate_to_minute, currency, sync_id, updated_at, deleted, dirty) VALUES (1, 'Burger King', 3300, -1, 3700, 1380, 360, 'PLN', '$jobKb', $uploadedAt, 0, 0)")
+            execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, second_rate_grosze, second_rate_from_minute, second_rate_to_minute, currency, sync_id, updated_at, deleted, dirty) VALUES (1, 'Corner Cafe', 3300, -1, 3700, 1380, 360, 'PLN', '$jobKb', $uploadedAt, 0, 0)")
             execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, currency, sync_id, updated_at, deleted, dirty) VALUES (2, 'Stara praca', 2500, -3, 'PLN', '$jobOld', ${uploadedAt + 10}, 1, 0)")
             execSQL("INSERT INTO jobs (id, name, hourly_rate_grosze, color, currency, sync_id, updated_at, deleted, dirty) VALUES (5, 'Biuro', 0, -2, 'EUR', '$jobEur', ${uploadedAt + 20}, 0, 1)")
             execSQL("INSERT INTO job_pay_settings (job_id, from_month, pay_type, monthly_amount_minor, deduction_bp) VALUES (5, 0, 'FIXED_MONTHLY', 450000, 1371)")
